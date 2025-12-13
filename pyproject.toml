@@ -1,0 +1,48 @@
+[tool.poetry]
+name = "axiom-platform"
+version = "0.1.0"
+description = "AI-powered autonomous platform for Autodesk Revit"
+authors = ["Axiom Team"]
+readme = "README.md"
+packages = [
+    { include = "axiom_core", from = "src" },
+    { include = "axiom_cli", from = "src" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pydantic = "^2.5.0"
+openpyxl = "^3.1.2"
+sqlalchemy = "^2.0.23"
+click = "^8.1.7"
+rich = "^13.7.0"
+python-dotenv = "^1.0.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+pytest-cov = "^4.1.0"
+black = "^23.12.0"
+ruff = "^0.1.8"
+mypy = "^1.7.1"
+
+[tool.poetry.scripts]
+axiom = "axiom_cli.main:cli"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "I", "N", "W"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
