@@ -132,8 +132,7 @@ def _display_plan_steps(plan):
 
     for step in plan.steps:
         step_node = tree.add(
-            f"[cyan]{step.sequence}.[/cyan] {step.tool_name} "
-            f"[dim]({step.status.value})[/dim]"
+            f"[cyan]{step.sequence}.[/cyan] {step.tool_name} " f"[dim]({step.status.value})[/dim]"
         )
         if step.args:
             args_str = ", ".join(f"{k}={v}" for k, v in list(step.args.items())[:3])
@@ -332,9 +331,9 @@ def stats():
         f"[bold]Total Plans:[/bold] {statistics['total_plans']}\n"
         f"[bold]Total QA Reports:[/bold] {statistics['total_qa_reports']}\n\n"
         f"[bold]Jobs by Status:[/bold]\n"
-        + "\n".join(f"  {k}: {v}" for k, v in statistics['jobs_by_status'].items())
+        + "\n".join(f"  {k}: {v}" for k, v in statistics["jobs_by_status"].items())
         + "\n\n[bold]Plans by Status:[/bold]\n"
-        + "\n".join(f"  {k}: {v}" for k, v in statistics['plans_by_status'].items()),
+        + "\n".join(f"  {k}: {v}" for k, v in statistics["plans_by_status"].items()),
         title="Storage Statistics",
     )
 
@@ -380,7 +379,9 @@ def demo(excel_file: str, firm_id: str):
         console.print("\n[bold]Step 4: QA Evaluation...[/bold]")
         qa_report = orchestrator.evaluate_results(plan, results)
         storage.save_qa_report(qa_report)
-        console.print(f"[green]QA Score: {qa_report.score:.1f}/100 ({qa_report.status.value})[/green]")
+        console.print(
+            f"[green]QA Score: {qa_report.score:.1f}/100 ({qa_report.status.value})[/green]"
+        )
 
         console.print("\n[bold blue]===== DEMO COMPLETE =====[/bold blue]")
         console.print(f"\nJob ID: {report.job.job_id}")

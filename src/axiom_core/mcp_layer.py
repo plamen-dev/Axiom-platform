@@ -171,9 +171,7 @@ class MCPLayer:
             self._mock_generate_report,
         )
 
-    def register_tool(
-        self, definition: ToolDefinition, handler: Callable
-    ) -> None:
+    def register_tool(self, definition: ToolDefinition, handler: Callable) -> None:
         """Register a tool with its handler."""
         self.tools[definition.name] = definition
         self.tool_handlers[definition.name] = handler
@@ -211,12 +209,14 @@ class MCPLayer:
             transaction_name=f"Axiom_{tool_name}",
         )
 
-        self.execution_log.append({
-            "tool_name": tool_name,
-            "args": args,
-            "simulate": simulate,
-            "timestamp": datetime.utcnow().isoformat(),
-        })
+        self.execution_log.append(
+            {
+                "tool_name": tool_name,
+                "args": args,
+                "simulate": simulate,
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        )
 
         try:
             result = handler(args, context)
@@ -309,9 +309,7 @@ class MCPLayer:
             },
         )
 
-    def _mock_create_views(
-        self, args: dict[str, Any], context: ToolExecutionContext
-    ) -> ToolResult:
+    def _mock_create_views(self, args: dict[str, Any], context: ToolExecutionContext) -> ToolResult:
         """Mock view creation."""
         view_type = args.get("view_type_code", "E - General")
         levels = args.get("levels", ["Level 1"])

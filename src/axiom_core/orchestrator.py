@@ -205,9 +205,7 @@ class Orchestrator:
 
         for step in plan.steps:
             if self.mcp_layer:
-                result = self.mcp_layer.execute_tool(
-                    step.tool_name, step.args, simulate=True
-                )
+                result = self.mcp_layer.execute_tool(step.tool_name, step.args, simulate=True)
             else:
                 result = ToolResult(
                     step_id=step.step_id,
@@ -241,9 +239,7 @@ class Orchestrator:
             step.status = StepStatus.RUNNING
 
             if self.mcp_layer:
-                result = self.mcp_layer.execute_tool(
-                    step.tool_name, step.args, simulate=False
-                )
+                result = self.mcp_layer.execute_tool(step.tool_name, step.args, simulate=False)
             else:
                 result = ToolResult(
                     step_id=step.step_id,
@@ -265,9 +261,7 @@ class Orchestrator:
         self.results[plan.plan_id] = results
         return plan, results
 
-    def evaluate_results(
-        self, plan: Plan, results: list[ToolResult]
-    ) -> QAReport:
+    def evaluate_results(self, plan: Plan, results: list[ToolResult]) -> QAReport:
         """Evaluate execution results and produce QA report."""
         violations = []
         score = 100.0

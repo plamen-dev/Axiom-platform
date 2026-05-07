@@ -265,9 +265,7 @@ class InputNormalizer:
         report.normalized_job = normalized_job
         return report
 
-    def _parse_revit_version(
-        self, value: Any, report: NormalizationReport
-    ) -> int:
+    def _parse_revit_version(self, value: Any, report: NormalizationReport) -> int:
         """Parse Revit version from various formats."""
         if value is None:
             report.errors.append(
@@ -296,9 +294,7 @@ class InputNormalizer:
             )
             return 2023
 
-    def _parse_boolean(
-        self, value: Any, field: str, report: NormalizationReport
-    ) -> bool:
+    def _parse_boolean(self, value: Any, field: str, report: NormalizationReport) -> bool:
         """Parse boolean from various formats."""
         if value is None:
             return False
@@ -321,9 +317,7 @@ class InputNormalizer:
         )
         return False
 
-    def _parse_views(
-        self, value: Any, report: NormalizationReport
-    ) -> list[ViewRequirement]:
+    def _parse_views(self, value: Any, report: NormalizationReport) -> list[ViewRequirement]:
         """Parse view requirements from semicolon-separated string."""
         if not value:
             return []
@@ -338,7 +332,10 @@ class InputNormalizer:
 
             matched = False
             for valid_code in VIEW_TYPE_CODES:
-                if view_code.lower() == valid_code.lower() or valid_code.lower() in view_code.lower():
+                if (
+                    view_code.lower() == valid_code.lower()
+                    or valid_code.lower() in view_code.lower()
+                ):
                     views.append(ViewRequirement(view_type_code=valid_code))
                     matched = True
                     break
@@ -354,9 +351,7 @@ class InputNormalizer:
 
         return views
 
-    def _parse_scope_boxes(
-        self, value: Any, report: NormalizationReport
-    ) -> list[ScopeBoxDef]:
+    def _parse_scope_boxes(self, value: Any, report: NormalizationReport) -> list[ScopeBoxDef]:
         """Parse scope box definitions from description string."""
         if not value:
             return []
@@ -381,9 +376,7 @@ class InputNormalizer:
                     ScopeBoxDef(name=f"Scope Box {len(scope_boxes) + 1}", copy_from_arch=True)
                 )
 
-            report.assumptions.append(
-                f"Parsed {count} scope boxes from description: {str_value}"
-            )
+            report.assumptions.append(f"Parsed {count} scope boxes from description: {str_value}")
 
         return scope_boxes
 

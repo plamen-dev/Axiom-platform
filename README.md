@@ -13,7 +13,7 @@ The platform follows a layered architecture:
 - **Input Normalization Layer**: Transforms Excel/CSV/JSON inputs into validated job objects
 - **Orchestration Layer**: Converts jobs into execution plans and coordinates workflow
 - **MCP Layer**: Tool protocol boundary for Revit operations (mock implementation for testing)
-- **Persistence Layer**: In-memory storage for jobs, plans, and results (proof-of-concept)
+- **Persistence Layer**: SQLite-backed storage with WAL mode for concurrent read/write access
 
 ## Current Status
 
@@ -24,8 +24,9 @@ This is a proof-of-concept implementation that demonstrates the core architectur
 - Mock tool execution with simulation
 - QA evaluation and reporting
 - CLI for job submission and monitoring
+- SQLite persistence with WAL mode (data survives restarts)
 
-**Note**: This uses in-memory storage. Data will be lost when the application restarts.
+Data is stored in `~/.axiom/axiom.db` by default. Override with the `AXIOM_DB_PATH` environment variable.
 
 ## Installation
 
@@ -126,7 +127,9 @@ axiom-platform/
 │   │   ├── input_normalization.py  # Excel/CSV parsing
 │   │   ├── orchestrator.py   # Plan generation and execution
 │   │   ├── mcp_layer.py      # Mock Revit tool layer
-│   │   └── persistence.py    # In-memory storage
+│   │   ├── models.py         # SQLAlchemy ORM models
+│   │   ├── database.py       # Engine/session management (WAL mode)
+│   │   └── persistence.py    # SQLite-backed storage
 │   └── axiom_cli/            # Command-line interface
 │       └── main.py
 ├── tests/                    # Test suite
@@ -136,15 +139,15 @@ axiom-platform/
 
 ## Roadmap
 
-### Phase 1 (Current)
+### Phase 1 (Complete)
 - Core architecture and schemas
 - Input normalization
 - Mock MCP layer
 - CLI interface
+- SQLite persistence with WAL mode
 
-### Phase 2
+### Phase 2 (Current)
 - Real Revit connector (C# add-in)
-- SQLite persistence
 - Basic Project Setup workflow
 
 ### Phase 3
