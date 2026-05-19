@@ -17,6 +17,9 @@ sqlalchemy = "^2.0.23"
 click = "^8.1.7"
 rich = "^13.7.0"
 python-dotenv = "^1.0.0"
+pywin32 = {version = ">=306", markers = "sys_platform == 'win32'"}
+pyyaml = "^6.0"
+pyarrow = ">=14.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.3"

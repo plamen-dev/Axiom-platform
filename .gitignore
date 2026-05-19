@@ -53,6 +53,13 @@ docs/_build/
 .DS_Store
 Thumbs.db
 
+# Execution logs (top-level only)
+/logs/
+
+# Test harness artifacts
+artifacts/grid_test_runs/
+artifacts/level_test_runs/
+
 # Project specific
 *.rvt
 *.rfa

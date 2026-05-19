@@ -1,0 +1,15 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+
+# NuGet packages (restored on build)
+packages/
+
+# Visual Studio files
+.vs/
+*.user
+*.suo
+
+# ReSharper
+_ReSharper*/
+*.DotSettings.user

@@ -1,0 +1,202 @@
+## CreateLevels test case suite
+## Each case tests prompt resolution, validation, and execution (simulate or real).
+
+test_cases:
+
+  # ── Uniform spacing ────────────────────────────────────────────────
+  - test_id: uniform_5_levels_12ft
+    prompt: "Create 5 levels starting at 0 feet, spaced 12 feet apart"
+    expected_capability: CreateLevels
+    expected_parameters:
+      LevelCount: 5
+      FloorToFloorFeet: 12.0
+      StartElevationFeet: 0.0
+    expected_created_count: 5
+    expected_success: true
+    mode: simulate
+    notes: "Baseline uniform level creation"
+
+  - test_id: uniform_3_levels_10ft
+    prompt: "Create 3 levels spaced 10 feet apart"
+    expected_capability: CreateLevels
+    expected_parameters:
+      LevelCount: 3
+      FloorToFloorFeet: 10.0
+    expected_created_count: 3
+    expected_success: true
+    mode: simulate
+    notes: "Uniform levels using 'spaced apart' phrasing"
+
+  - test_id: single_level
+    prompt: "Create 1 level at 0 feet"
+    expected_capability: CreateLevels
+    expected_parameters:
+      LevelCount: 1
+    expected_created_count: 1
+    expected_success: true
+    mode: simulate
+    notes: "Single level edge case"
+
+  # ── Start elevation ────────────────────────────────────────────────
+  - test_id: start_elevation_negative
+    prompt: "Create 3 levels starting at -10 ft, spaced 12 ft apart"
+    expected_capability: CreateLevels
+    expected_parameters:
+      LevelCount: 3
+      FloorToFloorFeet: 12.0
+      StartElevationFeet: -10.0
+    expected_created_count: 3
+    expected_success: true
+    mode: simulate
+    notes: "Negative start elevation (basement)"
+
+  - test_id: start_elevation_nonzero
+    prompt: "Create 4 levels starting at 10 feet spaced 12 ft apart"
+    expected_capability: CreateLevels
+    expected_parameters:
+      LevelCount: 4
+      StartElevationFeet: 10.0
+      FloorToFloorFeet: 12.0
+    expected_created_count: 4
+    expected_success: true
+    mode: simulate
+    notes: "Non-zero start elevation"
+
+  # ── Variable elevations ────────────────────────────────────────────
+  - test_id: variable_3_elevations
+    prompt: "Create 3 levels at 0, 12, and 24 feet"
+    expected_capability: CreateLevels
+    expected_parameters:
+      LevelCount: 3
+    expected_created_count: 3
+    expected_success: true
+    mode: simulate
+    notes: "Variable elevations with 'and' separator"
+
+  - test_id: variable_4_elevations
+    prompt: "Create levels at elevations 0, 10, 20, 30 feet"
+    expected_capability: CreateLevels
+    expected_parameters:
+      LevelCount: 4
+    expected_created_count: 4
+    expected_success: true
+    mode: simulate
+    notes: "Variable elevations with 'elevations' keyword"
+
+  # ── Named levels ───────────────────────────────────────────────────
+  - test_id: named_levels_uniform
+    prompt: "Create levels named Level 1, Level 2, Level 3 spaced 10 feet apart"
+    expected_capability: CreateLevels
+    expected_parameters:
+      LevelCount: 3
+      FloorToFloorFeet: 10.0
+    expected_created_count: 3
+    expected_success: true
+    mode: simulate
+    notes: "Named levels with uniform spacing"
+
+  - test_id: named_level_table
+    prompt: "Create levels:\nBasement = -10'\nGround = 0'\nLevel 2 = 12'"
+    expected_capability: CreateLevels
+    expected_parameters:
+      LevelCount: 3
+    expected_created_count: 3
+    expected_success: true
+    mode: simulate
+    notes: "Named level table with variable elevations"
+
+  # ── Error cases ────────────────────────────────────────────────────
+  - test_id: count_zero
+    prompt: "Create 0 levels"
+    expected_capability: CreateLevels
+    expected_parameters:
+      LevelCount: 0
+    expected_created_count: 0
+    expected_success: false
+    expected_failure_reason: "LevelCount must be greater than 0"
+    mode: simulate
+    notes: "Count zero should fail validation"
+
+  - test_id: missing_spacing
+    prompt: "Create 3 levels"
+    expected_capability: CreateLevels
+    expected_parameters:
+      LevelCount: 3
+    expected_created_count: 0
+    expected_success: false
+    expected_failure_reason: "FloorToFloorFeet must be provided and > 0"
+    mode: simulate
+    notes: "Missing spacing/elevation info"
+
+  - test_id: negative_spacing
+    prompt: "Create 3 levels spaced -5 feet apart"
+    expected_capability: CreateLevels
+    expected_parameters:
+      LevelCount: 3
+    expected_created_count: 0
+    expected_success: false
+    mode: simulate
+    notes: "Negative spacing should fail"
+
+  - test_id: duplicate_elevations
+    prompt: "Create 3 levels at 0, 12, 12 feet"
+    expected_capability: CreateLevels
+    expected_parameters:
+      LevelCount: 3
+    expected_created_count: 0
+    expected_success: false
+    expected_failure_reason: "Duplicate"
+    mode: simulate
+    notes: "Duplicate elevations should fail"
+
+  # ── Clarification cases ────────────────────────────────────────────
+  - test_id: clarify_floors
+    prompt: "Create 5 floors spaced 12 ft apart"
+    expected_capability: CreateLevels
+    expected_parameters: {}
+    expected_created_count: 0
+    expected_success: false
+    mode: simulate
+    notes: "'floors' without 'levels' triggers clarification"
+
+  - test_id: clarify_stories
+    prompt: "Create 3 stories"
+    expected_capability: CreateLevels
+    expected_parameters: {}
+    expected_created_count: 0
+    expected_success: false
+    mode: simulate
+    notes: "'stories' without 'levels' triggers clarification"
+
+  # ── Regression guards ──────────────────────────────────────────────
+  - test_id: grid_prompt_unchanged
+    prompt: "Create 10 vertical gridlines, 50 ft long, spaced 10 ft apart"
+    expected_capability: CreateGrids
+    expected_parameters:
+      HorizontalCount: 10
+      SpacingFeet: 10.0
+    expected_created_count: 10
+    expected_success: true
+    mode: simulate
+    notes: "Grid prompt must still resolve to CreateGrids"
+
+  - test_id: unsupported_prompt
+    prompt: "Place diffusers in every room"
+    expected_capability: null
+    expected_parameters: {}
+    expected_created_count: 0
+    expected_success: false
+    expected_failure_reason: "Prompt does not match any known capability"
+    mode: simulate
+    notes: "Non-level prompt should fail gracefully"
+
+  - test_id: add_keyword
+    prompt: "Add 3 levels spaced 12 ft apart"
+    expected_capability: CreateLevels
+    expected_parameters:
+      LevelCount: 3
+      FloorToFloorFeet: 12.0
+    expected_created_count: 3
+    expected_success: true
+    mode: simulate
+    notes: "'Add' keyword works same as 'Create'"

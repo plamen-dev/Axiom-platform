@@ -1,0 +1,337 @@
+{
+  "_comment": "Planned test cases for CreateLevels capability. Do not run until implementation is complete.",
+  "test_cases": [
+    {
+      "test_id": "uniform_5_levels_12ft",
+      "prompt": "Create 5 levels at 12 ft floor-to-floor",
+      "expected_capability": "CreateLevels",
+      "expected_parameters": {
+        "LevelCount": 5,
+        "FloorToFloorFeet": 12.0,
+        "StartElevationFeet": 0.0
+      },
+      "expected_created_count": 5,
+      "expected_success": true,
+      "mode": "simulate",
+      "notes": "Baseline uniform level creation"
+    },
+    {
+      "test_id": "uniform_3_levels_10ft",
+      "prompt": "Create 3 levels spaced 10 feet apart",
+      "expected_capability": "CreateLevels",
+      "expected_parameters": {
+        "LevelCount": 3,
+        "FloorToFloorFeet": 10.0,
+        "StartElevationFeet": 0.0
+      },
+      "expected_created_count": 3,
+      "expected_success": true,
+      "mode": "simulate",
+      "notes": "Uniform levels using 'spaced apart' phrasing"
+    },
+    {
+      "test_id": "uniform_1_level",
+      "prompt": "Create 1 level at 0 feet",
+      "expected_capability": "CreateLevels",
+      "expected_parameters": {
+        "LevelCount": 1,
+        "StartElevationFeet": 0.0
+      },
+      "expected_created_count": 1,
+      "expected_success": true,
+      "mode": "simulate",
+      "notes": "Single level — edge case, no spacing needed"
+    },
+    {
+      "test_id": "start_elevation_negative",
+      "prompt": "Create 3 levels starting at -10 ft, 12 ft floor-to-floor",
+      "expected_capability": "CreateLevels",
+      "expected_parameters": {
+        "LevelCount": 3,
+        "FloorToFloorFeet": 12.0,
+        "StartElevationFeet": -10.0
+      },
+      "expected_created_count": 3,
+      "expected_success": true,
+      "mode": "simulate",
+      "notes": "Negative start elevation (basement)"
+    },
+    {
+      "test_id": "start_elevation_nonzero",
+      "prompt": "Create 5 levels from elevation 20 ft, 14 ft apart",
+      "expected_capability": "CreateLevels",
+      "expected_parameters": {
+        "LevelCount": 5,
+        "FloorToFloorFeet": 14.0,
+        "StartElevationFeet": 20.0
+      },
+      "expected_created_count": 5,
+      "expected_success": true,
+      "mode": "simulate",
+      "notes": "Non-zero positive start elevation"
+    },
+    {
+      "test_id": "variable_elevations_comma",
+      "prompt": "Create levels at elevations 0, 12, 24, 36",
+      "expected_capability": "CreateLevels",
+      "expected_parameters": {
+        "LevelCount": 4,
+        "VariableElevationsFeet": [0.0, 12.0, 24.0, 36.0]
+      },
+      "expected_created_count": 4,
+      "expected_success": true,
+      "mode": "simulate",
+      "notes": "Variable elevations via comma-separated list"
+    },
+    {
+      "test_id": "variable_elevations_5",
+      "prompt": "Create levels at 0, 14, 28, 40, 52 feet",
+      "expected_capability": "CreateLevels",
+      "expected_parameters": {
+        "LevelCount": 5,
+        "VariableElevationsFeet": [0.0, 14.0, 28.0, 40.0, 52.0]
+      },
+      "expected_created_count": 5,
+      "expected_success": true,
+      "mode": "simulate",
+      "notes": "Five variable elevations"
+    },
+    {
+      "test_id": "named_levels_table",
+      "prompt": "Create levels:\n  Basement = -10'\n  Ground = 0'\n  Level 2 = 12'\n  Level 3 = 24'\n  Roof = 36'",
+      "expected_capability": "CreateLevels",
+      "expected_parameters": {
+        "LevelCount": 5,
+        "LevelNames": ["Basement", "Ground", "Level 2", "Level 3", "Roof"],
+        "VariableElevationsFeet": [-10.0, 0.0, 12.0, 24.0, 36.0]
+      },
+      "expected_created_count": 5,
+      "expected_success": true,
+      "mode": "simulate",
+      "notes": "Named levels with table-format elevations"
+    },
+    {
+      "test_id": "named_levels_simple",
+      "prompt": "Create 3 levels named Basement, Ground, Level 2 at 12 ft floor-to-floor starting at -12 ft",
+      "expected_capability": "CreateLevels",
+      "expected_parameters": {
+        "LevelCount": 3,
+        "FloorToFloorFeet": 12.0,
+        "StartElevationFeet": -12.0,
+        "LevelNames": ["Basement", "Ground", "Level 2"]
+      },
+      "expected_created_count": 3,
+      "expected_success": true,
+      "mode": "simulate",
+      "notes": "Named levels with uniform spacing"
+    },
+    {
+      "test_id": "decimal_spacing",
+      "prompt": "Create 4 levels at 11.5 ft floor-to-floor",
+      "expected_capability": "CreateLevels",
+      "expected_parameters": {
+        "LevelCount": 4,
+        "FloorToFloorFeet": 11.5
+      },
+      "expected_created_count": 4,
+      "expected_success": true,
+      "mode": "simulate",
+      "notes": "Fractional floor-to-floor height"
+    },
+    {
+      "test_id": "large_count_20",
+      "prompt": "Create 20 levels at 12 ft floor-to-floor",
+      "expected_capability": "CreateLevels",
+      "expected_parameters": {
+        "LevelCount": 20,
+        "FloorToFloorFeet": 12.0
+      },
+      "expected_created_count": 20,
+      "expected_success": true,
+      "mode": "simulate",
+      "notes": "Large level count — high-rise building"
+    },
+    {
+      "test_id": "missing_spacing_default",
+      "prompt": "Create 5 levels",
+      "expected_capability": "CreateLevels",
+      "expected_parameters": {
+        "LevelCount": 5
+      },
+      "expected_created_count": 0,
+      "expected_success": false,
+      "expected_failure_reason": "FloorToFloorFeet is required when VariableElevationsFeet is not provided",
+      "mode": "simulate",
+      "notes": "No spacing or elevations specified — should fail or require a default"
+    },
+    {
+      "test_id": "count_0_invalid",
+      "prompt": "Create 0 levels",
+      "expected_capability": "CreateLevels",
+      "expected_parameters": {
+        "LevelCount": 0
+      },
+      "expected_created_count": 0,
+      "expected_success": false,
+      "expected_failure_reason": "LevelCount must be greater than 0.",
+      "mode": "simulate",
+      "notes": "Zero levels — must fail validation"
+    },
+    {
+      "test_id": "negative_spacing_invalid",
+      "prompt": "Create 3 levels at -5 ft floor-to-floor",
+      "expected_capability": "CreateLevels",
+      "expected_parameters": {
+        "LevelCount": 3,
+        "FloorToFloorFeet": -5.0
+      },
+      "expected_created_count": 0,
+      "expected_success": false,
+      "expected_failure_reason": "FloorToFloorFeet must be positive.",
+      "mode": "simulate",
+      "notes": "Negative floor-to-floor height — must fail validation"
+    },
+    {
+      "test_id": "zero_spacing_invalid",
+      "prompt": "Create 3 levels at 0 ft floor-to-floor",
+      "expected_capability": "CreateLevels",
+      "expected_parameters": {
+        "LevelCount": 3,
+        "FloorToFloorFeet": 0.0
+      },
+      "expected_created_count": 0,
+      "expected_success": false,
+      "expected_failure_reason": "FloorToFloorFeet must be positive.",
+      "mode": "simulate",
+      "notes": "Zero floor-to-floor height — must fail validation"
+    },
+    {
+      "test_id": "mismatch_elevations_count",
+      "prompt": "Create 3 levels at elevations 0, 12, 24, 36",
+      "expected_capability": "CreateLevels",
+      "expected_parameters": {
+        "LevelCount": 3,
+        "VariableElevationsFeet": [0.0, 12.0, 24.0, 36.0]
+      },
+      "expected_created_count": 0,
+      "expected_success": false,
+      "expected_failure_reason": "VariableElevationsFeet has 4 values but LevelCount is 3.",
+      "mode": "simulate",
+      "notes": "Elevation array length does not match LevelCount"
+    },
+    {
+      "test_id": "mismatch_names_count",
+      "prompt": "Create 3 levels named Basement, Ground at 12 ft floor-to-floor",
+      "expected_capability": "CreateLevels",
+      "expected_parameters": {
+        "LevelCount": 3,
+        "LevelNames": ["Basement", "Ground"]
+      },
+      "expected_created_count": 0,
+      "expected_success": false,
+      "expected_failure_reason": "LevelNames has 2 names but LevelCount is 3.",
+      "mode": "simulate",
+      "notes": "Name array length does not match LevelCount"
+    },
+    {
+      "test_id": "duplicate_elevations_invalid",
+      "prompt": "Create levels at elevations 0, 12, 12, 24",
+      "expected_capability": "CreateLevels",
+      "expected_parameters": {
+        "LevelCount": 4,
+        "VariableElevationsFeet": [0.0, 12.0, 12.0, 24.0]
+      },
+      "expected_created_count": 0,
+      "expected_success": false,
+      "expected_failure_reason": "Duplicate elevation detected.",
+      "mode": "simulate",
+      "notes": "Duplicate elevations — Revit cannot have two levels at the same height"
+    },
+    {
+      "test_id": "ambiguous_floors_clarification",
+      "prompt": "Create 5 floors 12 ft apart",
+      "expected_capability": "CreateLevels",
+      "expected_parameters": {},
+      "expected_created_count": 0,
+      "expected_success": false,
+      "expected_status": "CLARIFICATION_NEEDED",
+      "mode": "simulate",
+      "notes": "Ambiguous 'floors' without 'levels' — should trigger clarification (same pattern as grid rows/columns BUG-001)"
+    },
+    {
+      "test_id": "ambiguous_stories_clarification",
+      "prompt": "Create stories at 0, 12, 24",
+      "expected_capability": "CreateLevels",
+      "expected_parameters": {},
+      "expected_created_count": 0,
+      "expected_success": false,
+      "expected_status": "CLARIFICATION_NEEDED",
+      "mode": "simulate",
+      "notes": "Ambiguous 'stories' without 'levels' — should trigger clarification"
+    },
+    {
+      "test_id": "unsupported_prompt_grids",
+      "prompt": "Create 10 vertical gridlines spaced 10 ft apart",
+      "expected_capability": "CreateGrids",
+      "expected_parameters": {},
+      "expected_created_count": 10,
+      "expected_success": true,
+      "mode": "simulate",
+      "notes": "Grid prompt must NOT resolve to CreateLevels — regression guard"
+    },
+    {
+      "test_id": "unsupported_prompt_diffusers",
+      "prompt": "Place diffusers in every room on level 2",
+      "expected_capability": null,
+      "expected_parameters": {},
+      "expected_created_count": 0,
+      "expected_success": false,
+      "expected_failure_reason": "Prompt does not match any known capability",
+      "mode": "simulate",
+      "notes": "Non-level, non-grid prompt — should resolve to None / UNRESOLVED"
+    },
+    {
+      "test_id": "duplicate_level_name_risk",
+      "prompt": "Create levels:\n  Level 1 = 0'\n  Level 1 = 12'",
+      "expected_capability": "CreateLevels",
+      "expected_parameters": {
+        "LevelCount": 2,
+        "LevelNames": ["Level 1", "Level 1"],
+        "VariableElevationsFeet": [0.0, 12.0]
+      },
+      "expected_created_count": 0,
+      "expected_success": false,
+      "expected_failure_reason": "Duplicate level name detected.",
+      "mode": "simulate",
+      "notes": "Duplicate level names — Revit may reject or auto-rename, but we should validate upfront"
+    },
+    {
+      "test_id": "real_uniform_3_levels",
+      "prompt": "Create 3 levels at 12 ft floor-to-floor",
+      "expected_capability": "CreateLevels",
+      "expected_parameters": {
+        "LevelCount": 3,
+        "FloorToFloorFeet": 12.0,
+        "StartElevationFeet": 0.0
+      },
+      "expected_created_count": 3,
+      "expected_success": true,
+      "mode": "real",
+      "notes": "Real Revit execution — uniform levels"
+    },
+    {
+      "test_id": "real_named_levels",
+      "prompt": "Create levels:\n  Basement = -10'\n  Ground = 0'\n  Level 2 = 12'",
+      "expected_capability": "CreateLevels",
+      "expected_parameters": {
+        "LevelCount": 3,
+        "LevelNames": ["Basement", "Ground", "Level 2"],
+        "VariableElevationsFeet": [-10.0, 0.0, 12.0]
+      },
+      "expected_created_count": 3,
+      "expected_success": true,
+      "mode": "real",
+      "notes": "Real Revit execution — named levels with variable elevations"
+    }
+  ]
+}

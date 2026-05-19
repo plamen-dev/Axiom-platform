@@ -1,0 +1,216 @@
+# Capability Compatibility Matrix
+#
+# Tracks the validation status of each Axiom capability per Revit version.
+# Statuses follow the VersionValidationStatus progression:
+#   planned → simulated → build_validated → startup_validated → real_validated
+#
+# See: docs/architecture/revit-version-compatibility-strategy.md
+
+capabilities:
+  - capability: "CreateGrids"
+    description: "Creates a grid system with vertical and horizontal grid lines."
+    versions:
+      - revit_version: "2024"
+        status: "simulated"
+        last_tested: null
+        tested_by: null
+        python_simulation: true
+        csharp_build: false
+        revit_startup: false
+        revit_execution: false
+        notes: >
+          Python simulation passes (31/31 test cases). C# code exists and
+          compiles against Revit 2024 API in Visual Studio. Real Revit
+          validation pending Windows testing environment.
+        known_issues:
+          - "BUG-001: rows/columns without 'grid' keyword — resolved with clarification loop"
+          - "BUG-002: mock count=0 validation — resolved, aligned with C#"
+
+      - revit_version: "2025"
+        status: "planned"
+        last_tested: null
+        tested_by: null
+        python_simulation: true
+        csharp_build: false
+        revit_startup: false
+        revit_execution: false
+        notes: "Python simulation is version-agnostic. C# build not attempted."
+
+      - revit_version: "2026"
+        status: "planned"
+        last_tested: null
+        tested_by: null
+        python_simulation: true
+        csharp_build: false
+        revit_startup: false
+        revit_execution: false
+        notes: "Python simulation is version-agnostic. C# build not attempted."
+
+      - revit_version: "2027"
+        status: "planned"
+        last_tested: null
+        tested_by: null
+        python_simulation: true
+        csharp_build: false
+        revit_startup: false
+        revit_execution: false
+        notes: >
+          Python simulation is version-agnostic. C# build requires .NET 10
+          SDK-style .csproj (not created yet). Grid.Create API expected to
+          be stable but not confirmed.
+
+  - capability: "CreateLevels"
+    description: "Creates building levels at specified elevations."
+    versions:
+      - revit_version: "2024"
+        status: "simulated"
+        last_tested: null
+        tested_by: null
+        python_simulation: true
+        csharp_build: false
+        revit_startup: false
+        revit_execution: false
+        notes: >
+          Python simulation passes (18/18 test cases). C# code exists.
+          Real Revit validation pending Windows testing environment.
+
+      - revit_version: "2025"
+        status: "planned"
+        last_tested: null
+        tested_by: null
+        python_simulation: true
+        csharp_build: false
+        revit_startup: false
+        revit_execution: false
+        notes: "Python simulation is version-agnostic. C# build not attempted."
+
+      - revit_version: "2026"
+        status: "planned"
+        last_tested: null
+        tested_by: null
+        python_simulation: true
+        csharp_build: false
+        revit_startup: false
+        revit_execution: false
+        notes: "Python simulation is version-agnostic. C# build not attempted."
+
+      - revit_version: "2027"
+        status: "planned"
+        last_tested: null
+        tested_by: null
+        python_simulation: true
+        csharp_build: false
+        revit_startup: false
+        revit_execution: false
+        notes: >
+          Python simulation is version-agnostic. Level.Create API expected
+          to be stable but not confirmed.
+
+  - capability: "InventoryModel"
+    description: "Read-only model inventory — enumerates all elements and parameters."
+    versions:
+      - revit_version: "2024"
+        status: "simulated"
+        last_tested: null
+        tested_by: null
+        python_simulation: true
+        csharp_build: false
+        revit_startup: false
+        revit_execution: false
+        notes: >
+          Python simulation passes (58 inventory tests). C# code exists
+          with generic parameter enumeration. Real Revit validation pending.
+        known_issues:
+          - "BUG-003: ParameterGroup not extracted in C# CollectParameters() — pending Revit validation"
+          - "BUG-004: LevelId not stored in C# ElementEntry DTO — pending Revit validation"
+          - "BUG-005: source_model (doc.Title) not included in real execution — pending Revit validation"
+
+      - revit_version: "2025"
+        status: "planned"
+        last_tested: null
+        tested_by: null
+        python_simulation: true
+        csharp_build: false
+        revit_startup: false
+        revit_execution: false
+        notes: >
+          InventoryModel is critical for version validation — it serves as
+          the compatibility probe. Priority target after 2024 validation.
+
+      - revit_version: "2026"
+        status: "planned"
+        last_tested: null
+        tested_by: null
+        python_simulation: true
+        csharp_build: false
+        revit_startup: false
+        revit_execution: false
+        notes: "Same runtime family as 2025. Expected to share build."
+
+      - revit_version: "2027"
+        status: "planned"
+        last_tested: null
+        tested_by: null
+        python_simulation: true
+        csharp_build: false
+        revit_startup: false
+        revit_execution: false
+        notes: >
+          Key validation target. InventoryModel output from 2027 will be
+          diffed against 2024 baseline to identify API surface changes.
+
+# Validation status reference
+validation_statuses:
+  - status: "planned"
+    description: "Support intended but no work started for this version."
+
+  - status: "simulated"
+    description: "Python simulation passes. No Revit-version-specific testing done."
+
+  - status: "build_validated"
+    description: "C# compiles against this Revit version's API DLLs without errors."
+
+  - status: "startup_validated"
+    description: "Add-in loads in Revit without errors. Axiom tab appears."
+
+  - status: "real_validated"
+    description: "Capability executes correctly in Revit with a real model."
+
+  - status: "failed"
+    description: "Attempted validation failed. See notes and known_issues."
+
+  - status: "deprecated"
+    description: "No longer targeting this Revit version."
+
+# Validation workflow per version
+validation_workflow:
+  steps:
+    - order: 1
+      name: "Python simulation"
+      description: "Run pytest and capability harness in simulate mode."
+      requires_revit: false
+
+    - order: 2
+      name: "C# build"
+      description: "Build C# solution against version-specific RevitAPI.dll."
+      requires_revit: false
+
+    - order: 3
+      name: "Revit startup"
+      description: "Deploy add-in to Revit addins folder, launch Revit, verify add-in loads."
+      requires_revit: true
+
+    - order: 4
+      name: "Capability smoke test"
+      description: "Execute each capability via Prompt dialog on a test model."
+      requires_revit: true
+
+    - order: 5
+      name: "InventoryModel scan"
+      description: "Run InventoryModel on the test model to capture parameter surface."
+      requires_revit: true
+
+    - order: 6
+      name: "Update metadata"
+      description: "Update this fixture file with validation results."
+      requires_revit: false

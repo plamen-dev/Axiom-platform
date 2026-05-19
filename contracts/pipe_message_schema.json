@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Axiom Pipe Bridge Message Schema",
+  "description": "JSON-RPC 2.0 messages exchanged between Python orchestrator and C# Revit add-in via named pipe.",
+  "definitions": {
+    "request": {
+      "type": "object",
+      "required": ["jsonrpc", "id", "method", "params"],
+      "properties": {
+        "jsonrpc": { "const": "2.0" },
+        "id": { "type": "string", "description": "Unique request ID (typically step UUID)." },
+        "method": { "enum": ["execute_tool"], "description": "JSON-RPC method name." },
+        "params": {
+          "type": "object",
+          "required": ["tool_name", "args_json"],
+          "properties": {
+            "tool_name": { "type": "string", "description": "Capability name, e.g. 'CreateGrids'." },
+            "args_json": { "type": "string", "description": "JSON-encoded parameter object matching the capability's ParameterType." },
+            "simulate": { "type": "boolean", "default": false, "description": "If true, validate only." },
+            "transaction_name": { "type": "string", "description": "Optional Revit transaction name." }
+          }
+        }
+      }
+    },
+    "response_success": {
+      "type": "object",
+      "required": ["jsonrpc", "id", "result"],
+      "properties": {
+        "jsonrpc": { "const": "2.0" },
+        "id": { "type": "string" },
+        "result": {
+          "type": "object",
+          "properties": {
+            "status": { "enum": ["SUCCESS", "FAILED"] },
+            "created_ids": { "type": "array", "items": { "type": "string" } },
+            "warnings": { "type": "array", "items": { "type": "string" } },
+            "errors": { "type": "array", "items": { "type": "string" } },
+            "duration_ms": { "type": "integer" },
+            "output_data": { "type": "object" }
+          }
+        }
+      }
+    },
+    "response_error": {
+      "type": "object",
+      "required": ["jsonrpc", "id", "error"],
+      "properties": {
+        "jsonrpc": { "const": "2.0" },
+        "id": { "type": "string" },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": { "type": "integer" },
+            "message": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+  "examples": {
+    "request_create_grids": {
+      "jsonrpc": "2.0",
+      "id": "step-abc123",
+      "method": "execute_tool",
+      "params": {
+        "tool_name": "CreateGrids",
+        "args_json": "{\"HorizontalCount\":5,\"VerticalCount\":5,\"SpacingFeet\":30.0,\"Naming\":\"Default\",\"Length\":0}",
+        "simulate": false,
+        "transaction_name": "Axiom_CreateGrids"
+      }
+    },
+    "response_success": {
+      "jsonrpc": "2.0",
+      "id": "step-abc123",
+      "result": {
+        "status": "SUCCESS",
+        "created_ids": ["grid_1", "grid_2", "grid_3", "grid_4", "grid_5", "grid_A", "grid_B", "grid_C", "grid_D", "grid_E"],
+        "warnings": [],
+        "errors": [],
+        "duration_ms": 450,
+        "output_data": {
+          "grid_count": 10,
+          "span_x_feet": 120.0,
+          "span_y_feet": 120.0
+        }
+      }
+    }
+  }
+}

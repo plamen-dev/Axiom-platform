@@ -1,0 +1,93 @@
+# Supported Revit Versions
+#
+# Defines each Revit version that Axiom targets or plans to target.
+# Used as reference data for documentation, test assertions, and future
+# version-aware build/test automation.
+#
+# See: docs/architecture/revit-version-compatibility-strategy.md
+
+versions:
+  - version: "2024"
+    runtime_family: "net48"
+    target_framework: "net48"
+    dotnet_version: ".NET Framework 4.8"
+    csharp_version: "7.3"
+    csproj_format: "legacy"
+    api_dll_path: "C:\\Program Files\\Autodesk\\Revit 2024\\RevitAPI.dll"
+    api_ui_dll_path: "C:\\Program Files\\Autodesk\\Revit 2024\\RevitAPIUI.dll"
+    addin_folder: "C:\\ProgramData\\Autodesk\\Revit\\Addins\\2024"
+    addin_isolation: false
+    status: "baseline"
+    notes: >
+      Current production baseline. All capabilities must reach real_validated
+      against 2024 before pursuing other versions.
+
+  - version: "2025"
+    runtime_family: "net8"
+    target_framework: "net8.0-windows"
+    dotnet_version: ".NET 8"
+    csharp_version: "12"
+    csproj_format: "sdk-style"
+    api_dll_path: "C:\\Program Files\\Autodesk\\Revit 2025\\RevitAPI.dll"
+    api_ui_dll_path: "C:\\Program Files\\Autodesk\\Revit 2025\\RevitAPIUI.dll"
+    addin_folder: "C:\\ProgramData\\Autodesk\\Revit\\Addins\\2025"
+    addin_isolation: true
+    status: "planned"
+    notes: >
+      First .NET 8 generation. Introduces add-in isolation. No local install
+      available yet. Expected to share API surface with 2024 with minor additions.
+
+  - version: "2026"
+    runtime_family: "net8"
+    target_framework: "net8.0-windows"
+    dotnet_version: ".NET 8"
+    csharp_version: "12"
+    csproj_format: "sdk-style"
+    api_dll_path: "C:\\Program Files\\Autodesk\\Revit 2026\\RevitAPI.dll"
+    api_ui_dll_path: "C:\\Program Files\\Autodesk\\Revit 2026\\RevitAPIUI.dll"
+    addin_folder: "C:\\ProgramData\\Autodesk\\Revit\\Addins\\2026"
+    addin_isolation: true
+    status: "planned"
+    notes: >
+      Second .NET 8 generation. Same runtime family as 2025. Build projects
+      should be shared with 2025 with only HintPath differences.
+
+  - version: "2027"
+    runtime_family: "net10"
+    target_framework: "net10.0-windows"
+    dotnet_version: ".NET 10"
+    csharp_version: "13+"
+    csproj_format: "sdk-style"
+    api_dll_path: "C:\\Program Files\\Autodesk\\Revit 2027\\RevitAPI.dll"
+    api_ui_dll_path: "C:\\Program Files\\Autodesk\\Revit 2027\\RevitAPIUI.dll"
+    addin_folder: "C:\\ProgramData\\Autodesk\\Revit\\Addins\\2027"
+    addin_isolation: true
+    status: "planned"
+    notes: >
+      Major runtime jump to .NET 10. Pending local install validation (trial
+      or developer license). Do not assume API compatibility until tested.
+      See docs/runbooks/revit-multi-version-runbook.md for build strategy.
+
+# Runtime family groupings for build matrix planning
+runtime_families:
+  - family: "net48"
+    dotnet_runtime: ".NET Framework 4.8"
+    versions: ["2024"]
+    build_strategy: "Legacy .csproj (current baseline)"
+    notes: "No migration planned. 2024 stays on legacy format."
+
+  - family: "net8"
+    dotnet_runtime: ".NET 8"
+    versions: ["2025", "2026"]
+    build_strategy: "SDK-style .csproj with shared source"
+    notes: >
+      One set of SDK-style .csproj files can target both 2025 and 2026.
+      Only HintPaths to RevitAPI.dll differ.
+
+  - family: "net10"
+    dotnet_runtime: ".NET 10"
+    versions: ["2027"]
+    build_strategy: "SDK-style .csproj with shared source"
+    notes: >
+      Separate from net8 due to runtime generation gap. May share source
+      with net8 projects if API surface is compatible.

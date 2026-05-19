@@ -136,3 +136,93 @@ class ExecutionTraceRow(Base):
     started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="RUNNING")
+
+
+class PromptExecutionRow(Base):
+    """Prompt execution record — one row per prompt run.
+
+    Captures all fields required by the Capability Framework v1 spec:
+    timestamp, original prompt, resolved capability, resolved parameters,
+    assumptions, simulate vs execute, status, created count/IDs,
+    errors, warnings, and duration.
+    """
+
+    __tablename__ = "prompt_executions"
+
+    execution_id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=_new_uuid
+    )
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=_utcnow
+    )
+    prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    mode: Mapped[str] = mapped_column(
+        String(20), nullable=False
+    )
+    capability: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    status: Mapped[str] = mapped_column(String(30), nullable=False)
+    parameters_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    assumptions_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    created_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_ids_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    errors_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    warnings_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    duration_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    def set_parameters(self, data: dict) -> None:
+        self.parameters_json = json.dumps(data, default=str)
+
+    def get_parameters(self) -> dict:
+        return json.loads(self.parameters_json) if self.parameters_json else {}
+
+    def set_assumptions(self, data: list) -> None:
+        self.assumptions_json = json.dumps(data)
+
+    def set_created_ids(self, data: list) -> None:
+        self.created_ids_json = json.dumps(data)
+
+    def set_errors(self, data: list) -> None:
+        self.errors_json = json.dumps(data)
+
+    def set_warnings(self, data: list) -> None:
+        self.warnings_json = json.dumps(data)
+
+
+class InventoryElementRow(Base):
+    """One row per inventoried element."""
+
+    __tablename__ = "inventory_elements"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    source_model: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    element_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    unique_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    category: Mapped[str] = mapped_column(String(255), nullable=False, default="", index=True)
+    class_name: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    name: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    family_name: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    type_name: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    level_name: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    level_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    workset_name: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    is_type: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+class InventoryParameterRow(Base):
+    """One row per parameter on an inventoried element."""
+
+    __tablename__ = "inventory_parameters"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    element_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    param_name: Mapped[str] = mapped_column(String(500), nullable=False, default="", index=True)
+    storage_type: Mapped[str] = mapped_column(String(50), nullable=False, default="")
+    value_string: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    value_number: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    value_integer: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    built_in_parameter_id: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    is_read_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_instance_param: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    parameter_group: Mapped[str] = mapped_column(String(255), nullable=False, default="")

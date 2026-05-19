@@ -1,0 +1,432 @@
+## CreateGrids test case suite
+## Each case tests prompt resolution, validation, and execution (simulate or real).
+## Categories cover uniform spacing, variable spacing, edge cases, and error cases.
+
+test_cases:
+
+  # ── Vertical-only uniform spacing ──────────────────────────────────
+  - test_id: vert_uniform_10
+    prompt: "Create 10 vertical gridlines, 50 ft long, spaced 10 ft apart"
+    expected_capability: CreateGrids
+    expected_parameters:
+      HorizontalCount: 10
+      VerticalCount: 0
+      SpacingFeet: 10.0
+      Length: 50.0
+    expected_created_count: 10
+    expected_success: true
+    mode: simulate
+    notes: "Baseline vertical-only prompt"
+
+  - test_id: vert_uniform_3
+    prompt: "Create 3 vertical grids spaced 25 feet apart"
+    expected_capability: CreateGrids
+    expected_parameters:
+      HorizontalCount: 3
+      VerticalCount: 0
+      SpacingFeet: 25.0
+    expected_created_count: 3
+    expected_success: true
+    mode: simulate
+    notes: "Minimal vertical grid count"
+
+  # ── Horizontal-only uniform spacing ────────────────────────────────
+  - test_id: horiz_uniform_5
+    prompt: "Create 5 horizontal gridlines spaced 20 ft apart, 40 ft long"
+    expected_capability: CreateGrids
+    expected_parameters:
+      VerticalCount: 5
+      HorizontalCount: 0
+      SpacingFeet: 20.0
+      Length: 40.0
+    expected_created_count: 5
+    expected_success: true
+    mode: simulate
+    notes: "Baseline horizontal-only prompt"
+
+  - test_id: horiz_uniform_rows
+    prompt: "Create 4 rows of gridlines spaced 15 ft apart"
+    expected_capability: CreateGrids
+    expected_parameters:
+      VerticalCount: 4
+      HorizontalCount: 0
+      SpacingFeet: 15.0
+    expected_created_count: 4
+    expected_success: true
+    mode: simulate
+    notes: "Horizontal via 'rows' keyword — prompt must contain 'grid' to be recognized"
+
+  - test_id: horiz_rows_no_grid_keyword
+    prompt: "Create 4 rows spaced 15 ft apart"
+    expected_capability: CreateGrids
+    expected_parameters: {}
+    expected_created_count: 0
+    expected_success: false
+    expected_status: CLARIFICATION_NEEDED
+    mode: simulate
+    notes: "BUG-001 FIX: 'rows' alone without 'grid' keyword now triggers clarification instead of silent failure."
+
+  # ── Both orientations uniform spacing ──────────────────────────────
+  - test_id: both_uniform_5x5
+    prompt: "Create 5 grids spaced 30 ft apart"
+    expected_capability: CreateGrids
+    expected_parameters:
+      HorizontalCount: 5
+      VerticalCount: 5
+      SpacingFeet: 30.0
+    expected_created_count: 10
+    expected_success: true
+    mode: simulate
+    notes: "Generic grid prompt — defaults to both orientations"
+
+  - test_id: both_uniform_4x6
+    prompt: "Create a 4 by 6 grid spaced 20 ft apart"
+    expected_capability: CreateGrids
+    expected_parameters:
+      HorizontalCount: 4
+      VerticalCount: 6
+      SpacingFeet: 20.0
+    expected_created_count: 10
+    expected_success: true
+    mode: simulate
+    notes: "Explicit NxM grid"
+
+  - test_id: both_uniform_columns_rows
+    prompt: "Create 8 columns and 4 rows of gridlines spaced 12 ft apart"
+    expected_capability: CreateGrids
+    expected_parameters:
+      HorizontalCount: 8
+      VerticalCount: 4
+      SpacingFeet: 12.0
+    expected_created_count: 12
+    expected_success: true
+    mode: simulate
+    notes: "Explicit columns + rows — prompt must contain 'grid' keyword"
+
+  - test_id: columns_rows_no_grid_keyword
+    prompt: "Create 8 columns and 4 rows spaced 12 ft apart"
+    expected_capability: CreateGrids
+    expected_parameters: {}
+    expected_created_count: 0
+    expected_success: false
+    expected_status: CLARIFICATION_NEEDED
+    mode: simulate
+    notes: "BUG-001 FIX: 'columns'/'rows' without 'grid' keyword now triggers clarification."
+
+  # ── Variable vertical spacing (comma list) ─────────────────────────
+  - test_id: var_vert_comma_4bay
+    prompt: "Create vertical grids with spacings 10, 5, 20, 10"
+    expected_capability: CreateGrids
+    expected_parameters:
+      HorizontalCount: 5
+      VerticalCount: 0
+      HorizontalSpacingsFeet: [10.0, 5.0, 20.0, 10.0]
+    expected_created_count: 5
+    expected_success: true
+    mode: simulate
+    notes: "Comma-separated variable vertical spacing"
+
+  - test_id: var_vert_comma_2bay
+    prompt: "Create vertical grids with spacing 15, 25"
+    expected_capability: CreateGrids
+    expected_parameters:
+      HorizontalCount: 3
+      VerticalCount: 0
+      HorizontalSpacingsFeet: [15.0, 25.0]
+    expected_created_count: 3
+    expected_success: true
+    mode: simulate
+    notes: "Two-bay comma-separated variable spacing"
+
+  # ── Variable horizontal spacing (comma list) ───────────────────────
+  - test_id: var_horiz_comma
+    prompt: "Create horizontal grids with spacings 12, 18, 12"
+    expected_capability: CreateGrids
+    expected_parameters:
+      HorizontalCount: 0
+      VerticalCount: 4
+      VerticalSpacingsFeet: [12.0, 18.0, 12.0]
+    expected_created_count: 4
+    expected_success: true
+    mode: simulate
+    notes: "Comma-separated variable horizontal spacing"
+
+  # ── Both orientations variable spacing (table with sections) ───────
+  - test_id: var_both_table_sections
+    prompt: |
+      Create grids:
+      Vertical:
+      1-2 = 10'
+      2-3 = 5'
+      3-4 = 20'
+      Horizontal:
+      A-B = 15'
+      B-C = 12'
+    expected_capability: CreateGrids
+    expected_parameters:
+      HorizontalCount: 4
+      VerticalCount: 3
+      HorizontalSpacingsFeet: [10.0, 5.0, 20.0]
+      VerticalSpacingsFeet: [15.0, 12.0]
+    expected_created_count: 7
+    expected_success: true
+    mode: simulate
+    notes: "Table format with Vertical/Horizontal section headers"
+
+  - test_id: var_vert_table_sections
+    prompt: |
+      Create grids:
+      Vertical:
+      1-2 = 30'
+      2-3 = 15'
+      3-4 = 30'
+    expected_capability: CreateGrids
+    expected_parameters:
+      HorizontalCount: 4
+      VerticalCount: 0
+      HorizontalSpacingsFeet: [30.0, 15.0, 30.0]
+    expected_created_count: 4
+    expected_success: true
+    mode: simulate
+    notes: "Table format with only Vertical section"
+
+  # ── Pasted-table spacing (unsectioned) ─────────────────────────────
+  - test_id: var_unsectioned_table
+    prompt: |
+      Create 5 vertical gridlines with spacing table:
+      1-2 = 10'
+      2-3 = 5'
+      3-4 = 20'
+      4-5 = 10'
+    expected_capability: CreateGrids
+    expected_parameters:
+      HorizontalCount: 5
+      VerticalCount: 0
+      HorizontalSpacingsFeet: [10.0, 5.0, 20.0, 10.0]
+    expected_created_count: 5
+    expected_success: true
+    mode: simulate
+    notes: "Unsectioned table entries with vertical keyword context"
+
+  # ── Missing length ─────────────────────────────────────────────────
+  - test_id: missing_length
+    prompt: "Create 5 vertical grids spaced 10 ft apart"
+    expected_capability: CreateGrids
+    expected_parameters:
+      HorizontalCount: 5
+      VerticalCount: 0
+      SpacingFeet: 10.0
+      Length: 0
+    expected_created_count: 5
+    expected_success: true
+    mode: simulate
+    notes: "Length not specified — defaults to 0 (derived from grid extents)"
+
+  # ── Invalid spacing (negative / zero) ──────────────────────────────
+  - test_id: invalid_spacing_negative_comma
+    prompt: "Create vertical grids with spacings 10, -5, 20"
+    expected_capability: CreateGrids
+    expected_parameters:
+      HorizontalCount: 5
+      SpacingFeet: 30.0
+    expected_created_count: 10
+    expected_success: true
+    mode: simulate
+    notes: "Negative spacing in comma list — parser rejects, falls through to default layout (H=5, V=5). No variable spacings applied."
+
+  # ── Mismatched count vs spacing array ──────────────────────────────
+  - test_id: mismatch_count_spacing
+    prompt: "Create 3 vertical grids with spacings 10, 5, 20, 10"
+    expected_capability: CreateGrids
+    expected_parameters:
+      HorizontalCount: 5
+      VerticalCount: 0
+    expected_created_count: 5
+    expected_success: true
+    mode: simulate
+    notes: "Count says 3 but 4 spacings provided — resolver adjusts count to match spacing array + 1"
+
+  # ── Unsupported prompt ─────────────────────────────────────────────
+  - test_id: unsupported_prompt
+    prompt: "Place diffusers in every room on level 2"
+    expected_capability: null
+    expected_parameters: {}
+    expected_created_count: 0
+    expected_success: false
+    expected_failure_reason: "Prompt does not match any known capability"
+    mode: simulate
+    notes: "Non-grid prompt — should resolve to None / UNRESOLVED"
+
+  - test_id: cross_capability_levels
+    prompt: "Create levels at 0, 10, 20, 30 feet"
+    expected_capability: CreateLevels
+    expected_parameters:
+      LevelCount: 4
+    expected_created_count: 4
+    expected_success: true
+    mode: simulate
+    notes: "Level prompt — now implemented as CreateLevels capability"
+
+  # ── Count = 1 edge cases ───────────────────────────────────────────
+  - test_id: count_1_vertical
+    prompt: "Create 1 vertical gridline, 50 ft long"
+    expected_capability: CreateGrids
+    expected_parameters:
+      HorizontalCount: 1
+      VerticalCount: 0
+      Length: 50.0
+    expected_created_count: 1
+    expected_success: true
+    mode: simulate
+    notes: "Single vertical gridline — no spacing needed"
+
+  - test_id: count_1_horizontal
+    prompt: "Create 1 horizontal gridline 30 ft long"
+    expected_capability: CreateGrids
+    expected_parameters:
+      VerticalCount: 1
+      HorizontalCount: 0
+      Length: 30.0
+    expected_created_count: 1
+    expected_success: true
+    mode: simulate
+    notes: "Single horizontal gridline — no spacing needed"
+
+  # ── Count = 0 edge cases ───────────────────────────────────────────
+  - test_id: count_0_both_invalid
+    prompt: "Create 0 grids"
+    expected_capability: CreateGrids
+    expected_parameters:
+      HorizontalCount: 0
+      VerticalCount: 0
+    expected_created_count: 0
+    expected_success: false
+    expected_failure_reason: "Both counts are 0 — at least one must be > 0"
+    mode: simulate
+    notes: "BUG-002 FIX: Mock now validates at least one count > 0, matching C# GridCapability."
+
+  # ── Duplicate run in same model ────────────────────────────────────
+  - test_id: duplicate_run
+    prompt: "Create 5 vertical gridlines spaced 10 ft apart, 30 ft long"
+    expected_capability: CreateGrids
+    expected_parameters:
+      HorizontalCount: 5
+      VerticalCount: 0
+      SpacingFeet: 10.0
+      Length: 30.0
+    expected_created_count: 5
+    expected_success: true
+    mode: simulate
+    notes: "Second run of same prompt — simulation should succeed (idempotent in sim mode)"
+
+  # ── Word number variants ───────────────────────────────────────────
+  - test_id: word_number_five
+    prompt: "Create five vertical gridlines spaced ten feet apart"
+    expected_capability: CreateGrids
+    expected_parameters:
+      HorizontalCount: 5
+      VerticalCount: 0
+      SpacingFeet: 10.0
+    expected_created_count: 5
+    expected_success: true
+    mode: simulate
+    notes: "Word numbers instead of digits"
+
+  # ── Large count ────────────────────────────────────────────────────
+  - test_id: large_count_50
+    prompt: "Create 50 vertical gridlines spaced 5 ft apart, 100 ft long"
+    expected_capability: CreateGrids
+    expected_parameters:
+      HorizontalCount: 50
+      VerticalCount: 0
+      SpacingFeet: 5.0
+      Length: 100.0
+    expected_created_count: 50
+    expected_success: true
+    mode: simulate
+    notes: "Large grid count stress test"
+
+  # ── Decimal spacing ────────────────────────────────────────────────
+  - test_id: decimal_spacing
+    prompt: "Create 4 vertical grids spaced 7.5 ft apart"
+    expected_capability: CreateGrids
+    expected_parameters:
+      HorizontalCount: 4
+      VerticalCount: 0
+      SpacingFeet: 7.5
+    expected_created_count: 4
+    expected_success: true
+    mode: simulate
+    notes: "Fractional spacing value"
+
+  # ── Clarification-needed cases (BUG-001) ────────────────────────────
+  - test_id: clarify_columns_only
+    prompt: "Create 6 columns spaced 10 ft apart"
+    expected_capability: CreateGrids
+    expected_parameters: {}
+    expected_created_count: 0
+    expected_success: false
+    expected_status: CLARIFICATION_NEEDED
+    mode: simulate
+    notes: "Columns-only without 'grid' keyword triggers clarification"
+
+  - test_id: clarify_rows_only
+    prompt: "Create 3 rows spaced 20 ft apart"
+    expected_capability: CreateGrids
+    expected_parameters: {}
+    expected_created_count: 0
+    expected_success: false
+    expected_status: CLARIFICATION_NEEDED
+    mode: simulate
+    notes: "Rows-only without 'grid' keyword triggers clarification"
+
+  # ── Explicit grid rows/columns (should execute) ─────────────────────
+  - test_id: explicit_grid_rows
+    prompt: "Create 5 grid rows spaced 15 ft apart"
+    expected_capability: CreateGrids
+    expected_parameters:
+      VerticalCount: 5
+      HorizontalCount: 0
+      SpacingFeet: 15.0
+    expected_created_count: 5
+    expected_success: true
+    mode: simulate
+    notes: "Explicit 'grid rows' — should execute, not clarify"
+
+  - test_id: explicit_gridlines_columns_rows
+    prompt: "Create 5 horizontal gridlines and 10 vertical gridlines spaced 10 ft apart"
+    expected_capability: CreateGrids
+    expected_parameters:
+      VerticalCount: 5
+      HorizontalCount: 10
+      SpacingFeet: 10.0
+    expected_created_count: 15
+    expected_success: true
+    mode: simulate
+    notes: "Explicit 'gridlines' with both orientations — should execute"
+
+  # ── Real execution test cases (require Revit) ──────────────────────
+  - test_id: real_vert_uniform_5
+    prompt: "Create 5 vertical gridlines, 40 ft long, spaced 10 ft apart"
+    expected_capability: CreateGrids
+    expected_parameters:
+      HorizontalCount: 5
+      VerticalCount: 0
+      SpacingFeet: 10.0
+      Length: 40.0
+    expected_created_count: 5
+    expected_success: true
+    mode: real
+    notes: "Real Revit execution — vertical uniform spacing"
+
+  - test_id: real_var_vert_comma
+    prompt: "Create vertical grids with spacings 10, 5, 20, 10"
+    expected_capability: CreateGrids
+    expected_parameters:
+      HorizontalCount: 5
+      VerticalCount: 0
+      HorizontalSpacingsFeet: [10.0, 5.0, 20.0, 10.0]
+    expected_created_count: 5
+    expected_success: true
+    mode: real
+    notes: "Real Revit execution — variable vertical spacing"

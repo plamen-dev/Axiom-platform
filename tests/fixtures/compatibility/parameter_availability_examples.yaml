@@ -1,0 +1,226 @@
+# Parameter Availability Examples
+#
+# Representative examples of Revit parameters and their known version availability.
+# This is NOT an exhaustive registry — it contains examples across parameter
+# categories to establish the fixture format for future InventoryModel-driven
+# population.
+#
+# See: docs/architecture/revit-parameter-versioning-strategy.md
+
+# --------------------------------------------------------------------------
+# Built-in parameters — API-defined, stable across most versions
+# --------------------------------------------------------------------------
+parameters:
+  # --- Grid-related built-in parameters ---
+  - name: "CURVE_ELEM_LENGTH"
+    built_in_id: "CURVE_ELEM_LENGTH"
+    category: "Grids"
+    storage_type: "Double"
+    is_read_only: true
+    parameter_group: "PG_GEOMETRY"
+    available_versions: ["2024", "2025", "2026", "2027"]
+    deprecated_versions: []
+    replacement: null
+    source: "documented"
+    notes: "Length of linear elements (grids, lines, walls). Extremely stable."
+
+  - name: "DATUM_TEXT"
+    built_in_id: "DATUM_TEXT"
+    category: "Grids"
+    storage_type: "String"
+    is_read_only: false
+    parameter_group: "PG_IDENTITY_DATA"
+    available_versions: ["2024", "2025", "2026", "2027"]
+    deprecated_versions: []
+    replacement: null
+    source: "documented"
+    notes: "Grid line name/label. Writable — used to rename grid lines."
+
+  # --- Level-related built-in parameters ---
+  - name: "LEVEL_ELEV"
+    built_in_id: "LEVEL_ELEV"
+    category: "Levels"
+    storage_type: "Double"
+    is_read_only: false
+    parameter_group: "PG_CONSTRAINTS"
+    available_versions: ["2024", "2025", "2026", "2027"]
+    deprecated_versions: []
+    replacement: null
+    source: "documented"
+    notes: "Level elevation in project units. Core level parameter."
+
+  - name: "LEVEL_NAME"
+    built_in_id: "LEVEL_NAME"
+    category: "Levels"
+    storage_type: "String"
+    is_read_only: false
+    parameter_group: "PG_IDENTITY_DATA"
+    available_versions: ["2024", "2025", "2026", "2027"]
+    deprecated_versions: []
+    replacement: null
+    source: "documented"
+    notes: "Level display name."
+
+  # --- Wall-related built-in parameters ---
+  - name: "HOST_AREA_COMPUTED"
+    built_in_id: "HOST_AREA_COMPUTED"
+    category: "Walls"
+    storage_type: "Double"
+    is_read_only: true
+    parameter_group: "PG_GEOMETRY"
+    available_versions: ["2024", "2025", "2026", "2027"]
+    deprecated_versions: []
+    replacement: null
+    source: "documented"
+    notes: "Computed area of host elements (walls, floors, roofs)."
+
+  - name: "WALL_BASE_CONSTRAINT"
+    built_in_id: "WALL_BASE_CONSTRAINT"
+    category: "Walls"
+    storage_type: "ElementId"
+    is_read_only: false
+    parameter_group: "PG_CONSTRAINTS"
+    available_versions: ["2024", "2025", "2026", "2027"]
+    deprecated_versions: []
+    replacement: null
+    source: "documented"
+    notes: "Base level constraint for walls. ElementId referencing a Level."
+
+  - name: "WALL_TOP_OFFSET"
+    built_in_id: "WALL_TOP_OFFSET"
+    category: "Walls"
+    storage_type: "Double"
+    is_read_only: false
+    parameter_group: "PG_CONSTRAINTS"
+    available_versions: ["2024", "2025", "2026", "2027"]
+    deprecated_versions: []
+    replacement: null
+    source: "documented"
+    notes: "Top offset from the top constraint level."
+
+  # --- Door-related built-in parameters ---
+  - name: "INSTANCE_HEAD_HEIGHT_PARAM"
+    built_in_id: "INSTANCE_HEAD_HEIGHT_PARAM"
+    category: "Doors"
+    storage_type: "Double"
+    is_read_only: false
+    parameter_group: "PG_CONSTRAINTS"
+    available_versions: ["2024", "2025", "2026", "2027"]
+    deprecated_versions: []
+    replacement: null
+    source: "documented"
+    notes: "Head height of door/window instances."
+
+  - name: "FAMILY_ROUGH_WIDTH_PARAM"
+    built_in_id: "FAMILY_ROUGH_WIDTH_PARAM"
+    category: "Doors"
+    storage_type: "Double"
+    is_read_only: true
+    parameter_group: "PG_GEOMETRY"
+    available_versions: ["2024", "2025", "2026", "2027"]
+    deprecated_versions: []
+    replacement: null
+    source: "documented"
+    notes: "Rough opening width from the door family definition."
+
+  # --- General identity parameters ---
+  - name: "ALL_MODEL_MARK"
+    built_in_id: "ALL_MODEL_MARK"
+    category: "*"
+    storage_type: "String"
+    is_read_only: false
+    parameter_group: "PG_IDENTITY_DATA"
+    available_versions: ["2024", "2025", "2026", "2027"]
+    deprecated_versions: []
+    replacement: null
+    source: "documented"
+    notes: "Mark parameter. Available on virtually all model element categories."
+
+  - name: "ELEM_CATEGORY_PARAM"
+    built_in_id: "ELEM_CATEGORY_PARAM"
+    category: "*"
+    storage_type: "ElementId"
+    is_read_only: true
+    parameter_group: "PG_IDENTITY_DATA"
+    available_versions: ["2024", "2025", "2026", "2027"]
+    deprecated_versions: []
+    replacement: null
+    source: "documented"
+    notes: "Element category. Read-only, available on all elements."
+
+  # --- Example: version-specific parameter (hypothetical) ---
+  - name: "ELEMENT_CARBON_FOOTPRINT"
+    built_in_id: "ELEMENT_CARBON_FOOTPRINT"
+    category: "*"
+    storage_type: "Double"
+    is_read_only: true
+    parameter_group: "PG_ANALYSIS_RESULTS"
+    available_versions: ["2027"]
+    deprecated_versions: []
+    replacement: null
+    source: "documented"
+    notes: >
+      Hypothetical example of a version-specific parameter. Illustrates how
+      new parameters introduced in later Revit versions are flagged with
+      limited available_versions. This specific parameter has NOT been
+      confirmed — it is included as a fixture format example only.
+
+  # --- Example: deprecated parameter (hypothetical) ---
+  - name: "ROOM_AREA_LEGACY"
+    built_in_id: "ROOM_AREA_LEGACY"
+    category: "Rooms"
+    storage_type: "Double"
+    is_read_only: true
+    parameter_group: "PG_GEOMETRY"
+    available_versions: ["2024"]
+    deprecated_versions: ["2025", "2026", "2027"]
+    replacement: "ROOM_AREA"
+    source: "documented"
+    notes: >
+      Hypothetical example of a deprecated parameter that was replaced in
+      a newer version. Illustrates the deprecation + replacement pattern.
+      This specific parameter has NOT been confirmed — it is included as
+      a fixture format example only.
+
+# --------------------------------------------------------------------------
+# Project/family/shared parameter examples (version-agnostic)
+# --------------------------------------------------------------------------
+version_agnostic_parameters:
+  - name: "Fire Rating"
+    type: "project_parameter"
+    storage_type: "String"
+    is_read_only: false
+    notes: >
+      Common project parameter. Not tied to any API version — defined in
+      the Revit project. Will appear in any Revit version that opens the
+      document. No version tracking needed.
+
+  - name: "Assembly Code"
+    type: "shared_parameter"
+    storage_type: "String"
+    is_read_only: false
+    notes: >
+      Common shared parameter (GUID-based). Version-independent — defined
+      in a shared parameter file, not by the API. No version tracking needed.
+
+  - name: "Cost"
+    type: "family_parameter"
+    storage_type: "Double"
+    is_read_only: false
+    notes: >
+      Family parameter defined in the family editor. Version-independent.
+      Exposed on instances/types of that family. No version tracking needed.
+
+# --------------------------------------------------------------------------
+# Discovery metadata
+# --------------------------------------------------------------------------
+discovery:
+  baseline_version: "2024"
+  baseline_scan_date: null
+  baseline_scan_run_id: null
+  notes: >
+    No InventoryModel scan has been performed yet against a real Revit model.
+    The parameters listed above are based on Revit API documentation.
+    Once the first real scan is completed, this section will be updated with
+    the scan run_id and date, and the available_versions fields will be
+    empirically confirmed.

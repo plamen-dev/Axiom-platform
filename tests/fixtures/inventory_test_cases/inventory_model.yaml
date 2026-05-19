@@ -1,0 +1,138 @@
+## InventoryModel test case suite
+## Each case tests prompt resolution and mock execution.
+## All cases run in simulation mode — no Revit model required.
+
+test_cases:
+
+  # ── Primary prompts ─────────────────────────────────────────────────
+
+  - test_id: inv_run_command
+    prompt: "Run InventoryModel"
+    expected_capability: InventoryModel
+    expected_success: true
+    mode: simulate
+    notes: "Primary developer/test prompt"
+
+  - test_id: inv_lowercase
+    prompt: "inventory model"
+    expected_capability: InventoryModel
+    expected_success: true
+    mode: simulate
+    notes: "Case-insensitive match"
+
+  - test_id: inv_one_word
+    prompt: "inventorymodel"
+    expected_capability: InventoryModel
+    expected_success: true
+    mode: simulate
+    notes: "No space variant"
+
+  # ── Natural language prompts ────────────────────────────────────────
+
+  - test_id: inv_list_elements
+    prompt: "List all model elements"
+    expected_capability: InventoryModel
+    expected_success: true
+    mode: simulate
+    notes: "Natural language element listing"
+
+  - test_id: inv_scan_params
+    prompt: "Scan model parameters"
+    expected_capability: InventoryModel
+    expected_success: true
+    mode: simulate
+    notes: "Parameter scan prompt"
+
+  - test_id: inv_extract_model_params
+    prompt: "Extract model parameters"
+    expected_capability: InventoryModel
+    expected_success: true
+    mode: simulate
+    notes: "Extract model parameters variant"
+
+  - test_id: inv_extract_all_params
+    prompt: "Extract all parameters"
+    expected_capability: InventoryModel
+    expected_success: true
+    mode: simulate
+    notes: "Extract all parameters variant"
+
+  - test_id: inv_show_writable
+    prompt: "Show writable parameters"
+    expected_capability: InventoryModel
+    expected_success: true
+    mode: simulate
+    notes: "Writable parameter focus"
+
+  - test_id: inv_model_inventory
+    prompt: "model inventory"
+    expected_capability: InventoryModel
+    expected_success: true
+    mode: simulate
+    notes: "Reversed word order"
+
+  # ── Unsupported / graceful failure ──────────────────────────────────
+
+  - test_id: inv_unrelated_diffuser
+    prompt: "Place diffusers in every room"
+    expected_capability: null
+    expected_success: false
+    expected_failure_reason: "Prompt not recognized"
+    mode: simulate
+    notes: "Unrelated prompt should fail gracefully"
+
+  - test_id: inv_unrelated_schedule
+    prompt: "Create a door schedule"
+    expected_capability: null
+    expected_success: false
+    expected_failure_reason: "Prompt not recognized"
+    mode: simulate
+    notes: "Scheduling is not an inventory action"
+
+  - test_id: inv_overly_specific
+    prompt: "Show me all structural columns on level 3"
+    expected_capability: null
+    expected_success: false
+    expected_failure_reason: "Prompt not recognized"
+    mode: simulate
+    notes: "Overly specific / filtered query not supported yet"
+
+  - test_id: inv_write_attempt
+    prompt: "Edit all wall comments to say test"
+    expected_capability: null
+    expected_success: false
+    expected_failure_reason: "Prompt not recognized"
+    mode: simulate
+    notes: "Write/edit prompts must fail — InventoryModel is read-only"
+
+  # ── Regression guards ───────────────────────────────────────────────
+
+  - test_id: inv_grid_regression
+    prompt: "Create 5 gridlines spaced 10 ft apart"
+    expected_capability: CreateGrids
+    expected_success: true
+    mode: simulate
+    notes: "Grid prompt must still resolve to CreateGrids, not InventoryModel"
+
+  - test_id: inv_level_regression
+    prompt: "Create 3 levels spaced 12 ft apart"
+    expected_capability: CreateLevels
+    expected_success: true
+    mode: simulate
+    notes: "Level prompt must still resolve to CreateLevels, not InventoryModel"
+
+  # ── Real execution (requires Revit) ─────────────────────────────────
+
+  - test_id: inv_real_execution
+    prompt: "Run InventoryModel"
+    expected_capability: InventoryModel
+    expected_success: true
+    mode: real
+    notes: "Real Revit execution — requires open model and pipe"
+
+  - test_id: inv_real_natural
+    prompt: "List all model elements"
+    expected_capability: InventoryModel
+    expected_success: true
+    mode: real
+    notes: "Real Revit execution with natural prompt"
