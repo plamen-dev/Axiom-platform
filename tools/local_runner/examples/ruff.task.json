@@ -1,0 +1,9 @@
+{
+  "action": "ruff",
+  "timeout_seconds": 120,
+  "workspace": "C:\\Dev\\Axiom\\Code\\Axiom-platform",
+  "metadata": {
+    "requested_by": "agent",
+    "purpose": "lint check after code changes"
+  }
+}

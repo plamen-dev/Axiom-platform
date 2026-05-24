@@ -1,0 +1,9 @@
+{
+  "action": "git_status",
+  "timeout_seconds": 30,
+  "workspace": "C:\\Dev\\Axiom\\Code\\Axiom-platform",
+  "metadata": {
+    "requested_by": "human",
+    "purpose": "check repository state before deploy"
+  }
+}

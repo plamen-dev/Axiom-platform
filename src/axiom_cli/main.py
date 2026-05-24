@@ -1116,6 +1116,55 @@ def inventory_summary(latest, run_id, base_dir, category_filter, param_name_filt
         console.print(param_table)
 
 
+@cli.command("local-runner")
+@click.option("--task", "task_path", required=True, type=click.Path(exists=True),
+              help="Path to task.json file")
+@click.option("--artifact-dir", default="artifacts/local_runner_runs",
+              type=click.Path(), help="Base directory for run artifacts")
+def local_runner(task_path, artifact_dir):
+    """Execute an allowlisted local action from a task.json file.
+
+    The local runner provides a restricted execution harness for safe
+    local developer/agent operations. Only named allowlisted actions
+    are permitted — no arbitrary shell commands.
+    """
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
+    from local_runner.local_runner import run_from_task_file
+
+    console.print("\n[bold blue]Axiom Local Runner[/bold blue]\n")
+    console.print(f"[dim]Task: {task_path}[/dim]")
+    console.print(f"[dim]Artifacts: {artifact_dir}[/dim]\n")
+
+    result = run_from_task_file(task_path, artifact_base=artifact_dir)
+
+    status_color = {
+        "success": "green",
+        "failed": "red",
+        "timed_out": "yellow",
+        "blocked": "red",
+        "not_implemented": "yellow",
+    }.get(result.status, "white")
+
+    console.print(f"[{status_color}]Status: {result.status}[/{status_color}]")
+    console.print(f"Action: {result.action}")
+    console.print(f"Exit code: {result.exit_code}")
+    console.print(f"Duration: {result.duration_ms}ms")
+
+    if result.artifact_dir:
+        console.print(f"Artifacts: {result.artifact_dir}")
+
+    if result.error_message:
+        console.print(f"[red]Error: {result.error_message}[/red]")
+
+    if result.status != "success" and result.artifact_dir:
+        failure_path = Path(result.artifact_dir) / "failure_summary.md"
+        if failure_path.exists():
+            console.print(f"\n[dim]Failure summary: {failure_path}[/dim]")
+
+
 @cli.command("inventory-import")
 @click.option("--latest", is_flag=True, default=False,
               help="Import the most recent Revit inventory export")

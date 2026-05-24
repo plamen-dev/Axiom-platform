@@ -1,0 +1,9 @@
+{
+  "action": "deploy_revit_2027",
+  "timeout_seconds": 600,
+  "workspace": "C:\\Dev\\Axiom\\Code\\Axiom-platform",
+  "metadata": {
+    "requested_by": "human",
+    "purpose": "build and deploy to Revit 2027"
+  }
+}
