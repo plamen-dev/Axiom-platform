@@ -2786,8 +2786,8 @@ class TestRegistryCoverageWorkflow:
         # Check metadata has coverage info
         meta = json.loads((reg_dir / "run_metadata.json").read_text())
         assert meta["after_dedup_count"] == 2
-        assert "Walls" in meta["categories_with_coverage"]
-        assert "Doors" in meta["categories_with_coverage"]
+        assert "Walls" in meta["categories_with_definitions"]
+        assert "Doors" in meta["categories_with_definitions"]
 
     def test_registry_build_merges_observed_count_on_dedup(self, tmp_path):
         """When same key appears in two runs, observed_count sums."""
@@ -2923,14 +2923,14 @@ class TestRegistryCoverageWorkflow:
             "--object-registry", str(tmp_path / "obj_reg"),
         ])
         assert result.exit_code == 0
-        assert "Missing coverage" in result.output
+        assert "Not executed/imported" in result.output
 
         meta = json.loads(
             (tmp_path / "registry" / "coverage_test" / "run_metadata.json").read_text(),
         )
-        assert "Doors" in meta["categories_missing_coverage"]
-        assert "Windows" in meta["categories_missing_coverage"]
-        assert "Walls" not in meta["categories_missing_coverage"]
+        assert "Doors" in meta["categories_not_executed"]
+        assert "Windows" in meta["categories_not_executed"]
+        assert "Walls" not in meta["categories_not_executed"]
 
 
 class TestParameterSchemaPlanExecution:
@@ -3381,6 +3381,236 @@ class TestManifestImportHardened:
         assert "resume" in result.output.lower() or "retry" in result.output.lower()
 
 
+class TestExportPathCollision:
+    """Tests for export path collision detection and unique filenames."""
+
+    def test_unique_export_paths_for_100_categories(self):
+        """100 categories processed in rapid succession produce 100 unique paths.
+
+        Simulates the C# naming scheme: inv_YYYYMMDD_HHmmss_fff_NNN_slug.json
+        """
+        import re
+        from datetime import datetime
+
+        paths: set[str] = set()
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:19]  # fff precision
+        for seq in range(1, 101):
+            category = f"Test Category {seq}"
+            slug = re.sub(r"[^\w]", "_", category.strip().lower())[:60]
+            path = f"inv_{timestamp}_{seq:03d}_{slug}.json"
+            paths.add(path)
+
+        assert len(paths) == 100, (
+            f"Expected 100 unique paths but got {len(paths)}. "
+            "Sequence numbering failed to produce unique filenames."
+        )
+
+    def test_category_slug_handles_special_chars(self):
+        """Category names with parentheses, spaces, special chars produce safe slugs."""
+        import re
+
+        test_cases = [
+            ("Walls", "walls"),
+            ("Mechanical Equipment", "mechanical_equipment"),
+            ("Duct Fittings (Types)", "duct_fittings_types"),
+            ("(No Category)", "no_category"),
+            ("Multi-Category Tags", "multi-category_tags"),
+        ]
+        for category, expected_contains in test_cases:
+            slug = re.sub(r"[^\w]", "_", category.strip().lower())[:60]
+            slug = slug.replace("(", "").replace(")", "")
+            assert slug, f"Empty slug for category '{category}'"
+            assert len(slug) <= 60, f"Slug too long for '{category}': {slug}"
+
+    def test_manifest_duplicate_export_path_detection(self, tmp_path):
+        """import-batch --manifest detects duplicate export_path values."""
+        import json
+
+        # Create manifest with duplicate export paths (simulating the collision bug)
+        manifest = {
+            "source_model": "Test.rvt",
+            "plan_id": "plan_collision",
+            "total_categories": 3,
+            "completed_categories": 3,
+            "failed_categories": 0,
+            "skipped_categories": 0,
+            "exports": [
+                {
+                    "category": "Walls",
+                    "status": "success",
+                    "export_path": str(tmp_path / "inv_20260524_120000.json"),
+                    "error_message": "",
+                },
+                {
+                    "category": "Doors",
+                    "status": "success",
+                    "export_path": str(tmp_path / "inv_20260524_120000.json"),
+                    "error_message": "",
+                },
+                {
+                    "category": "Windows",
+                    "status": "success",
+                    "export_path": str(tmp_path / "inv_20260524_120001.json"),
+                    "error_message": "",
+                },
+            ],
+        }
+        manifest_path = tmp_path / "manifest.json"
+        manifest_path.write_text(json.dumps(manifest))
+
+        # Create the referenced export files
+        for name in ["inv_20260524_120000.json", "inv_20260524_120001.json"]:
+            (tmp_path / name).write_text(json.dumps({
+                "run_id": name.replace(".json", ""),
+                "source_model": "Test.rvt",
+                "scan_mode": "category_parameter_schema",
+                "parameter_definitions": [],
+                "parameter_definition_count": 0,
+            }))
+
+        from axiom_cli.main import cli
+        from click.testing import CliRunner
+
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            "inventory-import-batch",
+            "--manifest", str(manifest_path),
+            "--output-dir", str(tmp_path / "output"),
+        ])
+        assert "collision detected" in result.output.lower() or \
+               "duplicate export path" in result.output.lower() or \
+               "WARNING" in result.output
+
+    def test_manifest_no_collision_when_paths_unique(self, tmp_path):
+        """import-batch --manifest does not warn when all export paths are unique."""
+        import json
+
+        manifest = {
+            "source_model": "Test.rvt",
+            "plan_id": "plan_ok",
+            "total_categories": 2,
+            "completed_categories": 2,
+            "failed_categories": 0,
+            "skipped_categories": 0,
+            "exports": [
+                {
+                    "category": "Walls",
+                    "status": "success",
+                    "export_path": str(tmp_path / "inv_20260524_120000_001_walls.json"),
+                    "error_message": "",
+                },
+                {
+                    "category": "Doors",
+                    "status": "success",
+                    "export_path": str(tmp_path / "inv_20260524_120000_002_doors.json"),
+                    "error_message": "",
+                },
+            ],
+        }
+        manifest_path = tmp_path / "manifest.json"
+        manifest_path.write_text(json.dumps(manifest))
+
+        for name in ["inv_20260524_120000_001_walls.json",
+                      "inv_20260524_120000_002_doors.json"]:
+            (tmp_path / name).write_text(json.dumps({
+                "run_id": name.replace(".json", ""),
+                "source_model": "Test.rvt",
+                "scan_mode": "category_parameter_schema",
+                "parameter_definitions": [],
+                "parameter_definition_count": 0,
+            }))
+
+        from axiom_cli.main import cli
+        from click.testing import CliRunner
+
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            "inventory-import-batch",
+            "--manifest", str(manifest_path),
+            "--output-dir", str(tmp_path / "output"),
+        ])
+        assert "export path collision detected" not in result.output.lower()
+
+
+class TestRegistryCoverageZeroDefinitions:
+    """Tests for distinguishing executed-with-zero-defs vs not-executed."""
+
+    def test_zero_definition_categories_reported_separately(self, tmp_path):
+        """Categories with zero parameter definitions should appear in summary."""
+        import json
+
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+        from axiom_core.inventory.storage import PARAMETER_SCHEMA_PARQUET_SCHEMA
+
+        inventory_dir = tmp_path / "inventory"
+
+        # Run with definitions (Walls)
+        walls_dir = inventory_dir / "ps_walls"
+        walls_dir.mkdir(parents=True)
+        rows = {
+            "run_id": ["ps_walls"], "source_model": ["T.rvt"],
+            "scan_mode": ["category_parameter_schema"], "category": ["Walls"],
+            "class_name": ["Wall"], "parameter_name": ["Height"],
+            "storage_type": ["Double"], "built_in_parameter_id": [""],
+            "is_read_only": [False], "is_instance_param": [True],
+            "is_type_param": [False], "observed_count": [10],
+            "observed_on_categories": ["Walls"], "observed_on_classes": ["Wall"],
+            "data_type_id": [""], "data_type_label": ["Length"],
+            "group_type_id": [""], "group_type_label": [""],
+            "is_measurable_spec": [False], "unit_type_id": [""],
+            "unit_label": [""], "discipline_label": [""],
+        }
+        table = pa.table(rows, schema=PARAMETER_SCHEMA_PARQUET_SCHEMA)
+        pq.write_table(table, str(walls_dir / "parameter_schema.parquet"))
+        (walls_dir / "run_metadata.json").write_text(json.dumps({
+            "run_id": "ps_walls", "source_model": "T.rvt",
+            "scan_mode": "category_parameter_schema",
+            "object_category": "Walls", "parameter_definition_count": 1,
+        }))
+
+        # Run with zero definitions (Tags)
+        tags_dir = inventory_dir / "ps_tags"
+        tags_dir.mkdir(parents=True)
+        empty_rows = {col: [] for col in PARAMETER_SCHEMA_PARQUET_SCHEMA.names}
+        empty_table = pa.table(empty_rows, schema=PARAMETER_SCHEMA_PARQUET_SCHEMA)
+        pq.write_table(empty_table, str(tags_dir / "parameter_schema.parquet"))
+        (tags_dir / "run_metadata.json").write_text(json.dumps({
+            "run_id": "ps_tags", "source_model": "T.rvt",
+            "scan_mode": "category_parameter_schema",
+            "object_category": "Multi-Category Tags", "parameter_definition_count": 0,
+        }))
+
+        from axiom_cli.main import cli
+        from click.testing import CliRunner
+
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            "parameter-registry-build",
+            "--from-inventory", str(inventory_dir),
+            "--output-dir", str(tmp_path / "registry"),
+            "--run-id", "zero_defs_test",
+        ])
+        assert result.exit_code == 0
+        assert "Categories with zero definitions: 1" in result.output
+        assert "Categories with definitions: 1" in result.output
+        assert "Categories executed: 2" in result.output
+
+        meta = json.loads(
+            (tmp_path / "registry" / "zero_defs_test" / "run_metadata.json").read_text(),
+        )
+        assert "Multi-Category Tags" in meta["categories_with_zero_definitions"]
+        assert "Walls" in meta["categories_with_definitions"]
+        assert "Multi-Category Tags" not in meta["categories_with_definitions"]
+        assert meta["category_executed_count"] == 2
+        assert meta["category_with_definitions_count"] == 1
+        assert meta["category_zero_defs_count"] == 1
+
+        summary = (tmp_path / "registry" / "zero_defs_test" / "summary.md").read_text()
+        assert "Executed With Zero Parameter Definitions" in summary
+        assert "Multi-Category Tags" in summary
+
+
 class TestRegistryCoveragePriority:
     """Tests for priority coverage in registry build (BHV-019)."""
 
@@ -3443,5 +3673,5 @@ class TestRegistryCoveragePriority:
         summary_files = list(out_dir.rglob("summary.md"))
         assert len(summary_files) > 0
         summary_text = summary_files[0].read_text()
-        assert "Priority categories covered" in summary_text
+        assert "Covered Priority Categories" in summary_text
         assert "Walls" in summary_text

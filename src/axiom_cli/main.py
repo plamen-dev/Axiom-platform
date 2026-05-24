@@ -1583,6 +1583,35 @@ def inventory_import_batch(import_dir, manifest_path, scan_mode_filter, output_d
                       f"skipped={len(skipped_exports)})[/dim]")
         console.print()
 
+        # Detect duplicate export_path values (export collision)
+        export_paths = [
+            e.get("export_path", "") for e in successful_exports
+            if e.get("export_path")
+        ]
+        unique_paths = set(export_paths)
+        if len(export_paths) != len(unique_paths):
+            dup_count = len(export_paths) - len(unique_paths)
+            console.print(
+                f"[red bold]WARNING: Export path collision detected![/red bold]\n"
+                f"  Successful entries: {len(export_paths)}\n"
+                f"  Distinct export paths: {len(unique_paths)}\n"
+                f"  Duplicate export paths: {dup_count}\n"
+            )
+            console.print(
+                "[red]Multiple categories exported to the same file, causing "
+                "data loss. Redeploy with the export collision fix and rerun "
+                "the plan.[/red]\n"
+            )
+            # Show which paths are duplicated
+            from collections import Counter as _Counter
+            path_counts = _Counter(export_paths)
+            dups = {p: c for p, c in path_counts.items() if c > 1}
+            for dp, dc in sorted(dups.items(), key=lambda x: -x[1])[:10]:
+                console.print(f"  [red]-[/red] {dp} ({dc} categories)")
+            if len(dups) > 10:
+                console.print(f"  [dim]... and {len(dups) - 10} more[/dim]")
+            console.print()
+
         if failed_exports:
             console.print("[yellow]Failed categories (not imported):[/yellow]")
             for fe in failed_exports:
@@ -2376,7 +2405,7 @@ def parameter_registry_build(input_dir, output_dir, run_id, object_registry_dir)
     console.print(f"  parquet: {parquet_path}")
 
     # Coverage analysis
-    covered_categories = {r["ObjectCategory"] for r in final_rows if r["ObjectCategory"]}
+    categories_with_definitions = {r["ObjectCategory"] for r in final_rows if r["ObjectCategory"]}
     unique_names = {r["ParameterName"] for r in final_rows}
     ro_count = sum(1 for r in final_rows if r["IsReadOnly"])
     instance_count = sum(1 for r in final_rows if r["IsInstanceParam"])
@@ -2385,36 +2414,58 @@ def parameter_registry_build(input_dir, output_dir, run_id, object_registry_dir)
     dt_counter = Counter(r["DataTypeLabel"] for r in final_rows if r["DataTypeLabel"])
     grp_counter = Counter(r["GroupTypeLabel"] for r in final_rows if r["GroupTypeLabel"])
 
+    # Scan run_metadata.json files to find all executed categories
+    # (including those with zero parameter definitions)
+    executed_categories: set[str] = set()
+    executed_zero_defs: set[str] = set()
+    for ps_file in ps_files:
+        meta_file = ps_file.parent / "run_metadata.json"
+        if meta_file.exists():
+            with open(meta_file, "r", encoding="utf-8-sig") as mf:
+                rmeta = json_mod.load(mf)
+            obj_cat = rmeta.get("object_category", "")
+            if obj_cat:
+                executed_categories.add(obj_cat)
+                if rmeta.get("parameter_definition_count", 0) == 0:
+                    executed_zero_defs.add(obj_cat)
+    # Categories from parquet rows are also executed
+    executed_categories.update(categories_with_definitions)
+
     # Check coverage against object registry if provided
-    all_categories: set[str] = set()
+    discovered_categories: set[str] = set()
     if object_registry_dir:
         obj_reg_path = Path(object_registry_dir)
         obj_parquet_files = list(obj_reg_path.rglob("revit_object_registry.parquet"))
         for opf in obj_parquet_files:
             ot = pq.read_table(str(opf))
             if "category" in ot.schema.names:
-                all_categories.update(
+                discovered_categories.update(
                     c for c in ot.column("category").to_pylist() if c
                 )
-        # Also check elements.parquet
         elem_parquet_files = list(obj_reg_path.rglob("elements.parquet"))
         for epf in elem_parquet_files:
             et = pq.read_table(str(epf))
             if "category" in et.schema.names:
-                all_categories.update(
+                discovered_categories.update(
                     c for c in et.column("category").to_pylist() if c
                 )
 
-    missing_categories = sorted(all_categories - covered_categories) if all_categories else []
+    not_executed = sorted(discovered_categories - executed_categories) if discovered_categories else []
+    executed_matching_discovered = sorted(
+        executed_categories & discovered_categories
+    ) if discovered_categories else []
 
     # Priority coverage analysis
     from axiom_core.inventory.extraction_planner import PRIORITY_CATEGORIES
     priority_lower = {p.lower(): p for p in PRIORITY_CATEGORIES}
     covered_priority = sorted(
-        c for c in covered_categories if c.lower() in priority_lower
+        c for c in categories_with_definitions if c.lower() in priority_lower
+    )
+    executed_priority = sorted(
+        c for c in executed_categories if c.lower() in priority_lower
     )
     missing_priority = sorted(
-        p for p in PRIORITY_CATEGORIES if p.lower() not in {c.lower() for c in covered_categories}
+        p for p in PRIORITY_CATEGORIES if p.lower() not in {c.lower() for c in executed_categories}
     )
 
     # Write summary
@@ -2426,19 +2477,32 @@ def parameter_registry_build(input_dir, output_dir, run_id, object_registry_dir)
         f"- **Total definitions before dedup:** {len(all_rows)}\n",
         f"- **Total unique definitions:** {len(final_rows)}\n",
         f"- **Unique parameter names:** {len(unique_names)}\n",
-        f"- **Categories with coverage:** {len(covered_categories)}\n",
         f"- **Read-only:** {ro_count}\n",
         f"- **Writable:** {len(final_rows) - ro_count}\n",
         f"- **Instance params:** {instance_count}\n",
         f"- **Type params:** {type_count}\n",
+        "\n## Coverage Breakdown\n",
     ]
-    if all_categories:
+    if discovered_categories:
+        summary_lines.append(
+            f"- **Discovered object categories:** {len(discovered_categories)}\n"
+        )
+    summary_lines.extend([
+        f"- **Categories executed successfully:** {len(executed_categories)}\n",
+        f"- **Categories with parameter definitions:** {len(categories_with_definitions)}\n",
+        f"- **Categories with zero parameter definitions:** {len(executed_zero_defs)}\n",
+    ])
+    if discovered_categories:
         summary_lines.extend([
-            f"- **Total discovered categories:** {len(all_categories)}\n",
-            f"- **Categories missing coverage:** {len(missing_categories)}\n",
+            f"- **Executed categories matching discovered:** "
+            f"{len(executed_matching_discovered)}\n",
+            f"- **Categories not executed/imported:** {len(not_executed)}\n",
         ])
     summary_lines.extend([
-        f"- **Priority categories covered:** {len(covered_priority)} / {len(PRIORITY_CATEGORIES)}\n",
+        f"- **Priority categories executed:** "
+        f"{len(executed_priority)} / {len(PRIORITY_CATEGORIES)}\n",
+        f"- **Priority categories with definitions:** "
+        f"{len(covered_priority)} / {len(PRIORITY_CATEGORIES)}\n",
         f"- **Priority categories missing:** {len(missing_priority)}\n",
     ])
 
@@ -2465,10 +2529,23 @@ def parameter_registry_build(input_dir, output_dir, run_id, object_registry_dir)
         summary_lines.append("\n## Missing Priority Categories\n")
         for mp in missing_priority:
             summary_lines.append(f"- {mp}\n")
-    if missing_categories:
-        summary_lines.append("\n## All Missing Coverage\n")
-        for mc in missing_categories:
-            summary_lines.append(f"- {mc}\n")
+    if executed_zero_defs:
+        summary_lines.append("\n## Executed With Zero Parameter Definitions\n")
+        summary_lines.append(
+            "These categories were scanned successfully but had no parameter "
+            "definitions. This is expected for categories like tags, annotation "
+            "symbols, and internal Revit types.\n\n"
+        )
+        for zc in sorted(executed_zero_defs):
+            summary_lines.append(f"- {zc}\n")
+    if not_executed:
+        summary_lines.append("\n## Not Executed / Not Imported\n")
+        summary_lines.append(
+            "These categories exist in the object registry but have not been "
+            "scanned for parameter schema yet.\n\n"
+        )
+        for ne in not_executed:
+            summary_lines.append(f"- {ne}\n")
     summary_lines.append("\n## Source Runs\n")
     for sr in source_runs:
         summary_lines.append(f"- {sr}\n")
@@ -2484,11 +2561,18 @@ def parameter_registry_build(input_dir, output_dir, run_id, object_registry_dir)
         "before_dedup_count": len(all_rows),
         "after_dedup_count": len(final_rows),
         "unique_parameter_names": len(unique_names),
-        "categories_with_coverage": sorted(covered_categories),
-        "categories_missing_coverage": missing_categories,
+        "categories_with_definitions": sorted(categories_with_definitions),
+        "categories_executed_successfully": sorted(executed_categories),
+        "categories_with_zero_definitions": sorted(executed_zero_defs),
+        "categories_not_executed": not_executed,
+        "discovered_object_categories": sorted(discovered_categories) if discovered_categories else [],
+        "executed_matching_discovered": executed_matching_discovered,
         "covered_priority_categories": covered_priority,
+        "executed_priority_categories": executed_priority,
         "missing_priority_categories": missing_priority,
-        "category_count": len(covered_categories),
+        "category_with_definitions_count": len(categories_with_definitions),
+        "category_executed_count": len(executed_categories),
+        "category_zero_defs_count": len(executed_zero_defs),
         "read_only_count": ro_count,
         "writable_count": len(final_rows) - ro_count,
         "instance_param_count": instance_count,
@@ -2506,15 +2590,21 @@ def parameter_registry_build(input_dir, output_dir, run_id, object_registry_dir)
 
     # Console summary
     console.print(f"\n[bold green]Property registry built: {len(final_rows)} unique definitions "
-                  f"from {len(source_runs)} runs across {len(covered_categories)} categories"
-                  f"[/bold green]")
-    console.print(f"  Priority coverage: {len(covered_priority)}/{len(PRIORITY_CATEGORIES)}")
+                  f"from {len(source_runs)} runs[/bold green]")
+    console.print(f"  Categories executed: {len(executed_categories)}")
+    console.print(f"  Categories with definitions: {len(categories_with_definitions)}")
+    console.print(f"  Categories with zero definitions: {len(executed_zero_defs)}")
+    if discovered_categories:
+        console.print(f"  Discovered object categories: {len(discovered_categories)}")
+        console.print(f"  Not executed/imported: {len(not_executed)}")
+    console.print(f"  Priority coverage: {len(executed_priority)}/{len(PRIORITY_CATEGORIES)} "
+                  f"executed, {len(covered_priority)}/{len(PRIORITY_CATEGORIES)} with definitions")
     if missing_priority:
         console.print(f"[yellow]Missing priority categories: "
                       f"{', '.join(missing_priority)}[/yellow]")
-    if missing_categories:
-        console.print(f"[yellow]Missing coverage for {len(missing_categories)} categories total. "
-                      f"Run parameter schema for these categories to complete coverage.[/yellow]")
+    if not_executed:
+        console.print(f"[dim]{len(not_executed)} categories not yet executed. "
+                      f"Use plan execution queue to scan remaining categories.[/dim]")
 
 
 if __name__ == "__main__":

@@ -493,7 +493,7 @@ namespace Axiom.RevitAddin
                         catch { catData["active_view"] = ""; }
 
                         string exportPath = PersistInventoryJson(
-                            catResult.CapabilityResult, doc.Title);
+                            catResult.CapabilityResult, doc.Title, category);
 
                         exportEntries.Add(new Dictionary<string, object>
                         {
@@ -648,15 +648,37 @@ namespace Axiom.RevitAddin
             return null;
         }
 
+        /// <summary>Sequence counter for unique export filenames within a session.</summary>
+        private static int _exportSequence = 0;
+
+        /// <summary>
+        /// Sanitize a category name into a safe filesystem slug.
+        /// Replaces spaces with underscores, removes invalid path chars,
+        /// strips parentheses, and lowercases.
+        /// </summary>
+        private static string CategorySlug(string category)
+        {
+            if (string.IsNullOrWhiteSpace(category)) return "unknown";
+            var slug = category.Trim().ToLowerInvariant()
+                .Replace(" ", "_")
+                .Replace("(", "").Replace(")", "");
+            // Remove any remaining invalid filename chars
+            foreach (char c in Path.GetInvalidFileNameChars())
+                slug = slug.Replace(c.ToString(), "");
+            if (slug.Length > 60) slug = slug.Substring(0, 60);
+            return string.IsNullOrEmpty(slug) ? "unknown" : slug;
+        }
+
         /// <summary>
         /// Write inventory results to a JSON file for the Python persistence pipeline.
         /// Returns the full file path on success, or null on failure.
-        /// Output: %LOCALAPPDATA%\Axiom\inventory_exports\inv_YYYYMMDD_HHmmss.json
+        /// Output: %LOCALAPPDATA%\Axiom\inventory_exports\inv_YYYYMMDD_HHmmss_fff_NNN_slug.json
         /// Uses streaming serialization to avoid building huge in-memory strings.
         /// </summary>
         private static string PersistInventoryJson(
             Axiom.Core.Capabilities.CapabilityResult capResult,
-            string docTitle)
+            string docTitle,
+            string category = null)
         {
             try
             {
@@ -665,7 +687,15 @@ namespace Axiom.RevitAddin
                 string exportDir = Path.Combine(localAppData, "Axiom", "inventory_exports");
                 Directory.CreateDirectory(exportDir);
 
-                string runId = "inv_" + DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                int seq = System.Threading.Interlocked.Increment(ref _exportSequence);
+                string slug = CategorySlug(
+                    category
+                    ?? (capResult.OutputData.ContainsKey("object_category")
+                        ? capResult.OutputData["object_category"]?.ToString()
+                        : null)
+                    ?? "export");
+                string runId = "inv_" + DateTime.Now.ToString("yyyyMMdd_HHmmss_fff")
+                    + $"_{seq:D3}_{slug}";
                 string filePath = Path.Combine(exportDir, runId + ".json");
 
                 var exportData = new Dictionary<string, object>
