@@ -16,7 +16,7 @@ Axiom targets **Revit 2024** as the baseline. This document covers building and 
 | Target Framework | `net48` (old-style .csproj) | `net10.0-windows` (SDK-style .csproj) |
 | RevitAPI.dll path | `C:\Program Files\Autodesk\Revit 2024\RevitAPI.dll` | `C:\Program Files\Autodesk\Revit 2027\RevitAPI.dll` |
 | RevitAPIUI.dll path | `C:\Program Files\Autodesk\Revit 2024\RevitAPIUI.dll` | `C:\Program Files\Autodesk\Revit 2027\RevitAPIUI.dll` |
-| .addin manifest folder | `C:\ProgramData\Autodesk\Revit\Addins\2024\` | `C:\ProgramData\Autodesk\Revit\Addins\2027\` |
+| .addin manifest folder | `C:\ProgramData\Autodesk\Revit\Addins\2024\` | `C:\Program Files\Autodesk\Revit\Addins\2027\` |
 | .csproj format | Legacy (ToolsVersion 15.0) | SDK-style recommended |
 | C# language | 7.3 | 12+ |
 | Add-in isolation | Not available | `AddInDependencyBase`, `PublicAssemblies`, `Dependencies` |
@@ -189,7 +189,7 @@ Same .addin manifest content, different target folder:
 
 ```powershell
 $source2027 = "src\axiom_revit\Axiom.RevitAddin\bin\x64\Debug\net10.0-windows"  # if using SDK-style
-$addinDir2027 = "C:\ProgramData\Autodesk\Revit\Addins\2027"
+$addinDir2027 = "C:\Program Files\Autodesk\Revit\Addins\2027"
 
 # Create the 2027 addins folder if needed
 New-Item -ItemType Directory -Force -Path $addinDir2027
@@ -335,7 +335,7 @@ msbuild Axiom.Revit.sln /p:Configuration=Debug /p:Platform=x64
 ```powershell
 cd src\axiom_revit
 dotnet build Axiom.Revit.2027.sln -c Debug
-# Deploy to C:\ProgramData\Autodesk\Revit\Addins\2027\
+# Deploy to C:\Program Files\Autodesk\Revit\Addins\2027\
 ```
 
 ### Python side (unchanged for both versions)

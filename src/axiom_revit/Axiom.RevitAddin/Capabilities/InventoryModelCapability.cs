@@ -57,62 +57,123 @@ namespace Axiom.RevitAddin.Capabilities
                 return result;
             }
 
-            // Real execution: collect inventory
+            // Real execution: route based on scan mode
             try
             {
                 var service = new ModelInventoryService();
-                var inventory = service.CollectInventory(doc, parameters);
 
-                int instanceCount = 0;
-                int typeCount = 0;
-                int paramCount = 0;
-                var serializedElements = new List<Dictionary<string, object>>();
-
-                foreach (var elem in inventory.Elements)
+                if (parameters.ParameterSchemaOnly)
                 {
-                    if (elem.IsType) typeCount++;
-                    else instanceCount++;
+                    // Parameter schema: collect parameter definitions via CollectSchema()
+                    var schema = service.CollectSchema(doc, parameters);
 
-                    paramCount += elem.Parameters.Count;
-
-                    var elemDict = new Dictionary<string, object>
+                    var serializedParams = new List<Dictionary<string, object>>();
+                    foreach (var p in schema.Parameters)
                     {
-                        { "ElementId", elem.ElementId },
-                        { "UniqueId", elem.UniqueId },
-                        { "Category", elem.Category },
-                        { "ClassName", elem.ClassName },
-                        { "Name", elem.Name },
-                        { "FamilyName", elem.FamilyName ?? "" },
-                        { "TypeName", elem.TypeName ?? "" },
-                        { "LevelName", elem.LevelName ?? "" },
-                        { "WorksetName", elem.WorksetName ?? "" },
-                        { "IsType", elem.IsType },
-                    };
-
-                    var paramList = new List<Dictionary<string, object>>();
-                    foreach (var p in elem.Parameters)
-                    {
-                        paramList.Add(new Dictionary<string, object>
+                        serializedParams.Add(new Dictionary<string, object>
                         {
-                            { "Name", p.Name },
+                            { "ParameterName", p.ParameterName },
                             { "StorageType", p.StorageType },
-                            { "ValueString", p.ValueString ?? "" },
-                            { "ValueDouble", p.ValueDouble },
-                            { "ValueInt", p.ValueInt },
                             { "BuiltInParameterId", p.BuiltInParameterId ?? "" },
                             { "IsReadOnly", p.IsReadOnly },
+                            { "IsInstanceParam", p.IsInstanceParam },
+                            { "IsTypeParam", p.IsTypeParam },
+                            { "ObservedCount", p.ObservedCount },
+                            { "ObservedOnCategories", p.ObservedOnCategories },
+                            { "ObservedOnClasses", p.ObservedOnClasses },
+                            { "DataTypeId", p.DataTypeId ?? "" },
+                            { "DataTypeLabel", p.DataTypeLabel ?? "" },
+                            { "GroupTypeId", p.GroupTypeId ?? "" },
+                            { "GroupTypeLabel", p.GroupTypeLabel ?? "" },
+                            { "IsMeasurableSpec", p.IsMeasurableSpec },
+                            { "UnitTypeId", p.UnitTypeId ?? "" },
+                            { "UnitLabel", p.UnitLabel ?? "" },
+                            { "DisciplineLabel", p.DisciplineLabel ?? "" },
                         });
                     }
-                    elemDict["Parameters"] = paramList;
-                    serializedElements.Add(elemDict);
-                }
 
-                result.Status = "SUCCESS";
-                result.OutputData["element_count"] = instanceCount;
-                result.OutputData["type_count"] = typeCount;
-                result.OutputData["parameter_count"] = paramCount;
-                result.OutputData["elements"] = serializedElements;
-                result.DurationMs = sw.ElapsedMilliseconds;
+                    result.Status = "SUCCESS";
+                    result.OutputData["scan_mode"] = parameters.ScanMode;
+                    result.OutputData["instance_count"] = schema.InstanceCount;
+                    result.OutputData["type_count"] = schema.TypeCount;
+                    result.OutputData["element_count"] = schema.InstanceCount + schema.TypeCount;
+                    result.OutputData["parameter_definition_count"] = schema.Parameters.Count;
+                    result.OutputData["error_count"] = schema.ErrorCount;
+                    result.OutputData["category_counts"] = schema.CategoryCounts;
+                    result.OutputData["parameter_definitions"] = serializedParams;
+                    if (parameters.CategoryFilter != null && parameters.CategoryFilter.Length > 0)
+                        result.OutputData["object_category"] = string.Join(", ", parameters.CategoryFilter);
+                    result.DurationMs = sw.ElapsedMilliseconds;
+                }
+                else
+                {
+                    // Object schema / summary / category / sample / batched modes
+                    var inventory = service.CollectInventory(doc, parameters);
+
+                    int instanceCount = inventory.InstanceCount;
+                    int typeCount = inventory.TypeCount;
+                    int paramCount = 0;
+
+                    var serializedElements = new List<Dictionary<string, object>>();
+                    if (!parameters.SummaryOnly)
+                    {
+                        foreach (var elem in inventory.Elements)
+                        {
+                            try
+                            {
+                                paramCount += elem.Parameters.Count;
+
+                                var elemDict = new Dictionary<string, object>
+                                {
+                                    { "ElementId", elem.ElementId },
+                                    { "UniqueId", elem.UniqueId },
+                                    { "Category", elem.Category },
+                                    { "ClassName", elem.ClassName },
+                                    { "Name", elem.Name },
+                                    { "FamilyName", elem.FamilyName ?? "" },
+                                    { "TypeName", elem.TypeName ?? "" },
+                                    { "LevelName", elem.LevelName ?? "" },
+                                    { "WorksetName", elem.WorksetName ?? "" },
+                                    { "IsType", elem.IsType },
+                                };
+
+                                var paramList = new List<Dictionary<string, object>>();
+                                foreach (var p in elem.Parameters)
+                                {
+                                    paramList.Add(new Dictionary<string, object>
+                                    {
+                                        { "Name", p.Name },
+                                        { "StorageType", p.StorageType },
+                                        { "ValueString", p.ValueString ?? "" },
+                                        { "ValueDouble", p.ValueDouble },
+                                        { "ValueInt", p.ValueInt },
+                                        { "BuiltInParameterId", p.BuiltInParameterId ?? "" },
+                                        { "IsReadOnly", p.IsReadOnly },
+                                    });
+                                }
+                                elemDict["Parameters"] = paramList;
+                                serializedElements.Add(elemDict);
+                            }
+                            catch (Exception)
+                            {
+                                // Skip individual element serialization errors
+                            }
+                        }
+                    }
+
+                    result.Status = "SUCCESS";
+                    result.OutputData["scan_mode"] = parameters.ScanMode;
+                    result.OutputData["instance_count"] = instanceCount;
+                    result.OutputData["type_count"] = typeCount;
+                    result.OutputData["element_count"] = instanceCount + typeCount;
+                    result.OutputData["parameter_count"] = paramCount;
+                    result.OutputData["error_count"] = inventory.ErrorCount;
+                    result.OutputData["category_counts"] = inventory.CategoryCounts;
+                    result.OutputData["elements"] = serializedElements;
+                    if (parameters.CategoryFilter != null && parameters.CategoryFilter.Length > 0)
+                        result.OutputData["object_category"] = string.Join(", ", parameters.CategoryFilter);
+                    result.DurationMs = sw.ElapsedMilliseconds;
+                }
             }
             catch (Exception ex)
             {

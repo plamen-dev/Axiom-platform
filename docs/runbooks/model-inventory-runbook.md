@@ -2,7 +2,233 @@
 
 ## Overview
 
-InventoryModel is a **read-only** Revit capability that scans the active model and returns a structured inventory of all elements and their parameters. It never modifies the model.
+InventoryModel is a **read-only** Revit capability that scans the active model and returns a structured inventory of elements and their parameters. It never modifies the model.
+
+**Important:** Default scan mode is **summary-only** (counts and categories). Full parameter scanning of large models can crash Revit due to memory pressure. Always use the staged workflow below.
+
+## Staged Scan Workflow (Recommended)
+
+```
+ 1. Run InventoryModel                                → summary (counts + categories, no parameters)
+ 2. Run InventoryModel schema                         → object_schema (ElementId, Category, ClassName, Name, LevelName, IsType)
+ 3. Run InventoryModel parameter schema               → parameter_schema (ParameterName, StorageType, BuiltInParameterId, IsReadOnly, Instance/Type)
+ 4. Run InventoryModel parameter schema batch 500     → parameter_schema in bounded batches
+ 5. axiom inventory-plan --file <summary.json>        → build safe extraction plan
+ 6. Run InventoryModel for Walls                      → category value extraction (small categories)
+ 7. Run InventoryModel for Walls schema               → category_object_schema (elements only)
+ 8. Run InventoryModel for Walls parameter schema     → category_parameter_schema (parameter defs)
+ 9. Run InventoryModel sample values for Walls        → constrained value samples (max 25 elements)
+10. Run InventoryModel sample values for Walls max 25 → explicit max cap
+11. Run InventoryModel sample values on Level 1 max 25 → level-constrained samples
+12. Run InventoryModel on Level 1                     → level scan (one level)
+13. Run InventoryModel for Walls on Level 1           → category + level scan
+14. Run InventoryModel sample                        → sample (first 100 elements)
+15. Run full InventoryModel                          → DISABLED (returns blocked message)
+16. Run InventoryModel batch 100                     → resolves to object_schema (NOT full values)
+```
+
+**Full value extraction is currently disabled.** It crashed Revit 2027 on real models (~43K instances), even with batching. The expensive operation is per-element parameter value extraction, not element enumeration.
+
+**Whole-model value sampling is also disabled.** It crashed Revit 2027 due to expensive value accessors. Use category/level-constrained sample values instead.
+
+### Four Extraction Tiers
+
+| Tier | Mode | Cost | Safe for whole model? |
+|------|------|------|-----------------------|
+| **Object schema** | `object_schema`, `category_object_schema` | Low | Yes (validated Revit 2027) |
+| **Parameter schema** | `category_parameter_schema` | Low | Only with category/level constraint (whole-model BLOCKED) |
+| **Value sampling** | `category_sample_values` (constrained) | Medium | Only with category/level/max |
+| **Whole-model value sampling** | `sample_values` | High | No — BLOCKED |
+| **Full value export** | `full` | High | No — BLOCKED |
+
+### Hard Caps for Value Sampling
+
+| Parameter | Default |
+|-----------|---------|
+| MaxElements | 25 |
+| SampleLimit (samples per parameter) | 5 |
+
+These defaults apply unless overridden with `max N` in the prompt.
+
+## Scan Modes
+
+| Mode | Prompt | What it collects | Safety |
+|------|--------|------------------|--------|
+| **summary** (default) | `Run InventoryModel` | Instance/type counts, category breakdown | Safe for any model size |
+| **object_schema** | `Run InventoryModel schema` | ElementId, Category, ClassName, Name, LevelName, IsType (no params) | Safe — validated Revit 2027 |
+| **object_schema** (batched) | `Run InventoryModel schema batch 500` | Object schema in bounded batches | Safe |
+| **parameter_schema** | `Run InventoryModel parameter schema` | BLOCKED — whole-model param schema crashed Revit 2027 | Blocked |
+| **category_object_schema** | `Run InventoryModel for Walls schema` | Category element inventory (no parameters) | Safe |
+| **category_parameter_schema** | `Run InventoryModel for Walls parameter schema` | Category parameter definitions only | Safe |
+| **sample_values** | `Run InventoryModel sample values` | BLOCKED — whole-model sampling crashed Revit 2027 | Blocked |
+| **category_sample_values** | `Run InventoryModel sample values for Walls` | Category value samples (max 25 elements, 5/param) | Safe (constrained) |
+| **category** | `Run InventoryModel for Walls` | All elements in one category + parameters | Safe for small categories |
+| **level** | `Run InventoryModel on Level 1` | All elements on one level + parameters | Safe for most levels |
+| **category_level** | `Run InventoryModel for Walls on Level 1` | One category on one level | Safest value scan |
+| **sample** | `Run InventoryModel sample` | First 100 elements + parameters | Always safe (capped) |
+| **batch→object_schema** | `Run InventoryModel batch 100` | Resolves to object schema, not full values | Safe |
+| **full** | `Run full InventoryModel` | DISABLED — returns blocked message | Blocked |
+
+### Schema Discovery Mode
+
+Two schema modes exist to separate concerns:
+
+**1. Object Schema** (`object_schema`, `category_object_schema`):
+- Collects: ElementId, Category, ClassName, Name, LevelName, IsType
+- Does NOT collect parameters
+- Output includes both instances and types (e.g. 42,881 + 2,276 = 45,157 total elements)
+- Validated working on Revit 2027 Snowdon Towers
+- This is what `Run InventoryModel schema` produces
+
+**2. Parameter Schema** (`category_parameter_schema` — whole-model BLOCKED):
+- Collects: ParameterName, StorageType, BuiltInParameterId, IsReadOnly, IsInstanceParam, IsTypeParam, ObservedCount, ObservedOnCategories, ObservedOnClasses
+- Does NOT collect values (no AsString/AsValueString/AsDouble calls)
+- Reads only `param.Definition` objects
+- Uses `CollectSchema()` in C# service (separate from `CollectInventory()`)
+- **Whole-model parameter schema crashed Revit 2027** (BUG-017). Must use category/level constraint.
+- Allowed: `Run InventoryModel for Walls parameter schema`, `parameter schema on Level 1`
+- Blocked: `Run InventoryModel parameter schema` (no constraint)
+
+**Why whole-model parameter schema crashes:** Even though it only reads `param.Definition` objects (no value accessors), iterating all ~43K elements and enumerating their parameter definitions is still too expensive for live Revit on large models.
+
+### Value Sampling Mode
+
+**Whole-model value sampling is BLOCKED** — it crashed Revit 2027 due to expensive value accessors (AsString, AsValueString, AsDouble). Use constrained sample values with category/level/max constraints.
+
+**Allowed patterns:**
+- `Run InventoryModel sample values for Walls` — category-constrained
+- `Run InventoryModel sample values for Plumbing Fixtures` — category-constrained
+- `Run InventoryModel sample values for Walls max 25` — explicit max
+- `Run InventoryModel sample values on Level 1 max 25` — level-constrained
+- `Run InventoryModel sample values for Walls on Level 1 max 25` — both
+
+**Blocked:**
+- `Run InventoryModel sample values` — no category/level/max → blocked
+
+**Hard caps:**
+- MaxElements: 25 (default, overridable with `max N`)
+- SampleLimit: 5 samples per parameter
+- Never collect all values by default
+- Avoid expensive string/value conversions unless needed
+
+### Parameter Discovery Workflow (Validated)
+
+Complete parameter intelligence gathering via plan execution queue. Validated on Revit 2027 (2026-05-23).
+
+**Step 1: Object schema scan**
+```
+Run InventoryModel schema
+```
+Exports object_schema (ElementId, Category, ClassName, Name, IsType).
+
+**Step 2: Import object schema and create object registry candidate**
+```
+axiom inventory-import --file "<object_schema_export.json>"
+```
+
+**Step 3: Generate parameter schema plan**
+```
+axiom inventory-plan --file "<object_schema_summary.json>" --mode parameter-schema
+```
+Writes plan to both repo artifacts and `%LOCALAPPDATA%\Axiom\inventory_plans\latest\` for Revit pickup.
+Priority categories first (20), then remaining sorted smallest-to-largest. Non-executable categories ((No Category), <Unnamed>) excluded.
+
+**Step 4: Execute plan in Revit (automated queue)**
+```
+Run InventoryModel parameter schema plan max 10       → first 10 categories (validated)
+Run InventoryModel parameter schema plan priority only → 20 priority categories (validated)
+Run InventoryModel parameter schema plan max 50       → expand coverage progressively
+Run InventoryModel parameter schema plan max 100      → stress test larger batch
+Run InventoryModel parameter schema plan resume       → retry failed/remaining
+Run InventoryModel parameter schema plan              → all categories (only after progressive validation)
+```
+Each category executes via structured dispatch (CategoryFilter + ScanMode) — no NLP parsing.
+Writes per-category export JSON and manifest to `%LOCALAPPDATA%\Axiom\inventory_exports\`.
+
+**Important:** The queue mechanism is validated, but full-model coverage is not yet validated. Only `max 10` (10/10) and `priority only` (16/16) have been live-validated. Use progressive coverage: max 50 → max 100 → resume → full plan. Do not skip directly to full plan run.
+
+**Step 5: Batch import from manifest**
+```
+axiom inventory-import-batch --manifest "<manifest_path>"
+axiom inventory-import-batch --dir "<exports_dir>" --scan-mode category_parameter_schema
+```
+
+**Step 6: Build parameter registry with coverage analysis**
+```
+axiom parameter-registry-build --from-inventory artifacts/model_inventory_runs --object-registry artifacts/object_registry_candidates/<run_id>
+```
+Deduplicates by 8-tuple key (Category, ClassName, ParameterName, BuiltInParameterId, DataTypeId, StorageType, IsInstanceParam, IsTypeParam).
+Reports covered/missing categories including priority coverage breakdown.
+Output: `artifacts/parameter_registry_candidates/<run_id>/`
+
+**Step 7: Check plan and coverage status**
+```
+axiom inventory-plan-status
+```
+
+### Blocked Commands (do NOT use)
+
+These commands are blocked because they crashed Revit 2027 on real models:
+
+- `Run full InventoryModel` — full element+parameter dump
+- `Run InventoryModel sample values` — whole-model value sampling
+- `Run InventoryModel parameter schema` — whole-model parameter schema
+- Any prompt that attempts whole-model value extraction
+
+The plan execution queue only executes `category_parameter_schema` jobs. Unsafe commands remain blocked in both Python resolver and C# dispatcher.
+
+### Priority Categories
+
+Walls, Doors, Windows, Floors, Rooms, Views, Sheets, Levels, Grids, Ducts, Pipes, Mechanical Equipment, Plumbing Fixtures, Lighting Fixtures, Electrical Fixtures, Ceilings, Columns, Stairs, Railings, Furniture.
+
+### Category/Level Value Extraction (unchanged)
+
+**Category-batched:**
+- `Run InventoryModel for Walls batch 100` → walls only, 100 per batch
+
+**Level-batched:**
+- `Run InventoryModel on Level 1 batch 100` → Level 1 elements, 100 per batch
+
+**Category+level batched:**
+- `Run InventoryModel for Walls on Level 1 batch 100`
+
+**After extraction, merge batches:**
+```
+axiom inventory-combine --manifest "<manifest.json>"
+axiom inventory-combine --batch-dir "<batch-folder>"
+axiom inventory-combine --manifest "<manifest.json>" --chunk-by discipline
+```
+
+**Important distinction:**
+- `Run full InventoryModel` = BLOCKED (unsafe in-memory dump)
+- `Run InventoryModel batch N` = SAFE (incremental, crash-checkpointed)
+
+Bare `Run InventoryModel` (no batch number, no category/level) = summary mode (counts only).
+
+### Safety Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `SummaryOnly` | `true` | Only collect counts and categories — no element details |
+| `CategoryFilter` | `null` (all) | Limit to specific categories (e.g. `["Walls"]`) |
+| `LevelFilter` | `null` (all) | Limit to specific levels (e.g. `["Level 1"]`) |
+| `MaxElements` | `0` (no limit) | Hard cap on element count (used by sample mode) |
+| `BatchSize` | `0` (no batching) | Elements per batch for continuation extraction |
+| `SkipElements` | `0` | Offset for manual pagination/resume |
+| `IncludeParameters` | `false` | Collect parameters on each element |
+| `IncludeTypeParameters` | `false` | Collect type parameters |
+| `IncludeInstanceParameters` | `false` | Collect instance parameters |
+
+Per-element exceptions are caught silently — a crash on one element does not abort the entire scan. Error counts are reported in the dialog.
+
+### Architecture Note: Level Filtering
+
+**Level filter is post-collector / pre-extraction.** The C# `ModelInventoryService` uses `FilteredElementCollector(doc).WhereElementIsNotElementType()` which iterates all elements. Level filtering is applied inside the foreach loop — after the element is retrieved but before parameter extraction (`CollectParameters()`). This means:
+- The Revit collector still enumerates all elements
+- Level lookup (`GetElementLevelName`) runs per element (lightweight — reads one parameter)
+- **Parameter extraction is skipped for filtered-out elements** — this is the expensive operation
+
+For future optimization: use `ElementLevelFilter` for true pre-collector filtering.
 
 ## Entry Points
 
@@ -15,14 +241,44 @@ python -m poetry run axiom inventory-model --output-dir artifacts/model_inventor
 
 ### Revit Prompt Dialog
 
-Type any of these prompts:
+Summary scan prompts (safe default):
 - `Run InventoryModel`
 - `inventory model`
 - `List all model elements`
 - `Scan model parameters`
-- `Extract model parameters`
-- `Extract all parameters`
-- `Show writable parameters`
+
+Category scan prompts:
+- `Run InventoryModel for Walls`
+- `Inventory doors`
+- `Inventory parameters for windows`
+
+Sample scan prompts:
+- `Run InventoryModel sample`
+
+Full scan prompts (use with caution):
+- `Run full InventoryModel`
+- `full inventory`
+
+InventoryModel can run from **any view** (floor plan, section, elevation, 3D). It is not restricted to plan views like CreateGrids/CreateLevels.
+
+The dialog shows scan mode, element/type counts, and (for non-summary scans) parameter counts. After a summary scan, it also shows next-step suggestions.
+
+### Revit → Python Artifact Pipeline
+
+When InventoryModel runs from the Revit Prompt dialog, it writes a JSON export to:
+```
+%LOCALAPPDATA%\Axiom\inventory_exports\inv_YYYYMMDD_HHmmss.json
+```
+
+To persist this into the standard Parquet/SQLite artifact pipeline:
+```bash
+python -m poetry run axiom inventory-import --latest
+python -m poetry run axiom inventory-import --file path/to/inv_20260506_120000.json
+```
+
+This creates the same artifacts as a CLI-initiated run. After importing, use `inventory-summary --latest` to inspect.
+
+**Note:** `%LOCALAPPDATA%` exports are temporary handoff files, not durable artifacts. The Parquet/SQLite artifacts in `artifacts/model_inventory_runs/` are the durable storage.
 
 ## Output Artifacts
 
@@ -48,7 +304,7 @@ The `BuiltInParameterId` field is populated only for built-in parameters (via `I
 
 **Null/unreadable value handling:** Parameters with `null` definitions or no value (`!param.HasValue`) are silently skipped. All value extraction uses null-coalescing (`?? ""`) to prevent runtime errors.
 
-**Type parameters** are collected when `IncludeTypeParameters` is `true` (default). Instance parameters are collected when `IncludeInstanceParameters` is `true` (default). Both use the same generic `CollectParameters()` method.
+**Type parameters** are collected when `IncludeTypeParameters` is `true` (default: `false`). Instance parameters are collected when `IncludeInstanceParameters` is `true` (default: `false`). Both use the same generic `CollectParameters()` method. Set `IncludeParameters` to `true` as a shorthand to enable both.
 
 **Schema fields are metadata, not collection limits.** Fields like `parameter_group`, `level_id`, and `source_model` in the Parquet/SQLite schema are output columns for analysis. They do not filter or restrict which parameters are collected. The examples in tests/fixtures are representative samples — real Revit execution captures all available parameters.
 
@@ -211,13 +467,17 @@ python -m poetry run pytest tests/test_inventory.py -v
 
 The following require Revit open on Windows:
 
-- [ ] Real `Run InventoryModel` via pipe produces output
-- [ ] Elements from real model match expected schema
-- [ ] Large model performance (>10,000 elements)
+- [x] Real `Run InventoryModel` via pipe produces output — **validated Revit 2027**
+- [x] Elements from real model match expected schema — **validated Revit 2027**
+- [x] Large model performance (>10,000 elements) — **validated:** Snowdon Towers 2.0, 42,881 instances / 2,276 types, summary scan 560ms
 - [ ] Workshared model with workset names populated
 - [ ] Category filter parameter works as expected
+- [ ] Sample scan (MaxElements) works as expected
+- [ ] Full scan with streaming write on large model
 - [ ] Parameters extracted from all storage types (String, Double, Integer, ElementId)
 - [ ] ParameterGroup populated for built-in parameters
+- [x] JSON export path shown in dialog — **validated Revit 2027**
+- [x] `inventory-import --file` with UTF-8 BOM JSON — **validated** (BUG-013 fix)
 
 ## Known Gaps
 
@@ -228,3 +488,99 @@ The following require Revit open on Windows:
 3. **Source model title**: The C# `InventoryModelCapability` does not yet include `doc.Title` in the output. Need to add `result.OutputData["source_model"] = doc.Title;` to the real execution path.
 
 These are small C# changes to be made when the Revit real execution is validated.
+
+## Full Registry Coverage Workflow
+
+Complete parameter discovery across all Revit object categories:
+
+```
+1. Run InventoryModel                                    → summary (get category counts)
+2. Run InventoryModel schema                             → object_schema (full element/class inventory)
+3. axiom inventory-import --file <object_schema.json>    → creates object registry candidate
+4. axiom inventory-plan --file <summary.json> --mode parameter-schema
+                                                         → generates all-category plan with prompts
+5. Copy-paste each prompt from the plan into Revit:
+     Run InventoryModel for Walls parameter schema
+     Run InventoryModel for Doors parameter schema
+     Run InventoryModel for Ceilings parameter schema
+     ... (all categories from plan)
+6. axiom inventory-import-batch --dir <exports-dir> --scan-mode category_parameter_schema
+                                                         → batch import all category parameter schemas
+7. axiom parameter-registry-build --from-inventory artifacts/model_inventory_runs
+     --object-registry artifacts/object_registry_candidates
+                                                         → build property registry + coverage report
+```
+
+### Artifacts produced:
+- `artifacts/object_registry_candidates/<run_id>/` — JSONL + Parquet + summary
+- `artifacts/inventory_plans/<plan_id>/` — parameter_schema_plan.json + .md
+- `artifacts/parameter_registry_candidates/<timestamp>/` — revit_property_registry.jsonl + .parquet + summary.md
+
+### Registry deduplication key:
+ObjectCategory, ClassName, ParameterName, BuiltInParameterId, DataTypeId, StorageType, IsInstanceParam, IsTypeParam
+
+### Automatic multi-category execution:
+
+Instead of copy-pasting 279 prompts, use the plan execution queue:
+
+```
+Run InventoryModel parameter schema plan              → executes all categories from plan
+Run InventoryModel parameter schema plan max 10       → first 10 categories only
+Run InventoryModel parameter schema plan priority only → priority categories only (20 categories)
+Run InventoryModel parameter schema plan resume        → skip already-completed, continue remaining
+```
+
+**Behavior:**
+1. Reads latest `parameter_schema_plan.json` from `%LOCALAPPDATA%\Axiom\inventory_plans\` or repo `artifacts/inventory_plans/`
+2. Executes `category_parameter_schema` one category at a time
+3. Writes one JSON export per category to `%LOCALAPPDATA%\Axiom\inventory_exports\`
+4. Writes manifest: `parameter_schema_manifest_<timestamp>.json`
+5. Dialog shows completed/failed/skipped counts and next CLI command
+
+**Manifest import:**
+```
+axiom inventory-import-batch --manifest "<manifest_path>"
+axiom inventory-import-batch --dir "<exports_dir>" --scan-mode category_parameter_schema
+```
+
+**Plan handoff:** `inventory-plan --mode parameter-schema` writes plan JSON to both repo artifacts AND `%LOCALAPPDATA%\Axiom\inventory_plans\latest\` for Revit pickup. Revit searches LocalAppData first, falls back to repo artifacts. Use `axiom inventory-plan-status` to check plan locations and existence.
+
+**Safety:** Only executes `category_parameter_schema` jobs. Whole-model parameter schema, sample values, and full inventory remain blocked.
+
+### Complete safe workflow (end-to-end):
+
+```bash
+# 1. Object schema discovery (in Revit)
+Run InventoryModel schema
+
+# 2. Import object schema
+axiom inventory-import --file <export.json>
+
+# 3. Plan parameter schema extraction
+axiom inventory-plan --file <summary.json> --mode parameter-schema
+
+# 4. Check plan status
+axiom inventory-plan-status
+
+# 5. Execute plan (in Revit — pick one)
+Run InventoryModel parameter schema plan max 10         # validate first
+Run InventoryModel parameter schema plan priority only  # priority categories
+Run InventoryModel parameter schema plan resume         # continue after interruption
+Run InventoryModel parameter schema plan                # all categories
+
+# 6. Import results from manifest
+axiom inventory-import-batch --manifest "<manifest_path>"
+
+# 7. Build property registry
+axiom parameter-registry-build --from-inventory artifacts/model_inventory_runs \
+  --object-registry artifacts/object_registry_candidates/<run_id>
+
+# 8. Review coverage
+axiom inventory-plan-status
+```
+
+### BLOCKED commands (never recommended by planner):
+- `Run InventoryModel parameter schema` (whole-model — crashed Revit 2027)
+- `Run InventoryModel sample values` (whole-model — crashed Revit 2027)
+- `Run full InventoryModel` (crashed Revit 2027 on large models)
+- Whole-model value extraction (any form)

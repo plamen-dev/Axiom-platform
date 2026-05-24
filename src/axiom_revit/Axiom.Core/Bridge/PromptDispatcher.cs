@@ -60,6 +60,14 @@ namespace Axiom.Core.Bridge
                     "Unsupported prompts will be available in future updates.");
             }
 
+            // Check for grid spacing ambiguities before accepting resolution
+            if (capabilityName == "CreateGrids")
+            {
+                string spacingClarification = CheckGridSpacingClarification(lower, promptText);
+                if (spacingClarification != null)
+                    return PromptDispatchResult.Clarification(spacingClarification);
+            }
+
             return new PromptDispatchResult
             {
                 Success = true,
@@ -112,6 +120,14 @@ namespace Axiom.Core.Bridge
                     "Unsupported prompts will be available in future updates.");
             }
 
+            // Check for grid spacing ambiguities before executing
+            if (capabilityName == "CreateGrids")
+            {
+                string spacingClarification = CheckGridSpacingClarification(lower, promptText);
+                if (spacingClarification != null)
+                    return PromptDispatchResult.Clarification(spacingClarification);
+            }
+
             IAxiomCapability capability;
             if (!_registry.TryGet(capabilityName, out capability))
             {
@@ -120,26 +136,204 @@ namespace Axiom.Core.Bridge
                     "The capability was recognized but is not available in this build.");
             }
 
+            // Block full inventory scan — crashes Revit on large models (BUG-014)
+            if (capabilityName == "InventoryModel" &&
+                (lower.Contains("full inventory") ||
+                 lower.Contains("run full inventorymodel") ||
+                 lower.Contains("full scan") ||
+                 lower.Contains("complete inventory") ||
+                 lower.Contains("full values")))
+            {
+                return new PromptDispatchResult
+                {
+                    Success = false,
+                    CapabilityName = capabilityName,
+                    Message =
+                        "BLOCKED_UNSAFE: Full value extraction is disabled for live Revit sessions.\n" +
+                        "Full element+parameter scans have caused Revit crashes on large models.\n\n" +
+                        "Safe alternatives:\n" +
+                        "  - \"Run InventoryModel\" (summary counts only)\n" +
+                        "  - \"Run InventoryModel schema\" (parameter definitions, no values)\n" +
+                        "  - \"Run InventoryModel sample values for Walls\" (constrained samples)\n" +
+                        "  - \"Run InventoryModel for Walls\" (single category scan)\n\n" +
+                        "Use schema discovery for whole-model learning."
+                };
+            }
+
+            // Block whole-model sample values — crashed Revit 2027 (BUG-016)
+            if (capabilityName == "InventoryModel" &&
+                (lower.Contains("sample values") || lower.Contains("sample value")) &&
+                !lower.Contains("inventory for ") &&
+                !lower.Contains("inventory walls") && !lower.Contains("inventory doors") &&
+                !lower.Contains("values for ") &&
+                !lower.Contains("on level"))
+            {
+                // Check if any known category is mentioned
+                bool hasCategoryConstraint = false;
+                string[] knownCats = {
+                    "walls", "doors", "windows", "floors", "roofs", "ceilings",
+                    "columns", "beams", "stairs", "railings", "furniture",
+                    "plumbing fixtures", "mechanical equipment", "electrical fixtures",
+                    "lighting fixtures", "generic models", "duct systems", "ducts",
+                    "pipe systems", "pipes", "rooms", "areas", "levels",
+                    "views", "sheets"
+                };
+                foreach (var cat in knownCats)
+                {
+                    if (lower.Contains(cat))
+                    {
+                        hasCategoryConstraint = true;
+                        break;
+                    }
+                }
+                if (!hasCategoryConstraint)
+                {
+                    return new PromptDispatchResult
+                    {
+                        Success = false,
+                        CapabilityName = capabilityName,
+                        Message =
+                            "BLOCKED_UNSAFE: Whole-model value sampling is disabled for live Revit sessions.\n" +
+                            "It crashed Revit 2027 due to expensive value accessors.\n\n" +
+                            "Use constrained sample values instead:\n" +
+                            "  - \"Run InventoryModel sample values for Walls\"\n" +
+                            "  - \"Run InventoryModel sample values for Plumbing Fixtures\"\n" +
+                            "  - \"Run InventoryModel sample values for Walls max 25\"\n" +
+                            "  - \"Run InventoryModel sample values on Level 1 max 25\"\n\n" +
+                            "For whole-model learning, use schema discovery:\n" +
+                            "  - \"Run InventoryModel schema\""
+                    };
+                }
+            }
+
+            // Allow "parameter schema plan" prompts through — they execute
+            // category-by-category, never whole-model.
+            bool isParameterSchemaPlan = capabilityName == "InventoryModel" &&
+                (lower.Contains("parameter schema plan") || lower.Contains("param schema plan"));
+
+            // Block whole-model parameter schema — crashed Revit 2027 (BUG-017)
+            if (capabilityName == "InventoryModel" && !isParameterSchemaPlan &&
+                (lower.Contains("parameter schema") || lower.Contains("param schema")))
+            {
+                bool hasConstraint = false;
+                string[] knownCats2 = {
+                    "walls", "doors", "windows", "floors", "roofs", "ceilings",
+                    "columns", "beams", "stairs", "railings", "furniture",
+                    "plumbing fixtures", "mechanical equipment", "electrical fixtures",
+                    "lighting fixtures", "generic models", "duct systems", "ducts",
+                    "pipe systems", "pipes", "rooms", "areas", "levels",
+                    "views", "sheets"
+                };
+                foreach (var cat in knownCats2)
+                {
+                    if (lower.Contains(cat))
+                    {
+                        hasConstraint = true;
+                        break;
+                    }
+                }
+                if (!hasConstraint && !lower.Contains("on level") &&
+                    !lower.Contains("inventory for ") && !lower.Contains("schema for "))
+                {
+                    return new PromptDispatchResult
+                    {
+                        Success = false,
+                        CapabilityName = capabilityName,
+                        Message =
+                            "BLOCKED_UNSAFE: Whole-model parameter schema discovery is disabled for live Revit sessions.\n" +
+                            "It crashed Revit 2027 on large models.\n\n" +
+                            "Use category or level-constrained parameter schema:\n" +
+                            "  - \"Run InventoryModel for Walls parameter schema\"\n" +
+                            "  - \"Run InventoryModel for Ceilings parameter schema\"\n" +
+                            "  - \"Run InventoryModel parameter schema on Level 1\"\n\n" +
+                            "For planned multi-category extraction:\n" +
+                            "  - \"Run InventoryModel parameter schema plan\"\n" +
+                            "  - \"Run InventoryModel parameter schema plan max 10\"\n\n" +
+                            "For whole-model element inventory (no parameters):\n" +
+                            "  - \"Run InventoryModel schema\" (object_schema — validated safe)"
+                    };
+                }
+            }
+
+            // Parameter schema plan: return a special result that PromptCommand handles
+            if (isParameterSchemaPlan)
+            {
+                bool isResume = lower.Contains("resume");
+                bool isPriorityOnly = lower.Contains("priority only") || lower.Contains("priority-only");
+                int maxCategories = 0;
+                var maxMatch = Regex.Match(lower, @"(?:max|limit|first|top)\s+(\d+)");
+                if (maxMatch.Success)
+                    maxCategories = int.Parse(maxMatch.Groups[1].Value);
+
+                return new PromptDispatchResult
+                {
+                    Success = true,
+                    CapabilityName = "InventoryModel",
+                    Message = "PLAN_EXECUTION",
+                    CapabilityResult = new Capabilities.CapabilityResult
+                    {
+                        Status = "PLAN_EXECUTION",
+                        OutputData = new Dictionary<string, object>
+                        {
+                            { "is_plan_execution", true },
+                            { "is_resume", isResume },
+                            { "priority_only", isPriorityOnly },
+                            { "max_categories", maxCategories },
+                        }
+                    }
+                };
+            }
+
             // Build args JSON from the prompt (pass original text for table parsing)
             string argsJson = capabilityName == "InventoryModel"
-                ? "{}" : BuildArgsJson(lower, capabilityName, promptText);
+                ? BuildInventoryArgsJson(lower)
+                : BuildArgsJson(lower, capabilityName, promptText);
 
             try
             {
                 var result = capability.Execute(doc, argsJson, false);
+                string successMessage;
+                if (capabilityName == "InventoryModel" && result.Status == "SUCCESS")
+                {
+                    int elemCount = result.OutputData.ContainsKey("element_count")
+                        ? Convert.ToInt32(result.OutputData["element_count"]) : 0;
+                    int typeCount = result.OutputData.ContainsKey("type_count")
+                        ? Convert.ToInt32(result.OutputData["type_count"]) : 0;
+                    int paramCount = result.OutputData.ContainsKey("parameter_count")
+                        ? Convert.ToInt32(result.OutputData["parameter_count"]) : 0;
+                    string scanMode = result.OutputData.ContainsKey("scan_mode")
+                        ? result.OutputData["scan_mode"].ToString() : "summary";
+                    successMessage =
+                        $"Capability: {capabilityName} ({scanMode})\n" +
+                        $"Status: SUCCESS\n" +
+                        $"Elements inventoried: {elemCount} instances, {typeCount} types\n" +
+                        (paramCount > 0
+                            ? $"Parameters inventoried: {paramCount}\n"
+                            : "") +
+                        $"Duration: {result.DurationMs}ms";
+                }
+                else if (result.Status == "SUCCESS")
+                {
+                    successMessage =
+                        $"Capability: {capabilityName}\n" +
+                        $"Status: SUCCESS\n" +
+                        $"Created: {result.CreatedIds.Count} element(s)\n" +
+                        $"Duration: {result.DurationMs}ms";
+                }
+                else
+                {
+                    successMessage = null;
+                }
+
                 return new PromptDispatchResult
                 {
                     Success = result.Status == "SUCCESS",
                     CapabilityName = capabilityName,
                     CapabilityResult = result,
-                    Message = result.Status == "SUCCESS"
-                        ? $"Capability: {capabilityName}\n" +
-                          $"Status: SUCCESS\n" +
-                          $"Created: {result.CreatedIds.Count} element(s)\n" +
-                          $"Duration: {result.DurationMs}ms"
-                        : $"Capability: {capabilityName}\n" +
-                          $"Status: FAILED\n" +
-                          $"Errors: {string.Join("; ", result.Errors)}"
+                    Message = successMessage ??
+                        ($"Capability: {capabilityName}\n" +
+                         $"Status: FAILED\n" +
+                         $"Errors: {string.Join("; ", result.Errors)}")
                 };
             }
             catch (Exception ex)
@@ -150,19 +344,85 @@ namespace Axiom.Core.Bridge
             }
         }
 
+        /// <summary>
+        /// Dispatch a structured category parameter schema request directly,
+        /// bypassing NLP prompt parsing. Used by the plan execution queue
+        /// to avoid fragile category name matching through the resolver.
+        /// </summary>
+        public PromptDispatchResult DispatchCategoryParameterSchema(
+            Autodesk.Revit.DB.Document doc, string category)
+        {
+            IAxiomCapability capability;
+            if (!_registry.TryGet("InventoryModel", out capability))
+            {
+                return PromptDispatchResult.Fail(
+                    "InventoryModel capability not registered.");
+            }
+
+            var args = new Dictionary<string, object>
+            {
+                { "SummaryOnly", false },
+                { "ParameterSchemaOnly", true },
+                { "IncludeParameters", false },
+                { "ScanMode", "category_parameter_schema" },
+                { "CategoryFilter", new[] { category } },
+            };
+
+            string argsJson = JsonConvert.SerializeObject(args);
+
+            try
+            {
+                var result = capability.Execute(doc, argsJson, false);
+
+                int elemCount = result.OutputData.ContainsKey("element_count")
+                    ? Convert.ToInt32(result.OutputData["element_count"]) : 0;
+                int paramCount = result.OutputData.ContainsKey("parameter_count")
+                    ? Convert.ToInt32(result.OutputData["parameter_count"]) : 0;
+
+                return new PromptDispatchResult
+                {
+                    Success = result.Status == "SUCCESS",
+                    CapabilityName = "InventoryModel",
+                    CapabilityResult = result,
+                    Message = result.Status == "SUCCESS"
+                        ? $"Capability: InventoryModel (category_parameter_schema)\n" +
+                          $"Category: {category}\n" +
+                          $"Status: SUCCESS\n" +
+                          $"Elements: {elemCount}, Parameters: {paramCount}\n" +
+                          $"Duration: {result.DurationMs}ms"
+                        : $"Capability: InventoryModel\n" +
+                          $"Category: {category}\n" +
+                          $"Status: FAILED\n" +
+                          $"Errors: {string.Join("; ", result.Errors)}"
+                };
+            }
+            catch (Exception ex)
+            {
+                return PromptDispatchResult.Fail(
+                    $"Category: {category}\n" +
+                    $"Execution failed: {ex.Message}");
+            }
+        }
+
         private string ResolveCapability(string lower)
         {
             // Inventory keywords (checked first — read-only, unambiguous)
             string[] inventoryKeywords = {
                 "run inventorymodel", "inventory model", "inventorymodel",
                 "list all model elements", "scan model parameters",
-                "extract model parameters", "model inventory"
+                "extract model parameters", "model inventory",
+                "inventory parameters", "run full inventorymodel",
+                "full inventory", "inventory sample"
             };
             foreach (var kw in inventoryKeywords)
             {
                 if (lower.Contains(kw))
                     return "InventoryModel";
             }
+
+            // Category-scoped inventory: "inventory walls", "inventory for doors"
+            if (lower.Contains("inventory") && !lower.Contains("grid") && !lower.Contains("level"))
+                return "InventoryModel";
 
             // Grid keywords
             string[] gridKeywords = { "grid", "grids", "gridline", "gridlines" };
@@ -269,6 +529,197 @@ namespace Axiom.Core.Bridge
         /// Parse prompt text into JSON args for the identified capability.
         /// Mirrors the Python prompt_resolver logic.
         /// </summary>
+        private string BuildInventoryArgsJson(string lower)
+        {
+            // Full scan is blocked at the dispatcher level (see block above).
+            // This branch should never be reached, but defense-in-depth.
+            bool isFull = lower.Contains("full inventory") ||
+                          lower.Contains("run full inventorymodel") ||
+                          lower.Contains("full scan") ||
+                          lower.Contains("complete inventory") ||
+                          lower.Contains("full values");
+            bool isSampleValues = lower.Contains("sample values") ||
+                                  lower.Contains("sample value");
+            bool isSample = lower.Contains("sample") && !isSampleValues;
+            bool isParameterSchema = lower.Contains("parameter schema") ||
+                                      lower.Contains("param schema");
+            bool isSchema = lower.Contains("schema") && !isParameterSchema;
+
+            // Extract category filter: "inventory walls", "inventory for doors"
+            string[] knownCategories = {
+                "walls", "doors", "windows", "floors", "roofs", "ceilings",
+                "columns", "beams", "stairs", "railings", "curtain panels",
+                "curtain wall mullions", "furniture", "plumbing fixtures",
+                "mechanical equipment", "electrical fixtures", "lighting fixtures",
+                "generic models", "structural foundations", "structural framing",
+                "duct systems", "ducts", "pipe systems", "pipes",
+                "rooms", "areas", "levels", "views", "sheets"
+            };
+            string categoryFilter = null;
+            foreach (var cat in knownCategories)
+            {
+                if (lower.Contains("inventory for " + cat) ||
+                    lower.Contains("inventory " + cat) ||
+                    lower.Contains("inventorymodel for " + cat) ||
+                    lower.Contains("values for " + cat) ||
+                    lower.Contains("schema for " + cat))
+                {
+                    categoryFilter = System.Globalization.CultureInfo
+                        .CurrentCulture.TextInfo.ToTitleCase(cat);
+                    break;
+                }
+            }
+
+            // Extract level filter: "on level 1", "level 2", "for level ground"
+            string levelFilter = null;
+            var levelMatch = System.Text.RegularExpressions.Regex.Match(
+                lower, @"(?:on |for |at )?level\s+(\S+(?:\s+\S+)?)");
+            if (levelMatch.Success && !lower.Contains("level keyword") &&
+                categoryFilter != "Levels")
+            {
+                string rawLevel = levelMatch.Groups[1].Value.Trim();
+                // Avoid matching "levels" (the category) as a level filter
+                if (rawLevel != "s" && rawLevel != "keyword")
+                {
+                    levelFilter = System.Globalization.CultureInfo
+                        .CurrentCulture.TextInfo.ToTitleCase(rawLevel);
+                }
+            }
+
+            // Extract batch size: "limit 10000", "max 5000", "batch 10000"
+            int batchSize = 0;
+            var batchMatch = System.Text.RegularExpressions.Regex.Match(
+                lower, @"(?:max|limit|first|top|batch)\s+(\d+)");
+            if (batchMatch.Success && !isSample)
+            {
+                batchSize = int.Parse(batchMatch.Groups[1].Value);
+            }
+
+            var args = new Dictionary<string, object>();
+
+            if (isFull)
+            {
+                // Defense-in-depth: should be blocked before reaching here
+                args["SummaryOnly"] = true;
+                args["IncludeParameters"] = false;
+                args["ScanMode"] = "summary";
+            }
+            else if (isSample)
+            {
+                args["SummaryOnly"] = false;
+                args["MaxElements"] = 100;
+                args["IncludeParameters"] = true;
+                args["ScanMode"] = "sample";
+            }
+            else if (isParameterSchema && (categoryFilter != null || levelFilter != null))
+            {
+                // Constrained parameter schema: requires category or level
+                args["SummaryOnly"] = false;
+                args["ParameterSchemaOnly"] = true;
+                args["IncludeParameters"] = false;
+                args["ScanMode"] = "category_parameter_schema";
+                if (categoryFilter != null)
+                    args["CategoryFilter"] = new[] { categoryFilter };
+                if (levelFilter != null)
+                    args["LevelFilter"] = new[] { levelFilter };
+            }
+            else if (isParameterSchema)
+            {
+                // Whole-model parameter schema: BLOCKED — crashed Revit 2027.
+                // Defense-in-depth: should be blocked before reaching here.
+                args["SummaryOnly"] = true;
+                args["IncludeParameters"] = false;
+                args["ScanMode"] = "summary";
+            }
+            else if (isSchema && categoryFilter != null)
+            {
+                // Category object schema: element inventory for one category
+                args["SummaryOnly"] = false;
+                args["SchemaOnly"] = true;
+                args["CategoryFilter"] = new[] { categoryFilter };
+                args["IncludeParameters"] = false;
+                args["ScanMode"] = "category_object_schema";
+            }
+            else if (isSampleValues && (categoryFilter != null || levelFilter != null))
+            {
+                // Constrained sample values: requires category/level/max.
+                // Whole-model sample values crashed Revit 2027.
+                args["SummaryOnly"] = false;
+                args["SampleValues"] = true;
+                args["SampleLimit"] = 5;
+                args["MaxElements"] = batchSize > 0 ? batchSize : 25;
+                args["IncludeParameters"] = true;
+                args["ScanMode"] = "category_sample_values";
+                if (categoryFilter != null)
+                    args["CategoryFilter"] = new[] { categoryFilter };
+                if (levelFilter != null)
+                    args["LevelFilter"] = new[] { levelFilter };
+            }
+            else if (isSchema)
+            {
+                // Whole-model object schema: element/class/category inventory
+                args["SummaryOnly"] = false;
+                args["SchemaOnly"] = true;
+                args["IncludeParameters"] = false;
+                args["ScanMode"] = "object_schema";
+            }
+            else if (isSampleValues)
+            {
+                // Whole-model sample values: BLOCKED — crashed Revit 2027.
+                // Defense-in-depth: should be blocked before reaching here.
+                args["SummaryOnly"] = true;
+                args["IncludeParameters"] = false;
+                args["ScanMode"] = "summary";
+            }
+            else if (categoryFilter != null && levelFilter != null)
+            {
+                args["SummaryOnly"] = false;
+                args["CategoryFilter"] = new[] { categoryFilter };
+                args["LevelFilter"] = new[] { levelFilter };
+                args["IncludeParameters"] = true;
+                args["ScanMode"] = "category_level";
+            }
+            else if (categoryFilter != null)
+            {
+                args["SummaryOnly"] = false;
+                args["CategoryFilter"] = new[] { categoryFilter };
+                args["IncludeParameters"] = true;
+                args["ScanMode"] = "category";
+            }
+            else if (levelFilter != null)
+            {
+                args["SummaryOnly"] = false;
+                args["LevelFilter"] = new[] { levelFilter };
+                args["IncludeParameters"] = true;
+                args["ScanMode"] = "level";
+            }
+            else if (batchSize > 0)
+            {
+                // Whole-model batch defaults to object schema (safe).
+                // Full value batching crashed Revit 2027 even at batch 100.
+                args["SummaryOnly"] = false;
+                args["SchemaOnly"] = true;
+                args["IncludeParameters"] = false;
+                args["BatchSize"] = batchSize;
+                args["ScanMode"] = "object_schema";
+            }
+            else
+            {
+                // Default: safe summary scan
+                args["SummaryOnly"] = true;
+                args["IncludeParameters"] = false;
+                args["ScanMode"] = "summary";
+            }
+
+            // Apply batch size to scoped modes (category/level/category_level)
+            if (batchSize > 0 && !args.ContainsKey("BatchSize"))
+            {
+                args["BatchSize"] = batchSize;
+            }
+
+            return JsonConvert.SerializeObject(args);
+        }
+
         private string BuildArgsJson(string lower, string capabilityName, string promptText)
         {
             if (capabilityName == "CreateLevels")
@@ -404,6 +855,37 @@ namespace Axiom.Core.Bridge
                 }
             }
 
+            // Inline comma spacings: "spaced 5, 6, and 20 feet apart"
+            if (horizSpacings == null && vertSpacings == null)
+            {
+                var inlineSpacings = ParseInlineSpacings(lower);
+                if (inlineSpacings != null)
+                {
+                    if (hasVertical && !hasHorizontal)
+                    {
+                        horizSpacings = inlineSpacings;
+                        hCount = inlineSpacings.Length + 1;
+                    }
+                    else if (hasHorizontal && !hasVertical)
+                    {
+                        vertSpacings = inlineSpacings;
+                        vCount = inlineSpacings.Length + 1;
+                    }
+                    else if (lower.Contains("vert") || lower.Contains("column"))
+                    {
+                        horizSpacings = inlineSpacings;
+                        hCount = inlineSpacings.Length + 1;
+                        hasVertical = true;
+                    }
+                    else if (lower.Contains("horiz") || lower.Contains("row"))
+                    {
+                        vertSpacings = inlineSpacings;
+                        vCount = inlineSpacings.Length + 1;
+                        hasHorizontal = true;
+                    }
+                }
+            }
+
             // Single orientation: set other to 0 (re-evaluate after variable spacing)
             if (hasVertical && !hasHorizontal)
                 vCount = 0;
@@ -455,20 +937,24 @@ namespace Axiom.Core.Bridge
 
         /// <summary>
         /// Parse comma-separated spacing values from prompt text.
-        /// Matches patterns like "spacings 10, 5, 20, 10" or "with spacings 10,5,20".
+        /// Matches patterns like "spacings 10, 5, 20, 10" or "with spacings 5, 6, and 20".
         /// </summary>
         private static double[] ParseCommaSpacings(string lower)
         {
             var match = Regex.Match(lower,
-                @"spacings?\s+([\d]+\.?\d*(?:\s*,\s*[\d]+\.?\d*)+)");
+                @"spacings?\s+([\d]+\.?\d*(?:\s*[,]\s*(?:and\s+)?[\d]+\.?\d*)+)");
             if (!match.Success)
                 return null;
 
-            var parts = match.Groups[1].Value.Split(',');
+            var raw = Regex.Replace(match.Groups[1].Value, @"\band\b", ",");
+            var parts = raw.Split(',');
             var values = new List<double>();
             foreach (var part in parts)
             {
-                var trimmed = part.Trim().TrimEnd('\'');
+                var trimmed = part.Trim().TrimEnd('\'').Trim();
+                trimmed = Regex.Replace(trimmed, @"\s*(ft|feet|foot)\s*$", "").Trim();
+                if (string.IsNullOrEmpty(trimmed))
+                    continue;
                 double val;
                 if (double.TryParse(trimmed, NumberStyles.Any,
                     CultureInfo.InvariantCulture, out val) && val > 0)
@@ -481,6 +967,123 @@ namespace Axiom.Core.Bridge
                 }
             }
             return values.Count > 0 ? values.ToArray() : null;
+        }
+
+        /// <summary>
+        /// Parse inline comma-separated spacing values without 'spacings' keyword.
+        /// Matches: "spaced 5, 6, and 20 feet apart" or "spaced 5, 6 and 20 ft apart"
+        /// </summary>
+        private static double[] ParseInlineSpacings(string lower)
+        {
+            var match = Regex.Match(lower,
+                @"spaced?\s+([\d]+\.?\d*\s*(?:[',]\s*(?:and\s+)?[\d]+\.?\d*)+)\s*['\ ]*(?:ft|feet|foot)?");
+            if (!match.Success)
+                return null;
+
+            var raw = Regex.Replace(match.Groups[1].Value, @"\band\b", ",");
+            var parts = raw.Split(',');
+            var values = new List<double>();
+            foreach (var part in parts)
+            {
+                var trimmed = part.Trim().TrimEnd('\'').Trim();
+                trimmed = Regex.Replace(trimmed, @"\s*(ft|feet|foot)\s*$", "").Trim();
+                if (string.IsNullOrEmpty(trimmed))
+                    continue;
+                double val;
+                if (double.TryParse(trimmed, NumberStyles.Any,
+                    CultureInfo.InvariantCulture, out val) && val > 0)
+                {
+                    values.Add(val);
+                }
+                else
+                {
+                    return null;
+                }
+            }
+            return values.Count >= 2 ? values.ToArray() : null;
+        }
+
+        /// <summary>
+        /// Check for arithmetic/progressive spacing sequences and variable
+        /// spacing ambiguities.
+        /// Returns a clarification message if the prompt is ambiguous, null otherwise.
+        /// </summary>
+        private string CheckGridSpacingClarification(string lower, string promptText)
+        {
+            // Detect arithmetic sequence phrases: "and so on", "etc", "..."
+            string[] sequencePhrases = {
+                @"and\s+so\s+on", @"etc\.?", @"and\s+so\s+forth",
+                @"continuing", @"\.{3}"
+            };
+            bool hasSequencePhrase = false;
+            foreach (var phrase in sequencePhrases)
+            {
+                if (Regex.IsMatch(lower, phrase))
+                {
+                    hasSequencePhrase = true;
+                    break;
+                }
+            }
+            if (hasSequencePhrase)
+            {
+                return "It looks like you want a progressive or arithmetic spacing sequence.\n\n" +
+                       "Axiom currently supports uniform spacing or explicit per-bay spacing lists.\n" +
+                       "Please provide the exact spacing values for each bay.";
+            }
+
+            // Detect variable spacing with ambiguous orientation or count mismatch
+            bool hasOrientationKeyword = lower.Contains("vert") || lower.Contains("column")
+                || lower.Contains("horiz") || lower.Contains("row");
+
+            // Get variable spacings from comma or inline parsers
+            var commaSpacings = ParseCommaSpacings(lower);
+            var inlineSpacings = ParseInlineSpacings(lower);
+            var spacings = commaSpacings ?? inlineSpacings;
+
+            if (spacings == null)
+                return null;
+
+            // Get the count from the prompt
+            int? requestedCount = null;
+            var vertMatch = Regex.Match(lower, @"(\d+)\s*(?:vert(?:ical)?s?|columns?)");
+            if (vertMatch.Success)
+                requestedCount = int.Parse(vertMatch.Groups[1].Value);
+            var horizMatch = Regex.Match(lower, @"(\d+)\s*(?:horiz(?:ontal)?s?|rows?)");
+            if (!requestedCount.HasValue && horizMatch.Success)
+                requestedCount = int.Parse(horizMatch.Groups[1].Value);
+            if (!requestedCount.HasValue)
+            {
+                var genericMatch = Regex.Match(lower, @"(\d+)\s*(?:grid|grids|gridline|gridlines)");
+                if (genericMatch.Success)
+                    requestedCount = int.Parse(genericMatch.Groups[1].Value);
+            }
+
+            // Spacing count vs grid count mismatch
+            if (requestedCount.HasValue && requestedCount.Value > 1)
+            {
+                int expectedIntervals = requestedCount.Value - 1;
+                int actualIntervals = spacings.Length;
+                if (actualIntervals != expectedIntervals)
+                {
+                    return $"You requested {requestedCount.Value} grids but provided " +
+                           $"{actualIntervals} spacing value{(actualIntervals != 1 ? "s" : "")}.\n\n" +
+                           $"{requestedCount.Value} grids require {expectedIntervals} spacing " +
+                           $"interval{(expectedIntervals != 1 ? "s" : "")}.\n" +
+                           $"No changes were made to the model.";
+                }
+            }
+
+            // No orientation keyword with variable spacing
+            if (!hasOrientationKeyword)
+            {
+                return "Variable spacing was specified but no grid orientation " +
+                       "(vertical or horizontal) was given.\n\n" +
+                       "Please specify the orientation (e.g. 'Create vertical grids " +
+                       "with spacings ...').\n" +
+                       "No changes were made to the model.";
+            }
+
+            return null;
         }
 
         /// <summary>

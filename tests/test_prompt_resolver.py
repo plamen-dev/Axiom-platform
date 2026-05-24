@@ -557,3 +557,100 @@ class TestLevelMockExecution:
         )
         assert result["status"] == "SUCCESS"
         assert result["resolved"].capability_name == "CreateGrids"
+
+
+class TestGridVariableSpacingClarification:
+    """Tests for variable spacing clarification and validation."""
+
+    def test_arithmetic_spacing_and_so_on_triggers_clarification(self):
+        result = resolve_prompt(
+            "create 10 vertical grids spaced 5', 10', 15' and so on apart"
+        )
+        assert result is not None
+        assert result.capability_name == "CreateGrids"
+        assert result.status == "clarification_needed"
+        assert "increases by" in result.clarification_message
+
+    def test_arithmetic_spacing_etc_triggers_clarification(self):
+        result = resolve_prompt(
+            "create grids spaced 10, 20, 30 ft etc"
+        )
+        assert result is not None
+        assert result.status == "clarification_needed"
+
+    def test_arithmetic_spacing_ellipsis_triggers_clarification(self):
+        result = resolve_prompt(
+            "create 8 vertical grids spaced 5, 10, 15..."
+        )
+        assert result is not None
+        assert result.status == "clarification_needed"
+
+    def test_count_3_with_3_spacings_triggers_clarification(self):
+        result = resolve_prompt(
+            "create 3 vertical grids spaced 5, 6, and 20 feet apart"
+        )
+        assert result is not None
+        assert result.capability_name == "CreateGrids"
+        assert result.status == "clarification_needed"
+        assert "3 grids" in result.clarification_message
+        assert "3 spacing" in result.clarification_message
+
+    def test_generic_grids_variable_spacing_no_orientation_clarification(self):
+        result = resolve_prompt(
+            "create 3 grids spaced 5, 6, and 20 feet apart"
+        )
+        assert result is not None
+        assert result.capability_name == "CreateGrids"
+        assert result.status == "clarification_needed"
+
+    def test_explicit_4_vertical_grids_with_3_spacings_succeeds(self):
+        result = resolve_prompt(
+            "create 4 vertical grids with spacings 5, 6, and 20 feet"
+        )
+        assert result is not None
+        assert result.capability_name == "CreateGrids"
+        assert result.status == "resolved"
+        assert result.params.get("HorizontalSpacingsFeet") == [5.0, 6.0, 20.0]
+        assert result.params.get("HorizontalCount") == 4
+
+    def test_explicit_3_vertical_grids_with_2_spacings_succeeds(self):
+        result = resolve_prompt(
+            "create 3 vertical grids spaced 5 and 6 feet apart"
+        )
+        assert result is not None
+        assert result.capability_name == "CreateGrids"
+        assert result.status == "resolved"
+
+    def test_explicit_3_horizontal_grids_with_2_spacings_succeeds(self):
+        result = resolve_prompt(
+            "create 3 horizontal grids spaced 5 and 6 feet apart"
+        )
+        assert result is not None
+        assert result.capability_name == "CreateGrids"
+        assert result.status == "resolved"
+
+    def test_uniform_spacing_still_works(self):
+        result = resolve_prompt(
+            "create 10 vertical grids spaced 10 ft apart"
+        )
+        assert result is not None
+        assert result.capability_name == "CreateGrids"
+        assert result.status == "resolved"
+        assert result.params.get("SpacingFeet") == 10.0
+
+    def test_uniform_spacing_with_both_orientations_still_works(self):
+        result = resolve_prompt(
+            "create a 5 by 5 grid layout spaced 20 ft apart"
+        )
+        assert result is not None
+        assert result.capability_name == "CreateGrids"
+        assert result.status == "resolved"
+
+    def test_explicit_vertical_variable_spacing_no_count_mismatch(self):
+        result = resolve_prompt(
+            "create vertical grids with spacings 10, 15, 20"
+        )
+        assert result is not None
+        assert result.capability_name == "CreateGrids"
+        assert result.status == "resolved"
+        assert result.params.get("HorizontalSpacingsFeet") == [10.0, 15.0, 20.0]

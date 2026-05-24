@@ -80,6 +80,7 @@
     <Compile Include="Models\GridParameters.cs" />
     <Compile Include="Models\LevelParameters.cs" />
     <Compile Include="Models\InventoryParameters.cs" />
+    <Compile Include="Compat\RevitElementIdCompat.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

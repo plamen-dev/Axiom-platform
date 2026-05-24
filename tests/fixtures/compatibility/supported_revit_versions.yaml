@@ -60,7 +60,7 @@ versions:
     csproj_format: "sdk-style"
     api_dll_path: "C:\\Program Files\\Autodesk\\Revit 2027\\RevitAPI.dll"
     api_ui_dll_path: "C:\\Program Files\\Autodesk\\Revit 2027\\RevitAPIUI.dll"
-    addin_folder: "C:\\ProgramData\\Autodesk\\Revit\\Addins\\2027"
+    addin_folder: "C:\\Program Files\\Autodesk\\Revit\\Addins\\2027"
     addin_isolation: true
     status: "planned"
     notes: >

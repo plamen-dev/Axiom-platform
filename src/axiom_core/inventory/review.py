@@ -6,6 +6,7 @@ structured summaries suitable for CLI display or programmatic use.
 
 from __future__ import annotations
 
+import json
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -33,9 +34,25 @@ class InventorySummary:
     type_params: int = 0
 
     missing_level_count: int = 0
+    scan_mode: str = ""
 
     category_counts: dict[str, int] = field(default_factory=dict)
     top_param_names: list[tuple[str, int]] = field(default_factory=list)
+
+    # Parameter schema specific
+    parameter_definition_count: int = 0
+    unique_parameter_names: int = 0
+    top_param_definitions: list[tuple[str, int]] = field(default_factory=list)
+    is_parameter_schema: bool = False
+
+    # Enriched metadata (parameter schema)
+    unique_data_types: int = 0
+    unique_groups: int = 0
+    measurable_count: int = 0
+    unique_disciplines: int = 0
+    top_data_type_labels: list[tuple[str, int]] = field(default_factory=list)
+    top_group_labels: list[tuple[str, int]] = field(default_factory=list)
+    top_disciplines: list[tuple[str, int]] = field(default_factory=list)
 
 
 def find_latest_run(base_dir: Path) -> Optional[Path]:
@@ -66,10 +83,37 @@ def load_summary(
     """
     summary = InventorySummary(run_dir=str(run_dir))
 
+    # Load run metadata if available (written during inventory-import)
+    meta_path = run_dir / "run_metadata.json"
+    run_meta: dict = {}
+    if meta_path.exists():
+        with open(meta_path, "r", encoding="utf-8-sig") as mf:
+            run_meta = json.load(mf)
+        summary.run_id = run_meta.get("run_id", "")
+        summary.source_model = run_meta.get("source_model", "")
+        summary.scan_mode = run_meta.get("scan_mode", "")
+
+    # Check if this is a parameter schema run
+    ps_parquet = run_dir / "parameter_schema.parquet"
+    if ps_parquet.exists():
+        return _load_parameter_schema_summary(
+            summary, run_dir, run_meta,
+            category_filter=category_filter,
+            param_name_filter=param_name_filter,
+            writable_only=writable_only,
+        )
+
     elem_path = run_dir / "elements.parquet"
     param_path = run_dir / "parameters.parquet"
 
     if not elem_path.exists() or not param_path.exists():
+        # Even without parquet files, metadata may have counts
+        if run_meta:
+            summary.total_instances = run_meta.get("instance_count", 0)
+            summary.total_types = run_meta.get("type_count", 0)
+            summary.total_elements = summary.total_instances + summary.total_types
+            summary.total_parameters = run_meta.get("parameter_count", 0)
+            summary.category_counts = run_meta.get("category_counts", {})
         return summary
 
     # --- Elements ---
@@ -77,10 +121,14 @@ def load_summary(
     elem_df = {col: elem_table.column(col).to_pylist() for col in elem_table.schema.names}
     n_rows = elem_table.num_rows
 
-    # Extract run_id / source_model from first row
+    # Extract run_id / source_model from first row (don't override metadata)
     if n_rows > 0:
-        summary.run_id = (elem_df.get("run_id") or [""])[0] or ""
-        summary.source_model = (elem_df.get("source_model") or [""])[0] or ""
+        parquet_run_id = (elem_df.get("run_id") or [""])[0] or ""
+        parquet_source = (elem_df.get("source_model") or [""])[0] or ""
+        if parquet_run_id:
+            summary.run_id = parquet_run_id
+        if parquet_source:
+            summary.source_model = parquet_source
 
     # Build per-element data for filtering (skip placeholder rows)
     elements: list[dict] = []
@@ -101,9 +149,16 @@ def load_summary(
     summary.total_types = sum(1 for e in elements if e.get("is_type", False))
     summary.total_elements = len(elements)
 
-    # Category counts
+    # Category counts (from parquet elements; metadata category_counts used as fallback)
     cat_counter = Counter(e.get("category", "(No Category)") for e in elements)
     summary.category_counts = dict(cat_counter.most_common())
+
+    # For summary-mode runs, elements list is empty — use metadata counts
+    if summary.total_elements == 0 and run_meta:
+        summary.total_instances = run_meta.get("instance_count", 0)
+        summary.total_types = run_meta.get("type_count", 0)
+        summary.total_elements = summary.total_instances + summary.total_types
+        summary.category_counts = run_meta.get("category_counts", {})
 
     # Missing level (instances only)
     summary.missing_level_count = sum(
@@ -146,5 +201,100 @@ def load_summary(
     # Top parameter names
     name_counter = Counter(p.get("param_name", "") for p in params)
     summary.top_param_names = name_counter.most_common(20)
+
+    return summary
+
+
+def _load_parameter_schema_summary(
+    summary: InventorySummary,
+    run_dir: Path,
+    run_meta: dict,
+    *,
+    category_filter: Optional[str] = None,
+    param_name_filter: Optional[str] = None,
+    writable_only: bool = False,
+) -> InventorySummary:
+    """Load summary from a parameter_schema.parquet run."""
+    summary.is_parameter_schema = True
+    if not summary.scan_mode:
+        summary.scan_mode = run_meta.get("scan_mode", "category_parameter_schema")
+
+    ps_path = run_dir / "parameter_schema.parquet"
+    table = pq.read_table(str(ps_path))
+    df = {col: table.column(col).to_pylist() for col in table.schema.names}
+    n_rows = table.num_rows
+
+    defs: list[dict] = []
+    for i in range(n_rows):
+        row = {col: df[col][i] for col in df}
+        if not row.get("parameter_name"):
+            continue
+        defs.append(row)
+
+    if category_filter:
+        cf_lower = category_filter.lower()
+        defs = [d for d in defs if cf_lower in (d.get("category") or "").lower()]
+
+    if param_name_filter:
+        pf_lower = param_name_filter.lower()
+        defs = [d for d in defs if pf_lower in (d.get("parameter_name") or "").lower()]
+
+    if writable_only:
+        defs = [d for d in defs if not d.get("is_read_only", False)]
+
+    summary.parameter_definition_count = len(defs)
+    unique_names = {d.get("parameter_name", "") for d in defs}
+    summary.unique_parameter_names = len(unique_names)
+    summary.read_only_params = sum(1 for d in defs if d.get("is_read_only", False))
+    summary.writable_params = len(defs) - summary.read_only_params
+    summary.instance_params = sum(1 for d in defs if d.get("is_instance_param", False))
+    summary.type_params = sum(1 for d in defs if d.get("is_type_param", False))
+    summary.total_parameters = len(defs)
+
+    # Category counts from parameter definitions
+    cat_counter = Counter(d.get("category", "") for d in defs)
+    summary.category_counts = dict(cat_counter.most_common())
+
+    # Top parameter names by observed_count
+    name_counts: dict[str, int] = {}
+    for d in defs:
+        pname = d.get("parameter_name", "")
+        count = d.get("observed_count", 1) or 1
+        name_counts[pname] = name_counts.get(pname, 0) + count
+    summary.top_param_definitions = sorted(
+        name_counts.items(), key=lambda x: -x[1],
+    )[:20]
+    summary.top_param_names = summary.top_param_definitions
+
+    # Enriched metadata stats
+    dt_labels = Counter(
+        d.get("data_type_label", "") for d in defs
+        if d.get("data_type_label")
+    )
+    summary.unique_data_types = len(dt_labels)
+    summary.top_data_type_labels = dt_labels.most_common(10)
+
+    grp_labels = Counter(
+        d.get("group_type_label", "") for d in defs
+        if d.get("group_type_label")
+    )
+    summary.unique_groups = len(grp_labels)
+    summary.top_group_labels = grp_labels.most_common(10)
+
+    summary.measurable_count = sum(
+        1 for d in defs if d.get("is_measurable_spec", False)
+    )
+
+    disc_labels = Counter(
+        d.get("discipline_label", "") for d in defs
+        if d.get("discipline_label")
+    )
+    summary.unique_disciplines = len(disc_labels)
+    summary.top_disciplines = disc_labels.most_common(10)
+
+    # Use metadata for element counts if available
+    summary.total_instances = run_meta.get("instance_count", 0)
+    summary.total_types = run_meta.get("type_count", 0)
+    summary.total_elements = summary.total_instances + summary.total_types
 
     return summary

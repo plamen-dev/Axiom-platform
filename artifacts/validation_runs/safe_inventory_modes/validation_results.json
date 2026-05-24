@@ -1,0 +1,1176 @@
+{
+  "timestamp": "2026-05-21T00:28:19.415196+00:00",
+  "total_tests": 46,
+  "passed": 46,
+  "failed": 0,
+  "environment": "Python prompt resolver (no live Revit)",
+  "level_filter_architecture": "post-collector, pre-extraction (not optimal, but safe)",
+  "results": [
+    {
+      "test_id": "VAL-001",
+      "category": "1. Summary mode",
+      "prompt": "Run InventoryModel",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "summary",
+      "category_filter": [],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": true,
+      "include_parameters": false,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Safe summary scan: counts and categories only, no parameter dump"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.43,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Default safe mode \u2014 counts and categories only"
+    },
+    {
+      "test_id": "VAL-002",
+      "category": "1. Summary mode",
+      "prompt": "InventoryModel",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "summary",
+      "category_filter": [],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": true,
+      "include_parameters": false,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Safe summary scan: counts and categories only, no parameter dump"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.02,
+      "passed": true,
+      "failure_reason": "",
+      "notes": ""
+    },
+    {
+      "test_id": "VAL-003",
+      "category": "1. Summary mode",
+      "prompt": "model inventory",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "summary",
+      "category_filter": [],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": true,
+      "include_parameters": false,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Safe summary scan: counts and categories only, no parameter dump"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.02,
+      "passed": true,
+      "failure_reason": "",
+      "notes": ""
+    },
+    {
+      "test_id": "VAL-010",
+      "category": "2. Sample mode",
+      "prompt": "Run InventoryModel sample",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "sample",
+      "category_filter": [],
+      "level_filter": [],
+      "max_threshold": 100,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Sample scan: first 100 elements with parameters"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Capped at 100 elements"
+    },
+    {
+      "test_id": "VAL-011",
+      "category": "2. Sample mode",
+      "prompt": "inventory sample",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "sample",
+      "category_filter": [],
+      "level_filter": [],
+      "max_threshold": 100,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Sample scan: first 100 elements with parameters"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": ""
+    },
+    {
+      "test_id": "VAL-02-2",
+      "category": "3. Single-category mode",
+      "prompt": "Run InventoryModel for Walls",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "category",
+      "category_filter": [
+        "Walls"
+      ],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Category scan: Walls only"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": ""
+    },
+    {
+      "test_id": "VAL-02-1",
+      "category": "3. Single-category mode",
+      "prompt": "Inventory doors",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "category",
+      "category_filter": [
+        "Doors"
+      ],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Category scan: Doors only"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": ""
+    },
+    {
+      "test_id": "VAL-020",
+      "category": "3. Single-category mode",
+      "prompt": "Run InventoryModel for Levels",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "category",
+      "category_filter": [
+        "Levels"
+      ],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Category scan: Levels only"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.04,
+      "passed": true,
+      "failure_reason": "",
+      "notes": ""
+    },
+    {
+      "test_id": "VAL-021",
+      "category": "3. Single-category mode",
+      "prompt": "Inventory rooms",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "category",
+      "category_filter": [
+        "Rooms"
+      ],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Category scan: Rooms only"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.02,
+      "passed": true,
+      "failure_reason": "",
+      "notes": ""
+    },
+    {
+      "test_id": "VAL-022",
+      "category": "3. Single-category mode",
+      "prompt": "Run InventoryModel for Mechanical Equipment",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "category",
+      "category_filter": [
+        "Mechanical Equipment"
+      ],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Category scan: Mechanical Equipment only"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.02,
+      "passed": true,
+      "failure_reason": "",
+      "notes": ""
+    },
+    {
+      "test_id": "VAL-023",
+      "category": "3. Single-category mode",
+      "prompt": "Inventory parameters for windows",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "category",
+      "category_filter": [
+        "Windows"
+      ],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Category scan: Windows only"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": ""
+    },
+    {
+      "test_id": "VAL-040",
+      "category": "4. Level-only mode",
+      "prompt": "Run InventoryModel on Level 1",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "level",
+      "category_filter": [],
+      "level_filter": [
+        "1"
+      ],
+      "max_threshold": null,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Level scan: 1 only"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.02,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Level 1 filtering"
+    },
+    {
+      "test_id": "VAL-041",
+      "category": "4. Level-only mode",
+      "prompt": "Run InventoryModel on Level Ground",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "level",
+      "category_filter": [],
+      "level_filter": [
+        "Ground"
+      ],
+      "max_threshold": null,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Level scan: Ground only"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.02,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Named level filtering"
+    },
+    {
+      "test_id": "VAL-042",
+      "category": "4. Level-only mode",
+      "prompt": "Run InventoryModel for Level 2",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "level",
+      "category_filter": [],
+      "level_filter": [
+        "2"
+      ],
+      "max_threshold": null,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Level scan: 2 only"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.02,
+      "passed": true,
+      "failure_reason": "",
+      "notes": ""
+    },
+    {
+      "test_id": "VAL-043",
+      "category": "4. Level-only mode",
+      "prompt": "Run InventoryModel at Level Basement",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "level",
+      "category_filter": [],
+      "level_filter": [
+        "Basement"
+      ],
+      "max_threshold": null,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Level scan: Basement only"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.02,
+      "passed": true,
+      "failure_reason": "",
+      "notes": ""
+    },
+    {
+      "test_id": "VAL-050",
+      "category": "5. Category+level mode",
+      "prompt": "Run InventoryModel for Walls on Level 1",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "category_level",
+      "category_filter": [
+        "Walls"
+      ],
+      "level_filter": [
+        "1"
+      ],
+      "max_threshold": null,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Category+level scan: Walls on 1"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Category + level combined"
+    },
+    {
+      "test_id": "VAL-051",
+      "category": "5. Category+level mode",
+      "prompt": "Run InventoryModel for Doors on Level 1",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "category_level",
+      "category_filter": [
+        "Doors"
+      ],
+      "level_filter": [
+        "1"
+      ],
+      "max_threshold": null,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Category+level scan: Doors on 1"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": ""
+    },
+    {
+      "test_id": "VAL-052",
+      "category": "5. Category+level mode",
+      "prompt": "Inventory doors on Level 2",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "category_level",
+      "category_filter": [
+        "Doors"
+      ],
+      "level_filter": [
+        "2"
+      ],
+      "max_threshold": null,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Category+level scan: Doors on 2"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": ""
+    },
+    {
+      "test_id": "VAL-053",
+      "category": "5. Category+level mode",
+      "prompt": "Run InventoryModel for Floors on Level Ground",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "category_level",
+      "category_filter": [
+        "Floors"
+      ],
+      "level_filter": [
+        "Ground"
+      ],
+      "max_threshold": null,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Category+level scan: Floors on Ground"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": ""
+    },
+    {
+      "test_id": "VAL-060",
+      "category": "6. Max threshold mode",
+      "prompt": "Run InventoryModel for Walls max 500",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "category",
+      "category_filter": [
+        "Walls"
+      ],
+      "level_filter": [],
+      "max_threshold": 500,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Category scan: Walls only",
+        "Max elements: 500"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Category + max element cap"
+    },
+    {
+      "test_id": "VAL-061",
+      "category": "6. Max threshold mode",
+      "prompt": "Run InventoryModel for Doors max 500",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "category",
+      "category_filter": [
+        "Doors"
+      ],
+      "level_filter": [],
+      "max_threshold": 500,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Category scan: Doors only",
+        "Max elements: 500"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": ""
+    },
+    {
+      "test_id": "VAL-062",
+      "category": "6. Max threshold mode",
+      "prompt": "Run InventoryModel on Level 1 limit 1000",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "level",
+      "category_filter": [],
+      "level_filter": [
+        "1"
+      ],
+      "max_threshold": 1000,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Level scan: 1 only",
+        "Max elements: 1000"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.05,
+      "passed": true,
+      "failure_reason": "",
+      "notes": ""
+    },
+    {
+      "test_id": "VAL-063",
+      "category": "6. Max threshold mode",
+      "prompt": "Run InventoryModel for Walls on Level 1 max 200",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "category_level",
+      "category_filter": [
+        "Walls"
+      ],
+      "level_filter": [
+        "1"
+      ],
+      "max_threshold": 200,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Category+level scan: Walls on 1",
+        "Max elements: 200"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": ""
+    },
+    {
+      "test_id": "VAL-064",
+      "category": "6. Max threshold mode",
+      "prompt": "Run InventoryModel for Walls first 50",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "category",
+      "category_filter": [
+        "Walls"
+      ],
+      "level_filter": [],
+      "max_threshold": 50,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Category scan: Walls only",
+        "Max elements: 50"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "'first N' variant"
+    },
+    {
+      "test_id": "VAL-07-3",
+      "category": "7. Full scan blocked",
+      "prompt": "Run full InventoryModel",
+      "capability_name": "InventoryModel",
+      "status": "clarification_needed",
+      "scan_mode": "",
+      "category_filter": [],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": null,
+      "include_parameters": null,
+      "clarification_message": "Full inventory is currently disabled for live Revit sessions. Full element+parameter scans have caused Revit crashes on large models.\n\nSafe workflow:\n  1. Run InventoryModel (summary counts only)\n  2. Run 'axiom inventory-plan --file <summary.json>' to build extraction plan\n  3. Execute approved chunks from the plan:\n     - \"Run InventoryModel for Walls\" (category scan)\n     - \"Run InventoryModel for Walls on Level 1\" (category+level scan)\n     - \"Run InventoryModel on Level 1\" (level scan)\n     - \"Run InventoryModel sample\" (first 100 elements)\n\nDo not run unbounded full extraction. Use the planner to determine safe chunks.",
+      "assumptions": [
+        "Full inventory scan is currently disabled for live Revit sessions"
+      ],
+      "is_blocked": true,
+      "is_unbounded": false,
+      "runtime_ms": 0.02,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Must return clarification_needed, never execute"
+    },
+    {
+      "test_id": "VAL-07-2",
+      "category": "7. Full scan blocked",
+      "prompt": "full inventory",
+      "capability_name": "InventoryModel",
+      "status": "clarification_needed",
+      "scan_mode": "",
+      "category_filter": [],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": null,
+      "include_parameters": null,
+      "clarification_message": "Full inventory is currently disabled for live Revit sessions. Full element+parameter scans have caused Revit crashes on large models.\n\nSafe workflow:\n  1. Run InventoryModel (summary counts only)\n  2. Run 'axiom inventory-plan --file <summary.json>' to build extraction plan\n  3. Execute approved chunks from the plan:\n     - \"Run InventoryModel for Walls\" (category scan)\n     - \"Run InventoryModel for Walls on Level 1\" (category+level scan)\n     - \"Run InventoryModel on Level 1\" (level scan)\n     - \"Run InventoryModel sample\" (first 100 elements)\n\nDo not run unbounded full extraction. Use the planner to determine safe chunks.",
+      "assumptions": [
+        "Full inventory scan is currently disabled for live Revit sessions"
+      ],
+      "is_blocked": true,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Must return clarification_needed, never execute"
+    },
+    {
+      "test_id": "VAL-07-1",
+      "category": "7. Full scan blocked",
+      "prompt": "Run full scan InventoryModel",
+      "capability_name": "InventoryModel",
+      "status": "clarification_needed",
+      "scan_mode": "",
+      "category_filter": [],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": null,
+      "include_parameters": null,
+      "clarification_message": "Full inventory is currently disabled for live Revit sessions. Full element+parameter scans have caused Revit crashes on large models.\n\nSafe workflow:\n  1. Run InventoryModel (summary counts only)\n  2. Run 'axiom inventory-plan --file <summary.json>' to build extraction plan\n  3. Execute approved chunks from the plan:\n     - \"Run InventoryModel for Walls\" (category scan)\n     - \"Run InventoryModel for Walls on Level 1\" (category+level scan)\n     - \"Run InventoryModel on Level 1\" (level scan)\n     - \"Run InventoryModel sample\" (first 100 elements)\n\nDo not run unbounded full extraction. Use the planner to determine safe chunks.",
+      "assumptions": [
+        "Full inventory scan is currently disabled for live Revit sessions"
+      ],
+      "is_blocked": true,
+      "is_unbounded": false,
+      "runtime_ms": 0.02,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Must return clarification_needed, never execute"
+    },
+    {
+      "test_id": "VAL-070",
+      "category": "7. Full scan blocked",
+      "prompt": "Run complete inventory",
+      "capability_name": "InventoryModel",
+      "status": "clarification_needed",
+      "scan_mode": "",
+      "category_filter": [],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": null,
+      "include_parameters": null,
+      "clarification_message": "Full inventory is currently disabled for live Revit sessions. Full element+parameter scans have caused Revit crashes on large models.\n\nSafe workflow:\n  1. Run InventoryModel (summary counts only)\n  2. Run 'axiom inventory-plan --file <summary.json>' to build extraction plan\n  3. Execute approved chunks from the plan:\n     - \"Run InventoryModel for Walls\" (category scan)\n     - \"Run InventoryModel for Walls on Level 1\" (category+level scan)\n     - \"Run InventoryModel on Level 1\" (level scan)\n     - \"Run InventoryModel sample\" (first 100 elements)\n\nDo not run unbounded full extraction. Use the planner to determine safe chunks.",
+      "assumptions": [
+        "Full inventory scan is currently disabled for live Revit sessions"
+      ],
+      "is_blocked": true,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Must return clarification_needed, never execute"
+    },
+    {
+      "test_id": "VAL-071",
+      "category": "7. Full scan blocked",
+      "prompt": "full inventory scan of the model",
+      "capability_name": "InventoryModel",
+      "status": "clarification_needed",
+      "scan_mode": "",
+      "category_filter": [],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": null,
+      "include_parameters": null,
+      "clarification_message": "Full inventory is currently disabled for live Revit sessions. Full element+parameter scans have caused Revit crashes on large models.\n\nSafe workflow:\n  1. Run InventoryModel (summary counts only)\n  2. Run 'axiom inventory-plan --file <summary.json>' to build extraction plan\n  3. Execute approved chunks from the plan:\n     - \"Run InventoryModel for Walls\" (category scan)\n     - \"Run InventoryModel for Walls on Level 1\" (category+level scan)\n     - \"Run InventoryModel on Level 1\" (level scan)\n     - \"Run InventoryModel sample\" (first 100 elements)\n\nDo not run unbounded full extraction. Use the planner to determine safe chunks.",
+      "assumptions": [
+        "Full inventory scan is currently disabled for live Revit sessions"
+      ],
+      "is_blocked": true,
+      "is_unbounded": false,
+      "runtime_ms": 0.02,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Must return clarification_needed, never execute"
+    },
+    {
+      "test_id": "VAL-072",
+      "category": "7. Full scan blocked",
+      "prompt": "run full inventorymodel please",
+      "capability_name": "InventoryModel",
+      "status": "clarification_needed",
+      "scan_mode": "",
+      "category_filter": [],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": null,
+      "include_parameters": null,
+      "clarification_message": "Full inventory is currently disabled for live Revit sessions. Full element+parameter scans have caused Revit crashes on large models.\n\nSafe workflow:\n  1. Run InventoryModel (summary counts only)\n  2. Run 'axiom inventory-plan --file <summary.json>' to build extraction plan\n  3. Execute approved chunks from the plan:\n     - \"Run InventoryModel for Walls\" (category scan)\n     - \"Run InventoryModel for Walls on Level 1\" (category+level scan)\n     - \"Run InventoryModel on Level 1\" (level scan)\n     - \"Run InventoryModel sample\" (first 100 elements)\n\nDo not run unbounded full extraction. Use the planner to determine safe chunks.",
+      "assumptions": [
+        "Full inventory scan is currently disabled for live Revit sessions"
+      ],
+      "is_blocked": true,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Must return clarification_needed, never execute"
+    },
+    {
+      "test_id": "VAL-08-3",
+      "category": "8. No unbounded extraction",
+      "prompt": "Run InventoryModel",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "summary",
+      "category_filter": [],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": true,
+      "include_parameters": false,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Safe summary scan: counts and categories only, no parameter dump"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Verify no prompt resolves to ScanMode=full or unbounded"
+    },
+    {
+      "test_id": "VAL-08-2",
+      "category": "8. No unbounded extraction",
+      "prompt": "Run InventoryModel sample",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "sample",
+      "category_filter": [],
+      "level_filter": [],
+      "max_threshold": 100,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Sample scan: first 100 elements with parameters"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Verify no prompt resolves to ScanMode=full or unbounded"
+    },
+    {
+      "test_id": "VAL-08-1",
+      "category": "8. No unbounded extraction",
+      "prompt": "Run InventoryModel for Walls",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "category",
+      "category_filter": [
+        "Walls"
+      ],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Category scan: Walls only"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Verify no prompt resolves to ScanMode=full or unbounded"
+    },
+    {
+      "test_id": "VAL-080",
+      "category": "8. No unbounded extraction",
+      "prompt": "Inventory doors",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "category",
+      "category_filter": [
+        "Doors"
+      ],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Category scan: Doors only"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Verify no prompt resolves to ScanMode=full or unbounded"
+    },
+    {
+      "test_id": "VAL-081",
+      "category": "8. No unbounded extraction",
+      "prompt": "Run InventoryModel on Level 1",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "level",
+      "category_filter": [],
+      "level_filter": [
+        "1"
+      ],
+      "max_threshold": null,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Level scan: 1 only"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.02,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Verify no prompt resolves to ScanMode=full or unbounded"
+    },
+    {
+      "test_id": "VAL-082",
+      "category": "8. No unbounded extraction",
+      "prompt": "Run InventoryModel for Walls on Level 1",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "category_level",
+      "category_filter": [
+        "Walls"
+      ],
+      "level_filter": [
+        "1"
+      ],
+      "max_threshold": null,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Category+level scan: Walls on 1"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Verify no prompt resolves to ScanMode=full or unbounded"
+    },
+    {
+      "test_id": "VAL-083",
+      "category": "8. No unbounded extraction",
+      "prompt": "Run InventoryModel for Walls max 500",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "category",
+      "category_filter": [
+        "Walls"
+      ],
+      "level_filter": [],
+      "max_threshold": 500,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Category scan: Walls only",
+        "Max elements: 500"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Verify no prompt resolves to ScanMode=full or unbounded"
+    },
+    {
+      "test_id": "VAL-084",
+      "category": "8. No unbounded extraction",
+      "prompt": "inventory plan",
+      "capability_name": "InventoryPlan",
+      "status": "clarification_needed",
+      "scan_mode": "",
+      "category_filter": [],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": null,
+      "include_parameters": null,
+      "clarification_message": "To build an extraction plan:\n  1. Run InventoryModel (summary mode) in Revit\n  2. Copy the exported JSON path from the dialog\n  3. Run: axiom inventory-plan --file \"<path to summary.json>\"\n\nThe plan will group categories by discipline, isolate large categories, and chunk very large ones into safe batches.\nAdjust thresholds with --max-group, --isolate-threshold, --max-chunk.",
+      "assumptions": [
+        "Extraction plan requested",
+        "Run summary mode first, then use 'axiom inventory-plan --file <summary.json>'"
+      ],
+      "is_blocked": true,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Verify no prompt resolves to ScanMode=full or unbounded"
+    },
+    {
+      "test_id": "VAL-085",
+      "category": "8. No unbounded extraction",
+      "prompt": "Create an extraction plan",
+      "capability_name": "InventoryPlan",
+      "status": "clarification_needed",
+      "scan_mode": "",
+      "category_filter": [],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": null,
+      "include_parameters": null,
+      "clarification_message": "To build an extraction plan:\n  1. Run InventoryModel (summary mode) in Revit\n  2. Copy the exported JSON path from the dialog\n  3. Run: axiom inventory-plan --file \"<path to summary.json>\"\n\nThe plan will group categories by discipline, isolate large categories, and chunk very large ones into safe batches.\nAdjust thresholds with --max-group, --isolate-threshold, --max-chunk.",
+      "assumptions": [
+        "Extraction plan requested",
+        "Run summary mode first, then use 'axiom inventory-plan --file <summary.json>'"
+      ],
+      "is_blocked": true,
+      "is_unbounded": false,
+      "runtime_ms": 0.02,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Verify no prompt resolves to ScanMode=full or unbounded"
+    },
+    {
+      "test_id": "VAL-086",
+      "category": "8. No unbounded extraction",
+      "prompt": "model inventory",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "summary",
+      "category_filter": [],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": true,
+      "include_parameters": false,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Safe summary scan: counts and categories only, no parameter dump"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Verify no prompt resolves to ScanMode=full or unbounded"
+    },
+    {
+      "test_id": "VAL-087",
+      "category": "8. No unbounded extraction",
+      "prompt": "scan model parameters",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "summary",
+      "category_filter": [],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": true,
+      "include_parameters": false,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Safe summary scan: counts and categories only, no parameter dump"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Verify no prompt resolves to ScanMode=full or unbounded"
+    },
+    {
+      "test_id": "VAL-088",
+      "category": "8. No unbounded extraction",
+      "prompt": "extract model parameters",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "summary",
+      "category_filter": [],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": true,
+      "include_parameters": false,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Safe summary scan: counts and categories only, no parameter dump"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Verify no prompt resolves to ScanMode=full or unbounded"
+    },
+    {
+      "test_id": "VAL-089",
+      "category": "8. No unbounded extraction",
+      "prompt": "inventory parameters for walls",
+      "capability_name": "InventoryModel",
+      "status": "resolved",
+      "scan_mode": "category",
+      "category_filter": [
+        "Walls"
+      ],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": false,
+      "include_parameters": true,
+      "clarification_message": "",
+      "assumptions": [
+        "Read-only model inventory scan",
+        "Category scan: Walls only"
+      ],
+      "is_blocked": false,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Verify no prompt resolves to ScanMode=full or unbounded"
+    },
+    {
+      "test_id": "VAL-090",
+      "category": "Plan prompt",
+      "prompt": "inventory plan",
+      "capability_name": "InventoryPlan",
+      "status": "clarification_needed",
+      "scan_mode": "",
+      "category_filter": [],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": null,
+      "include_parameters": null,
+      "clarification_message": "To build an extraction plan:\n  1. Run InventoryModel (summary mode) in Revit\n  2. Copy the exported JSON path from the dialog\n  3. Run: axiom inventory-plan --file \"<path to summary.json>\"\n\nThe plan will group categories by discipline, isolate large categories, and chunk very large ones into safe batches.\nAdjust thresholds with --max-group, --isolate-threshold, --max-chunk.",
+      "assumptions": [
+        "Extraction plan requested",
+        "Run summary mode first, then use 'axiom inventory-plan --file <summary.json>'"
+      ],
+      "is_blocked": true,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": "Returns guidance to use CLI planner"
+    },
+    {
+      "test_id": "VAL-091",
+      "category": "Plan prompt",
+      "prompt": "Create an extraction plan",
+      "capability_name": "InventoryPlan",
+      "status": "clarification_needed",
+      "scan_mode": "",
+      "category_filter": [],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": null,
+      "include_parameters": null,
+      "clarification_message": "To build an extraction plan:\n  1. Run InventoryModel (summary mode) in Revit\n  2. Copy the exported JSON path from the dialog\n  3. Run: axiom inventory-plan --file \"<path to summary.json>\"\n\nThe plan will group categories by discipline, isolate large categories, and chunk very large ones into safe batches.\nAdjust thresholds with --max-group, --isolate-threshold, --max-chunk.",
+      "assumptions": [
+        "Extraction plan requested",
+        "Run summary mode first, then use 'axiom inventory-plan --file <summary.json>'"
+      ],
+      "is_blocked": true,
+      "is_unbounded": false,
+      "runtime_ms": 0.01,
+      "passed": true,
+      "failure_reason": "",
+      "notes": ""
+    },
+    {
+      "test_id": "VAL-092",
+      "category": "Plan prompt",
+      "prompt": "Build an extraction plan for my model",
+      "capability_name": "InventoryPlan",
+      "status": "clarification_needed",
+      "scan_mode": "",
+      "category_filter": [],
+      "level_filter": [],
+      "max_threshold": null,
+      "summary_only": null,
+      "include_parameters": null,
+      "clarification_message": "To build an extraction plan:\n  1. Run InventoryModel (summary mode) in Revit\n  2. Copy the exported JSON path from the dialog\n  3. Run: axiom inventory-plan --file \"<path to summary.json>\"\n\nThe plan will group categories by discipline, isolate large categories, and chunk very large ones into safe batches.\nAdjust thresholds with --max-group, --isolate-threshold, --max-chunk.",
+      "assumptions": [
+        "Extraction plan requested",
+        "Run summary mode first, then use 'axiom inventory-plan --file <summary.json>'"
+      ],
+      "is_blocked": true,
+      "is_unbounded": false,
+      "runtime_ms": 0.02,
+      "passed": true,
+      "failure_reason": "",
+      "notes": ""
+    }
+  ]
+}

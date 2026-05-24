@@ -1,0 +1,107 @@
+# InventoryModel Behavior Regression Cases
+#
+# Machine-readable regression cases for InventoryModel prompt resolution,
+# read-only behavior, output format, and persistence pipeline.
+
+cases:
+  - case_id: inventory_resolves_from_prompt
+    behavior_ref: null
+    prompt: "Run InventoryModel"
+    expected_capability: InventoryModel
+    expected_status: RESOLVED
+    expected_success: true
+    expected_output_fields:
+      - element_count
+      - type_count
+      - parameter_count
+    notes: "Standard InventoryModel invocation."
+
+  - case_id: inventory_alternative_keywords
+    behavior_ref: null
+    prompt: "scan model parameters"
+    expected_capability: InventoryModel
+    expected_status: RESOLVED
+    expected_success: true
+    expected_output_fields:
+      - element_count
+      - type_count
+      - parameter_count
+    notes: "Alternative keywords must also resolve to InventoryModel."
+
+  - case_id: inventory_read_only_no_creation
+    behavior_ref: BHV-005
+    prompt: "Run InventoryModel"
+    previous_behavior: "Dialog showed 'Created: 0 element(s)'"
+    expected_capability: InventoryModel
+    expected_status: RESOLVED
+    expected_success: true
+    expected_dialog_contains:
+      - "Elements inventoried"
+      - "Parameters inventoried"
+    expected_dialog_must_not_contain:
+      - "Created: 0"
+    notes: "InventoryModel must never report 'Created' counts. It inventories, not creates."
+
+  - case_id: inventory_any_view_allowed
+    behavior_ref: BHV-006
+    prompt: "Run InventoryModel"
+    previous_behavior: "Blocked with 'Prompt execution requires a plan view'"
+    expected_capability: InventoryModel
+    expected_status: RESOLVED
+    expected_success: true
+    allowed_views:
+      - FloorPlan
+      - Section
+      - Elevation
+      - 3DView
+      - CeilingPlan
+    notes: "InventoryModel is read-only and must run from any view type."
+
+  - case_id: inventory_persistence_export_path
+    behavior_ref: BHV-007
+    prompt: "Run InventoryModel"
+    previous_behavior: "No artifacts created after Revit Prompt execution"
+    expected_capability: InventoryModel
+    expected_status: RESOLVED
+    expected_success: true
+    expected_export_location: "%LOCALAPPDATA%\\Axiom\\inventory_exports\\inv_YYYYMMDD_HHmmss.json"
+    expected_dialog_contains:
+      - "Exported to:"
+      - "inventory-import"
+    import_command: "axiom inventory-import --file <path>"
+    notes: >
+      C# writes JSON to LOCALAPPDATA. Python CLI imports to Parquet/SQLite artifacts.
+      Dialog must show the full export path for cross-user-profile scenarios.
+      Export path is a temporary handoff location, not a durable artifact store.
+
+  - case_id: inventory_import_produces_artifacts
+    behavior_ref: BHV-007
+    prompt: null
+    expected_capability: InventoryModel
+    expected_status: pending
+    expected_success: true
+    expected_artifacts:
+      - "artifacts/model_inventory_runs/<run_id>/elements.parquet"
+      - "artifacts/model_inventory_runs/<run_id>/parameters.parquet"
+      - "artifacts/model_inventory_runs/<run_id>/elements.jsonl"
+      - "artifacts/model_inventory_runs/<run_id>/summary.md"
+    import_command: "axiom inventory-import --latest"
+    notes: >
+      After import, axiom inventory-summary --latest should read the run.
+      This case is validated by pytest TestInventoryImport tests.
+
+  - case_id: inventory_not_grid_or_level
+    behavior_ref: null
+    prompt: "list all model elements"
+    expected_capability: InventoryModel
+    expected_status: RESOLVED
+    expected_success: true
+    notes: "Inventory keywords must not collide with grid or level prompts."
+
+  - case_id: grid_prompt_not_inventory
+    behavior_ref: null
+    prompt: "create 5 vertical grids spaced 10 ft apart"
+    expected_capability: CreateGrids
+    expected_status: RESOLVED
+    expected_success: true
+    notes: "Grid prompts must not be hijacked by inventory resolver."

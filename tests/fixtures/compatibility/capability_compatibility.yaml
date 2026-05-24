@@ -47,7 +47,7 @@ capabilities:
         notes: "Python simulation is version-agnostic. C# build not attempted."
 
       - revit_version: "2027"
-        status: "planned"
+        status: "simulated"
         last_tested: null
         tested_by: null
         python_simulation: true
@@ -55,9 +55,10 @@ capabilities:
         revit_startup: false
         revit_execution: false
         notes: >
-          Python simulation is version-agnostic. C# build requires .NET 10
-          SDK-style .csproj (not created yet). Grid.Create API expected to
-          be stable but not confirmed.
+          Python simulation is version-agnostic. SDK-style .csproj created
+          (Axiom.Core.2027, Axiom.RevitAddin.2027) targeting net10.0-windows
+          with shared source linking. Build validation pending .NET 10 SDK
+          on Windows. Grid.Create API expected stable but not confirmed.
 
   - capability: "CreateLevels"
     description: "Creates building levels at specified elevations."
@@ -95,7 +96,7 @@ capabilities:
         notes: "Python simulation is version-agnostic. C# build not attempted."
 
       - revit_version: "2027"
-        status: "planned"
+        status: "simulated"
         last_tested: null
         tested_by: null
         python_simulation: true
@@ -103,8 +104,9 @@ capabilities:
         revit_startup: false
         revit_execution: false
         notes: >
-          Python simulation is version-agnostic. Level.Create API expected
-          to be stable but not confirmed.
+          Python simulation is version-agnostic. SDK-style .csproj created.
+          Build validation pending .NET 10 SDK on Windows. Level.Create API
+          expected stable but not confirmed.
 
   - capability: "InventoryModel"
     description: "Read-only model inventory — enumerates all elements and parameters."
@@ -148,7 +150,7 @@ capabilities:
         notes: "Same runtime family as 2025. Expected to share build."
 
       - revit_version: "2027"
-        status: "planned"
+        status: "simulated"
         last_tested: null
         tested_by: null
         python_simulation: true
@@ -156,8 +158,9 @@ capabilities:
         revit_startup: false
         revit_execution: false
         notes: >
-          Key validation target. InventoryModel output from 2027 will be
-          diffed against 2024 baseline to identify API surface changes.
+          Key validation target. SDK-style .csproj created. Build validation
+          pending .NET 10 SDK on Windows. InventoryModel output from 2027
+          will be diffed against 2024 baseline to identify API surface changes.
 
 # Validation status reference
 validation_statuses:

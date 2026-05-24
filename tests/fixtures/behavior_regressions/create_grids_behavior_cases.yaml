@@ -1,0 +1,134 @@
+# CreateGrids Behavior Regression Cases
+#
+# Machine-readable regression cases for prompts that previously misresolved.
+# Each case captures the old (broken) behavior and the current (correct) behavior.
+# Used to prevent old bugs from returning.
+#
+# Fields:
+#   case_id:              Unique identifier
+#   behavior_ref:         Reference to behavior-change-ledger.md entry
+#   prompt:               The user prompt
+#   previous_behavior:    What used to happen (incorrect)
+#   expected_capability:  Which capability should be resolved
+#   expected_status:      RESOLVED | CLARIFICATION_NEEDED
+#   expected_success:     true | false
+#   expected_message_contains: Substring(s) expected in clarification message
+#   notes:                Additional context
+
+cases:
+  - case_id: regression_arithmetic_spacing_and_so_on
+    behavior_ref: BHV-001
+    prompt: "create 10 vertical grids spaced 5', 10', 15' and so on apart"
+    previous_behavior: "Silently created 10 grids at uniform 5 ft spacing"
+    expected_capability: CreateGrids
+    expected_status: CLARIFICATION_NEEDED
+    expected_success: false
+    expected_message_contains:
+      - "arithmetic"
+      - "5.0"
+      - "10.0"
+      - "15.0"
+    notes: "Arithmetic sequence detection must extract numbers from spacing context only, not from grid count."
+
+  - case_id: regression_arithmetic_spacing_etc
+    behavior_ref: BHV-001
+    prompt: "create 5 horizontal grids spaced 3, 6, 9 etc apart"
+    previous_behavior: "Silently created 5 grids at uniform 3 ft spacing"
+    expected_capability: CreateGrids
+    expected_status: CLARIFICATION_NEEDED
+    expected_success: false
+    expected_message_contains:
+      - "arithmetic"
+      - "3.0"
+      - "6.0"
+      - "9.0"
+    notes: "'etc' is treated as an arithmetic sequence marker."
+
+  - case_id: regression_generic_grids_variable_spacing_no_orientation
+    behavior_ref: BHV-002
+    prompt: "create 3 grids spaced 5, 6, and 20 feet apart"
+    previous_behavior: "Created 6 elements (3 vertical + 3 horizontal)"
+    expected_capability: CreateGrids
+    expected_status: CLARIFICATION_NEEDED
+    expected_success: false
+    expected_message_contains:
+      - "orientation"
+    notes: "Missing orientation keyword with variable spacing must not default to both."
+
+  - case_id: regression_mismatch_count_spacing
+    behavior_ref: BHV-008
+    prompt: "create 3 vertical grids with spacings 10, 5, 20, 10"
+    previous_behavior: "Silently adjusted grid count from 3 to 5"
+    expected_capability: CreateGrids
+    expected_status: CLARIFICATION_NEEDED
+    expected_success: false
+    expected_message_contains:
+      - "3"
+      - "4"
+    notes: "3 grids need 2 spacings, but 4 were provided. Must not silently adjust."
+
+  - case_id: regression_rows_no_grid_keyword
+    behavior_ref: BHV-004
+    prompt: "Create 4 rows spaced 15 ft apart"
+    previous_behavior: "Silently failed or created unexpected output"
+    expected_capability: CreateGrids
+    expected_status: CLARIFICATION_NEEDED
+    expected_success: false
+    expected_message_contains:
+      - "gridlines"
+      - "rows"
+    notes: "Without 'grid' keyword, 'rows' alone triggers clarification."
+
+  - case_id: regression_columns_no_grid_keyword
+    behavior_ref: BHV-004
+    prompt: "Create 6 columns spaced 20 ft apart"
+    previous_behavior: "Silently failed or created unexpected output"
+    expected_capability: CreateGrids
+    expected_status: CLARIFICATION_NEEDED
+    expected_success: false
+    expected_message_contains:
+      - "gridlines"
+      - "columns"
+    notes: "Without 'grid' keyword, 'columns' alone triggers clarification."
+
+  # --- Explicit prompts that must still resolve correctly ---
+
+  - case_id: explicit_3_vertical_2_spacings_succeeds
+    behavior_ref: null
+    prompt: "create 3 vertical grids spaced 5 and 6 feet apart"
+    previous_behavior: null
+    expected_capability: CreateGrids
+    expected_status: RESOLVED
+    expected_success: true
+    expected_message_contains: []
+    notes: "Explicit orientation + matching count/spacing must resolve without clarification."
+
+  - case_id: explicit_4_vertical_3_spacings_succeeds
+    behavior_ref: null
+    prompt: "create 4 vertical grids with spacings 5, 6, and 20 feet"
+    previous_behavior: null
+    expected_capability: CreateGrids
+    expected_status: RESOLVED
+    expected_success: true
+    expected_message_contains: []
+    notes: "4 grids with 3 spacings is correct. 'and' before last value must parse."
+
+  - case_id: explicit_grid_rows_no_clarification
+    behavior_ref: BHV-004
+    prompt: "create 4 grid rows spaced 15 ft apart"
+    previous_behavior: null
+    expected_capability: CreateGrids
+    expected_status: RESOLVED
+    expected_success: true
+    expected_message_contains: []
+    notes: "With 'grid' keyword present, 'rows' resolves normally."
+
+  - case_id: uniform_spacing_unchanged
+    behavior_ref: null
+    prompt: "create 10 vertical grids spaced 5 ft apart"
+    previous_behavior: null
+    expected_capability: CreateGrids
+    expected_status: RESOLVED
+    expected_success: true
+    expected_message_contains: []
+    notes: "Standard uniform spacing must remain unaffected by arithmetic detection."

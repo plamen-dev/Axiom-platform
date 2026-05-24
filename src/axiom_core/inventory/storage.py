@@ -47,6 +47,31 @@ PARAMETER_PARQUET_SCHEMA = pa.schema([
     ("parameter_group", pa.string()),
 ])
 
+PARAMETER_SCHEMA_PARQUET_SCHEMA = pa.schema([
+    ("run_id", pa.string()),
+    ("source_model", pa.string()),
+    ("scan_mode", pa.string()),
+    ("category", pa.string()),
+    ("class_name", pa.string()),
+    ("parameter_name", pa.string()),
+    ("storage_type", pa.string()),
+    ("built_in_parameter_id", pa.string()),
+    ("is_read_only", pa.bool_()),
+    ("is_instance_param", pa.bool_()),
+    ("is_type_param", pa.bool_()),
+    ("observed_count", pa.int32()),
+    ("observed_on_categories", pa.string()),
+    ("observed_on_classes", pa.string()),
+    ("data_type_id", pa.string()),
+    ("data_type_label", pa.string()),
+    ("group_type_id", pa.string()),
+    ("group_type_label", pa.string()),
+    ("is_measurable_spec", pa.bool_()),
+    ("unit_type_id", pa.string()),
+    ("unit_label", pa.string()),
+    ("discipline_label", pa.string()),
+])
+
 
 def _element_to_flat(elem: dict, run_id: str = "", source_model: str = "") -> dict:
     """Flatten an element dict for the elements Parquet table."""
@@ -193,6 +218,150 @@ def write_to_sqlite(
                     session.add(param_row)
     except Exception:
         pass
+
+
+def write_parameter_schema_jsonl(
+    param_defs: list[dict], path: Path,
+) -> Path:
+    """Write parameter schema definitions to JSONL."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        for p in param_defs:
+            f.write(json.dumps(p, default=str) + "\n")
+    return path
+
+
+def write_parameter_schema_parquet(
+    param_defs: list[dict],
+    path: Path,
+    run_id: str = "",
+    source_model: str = "",
+    scan_mode: str = "category_parameter_schema",
+) -> Path:
+    """Write parameter schema definitions to a Parquet file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows: list[dict] = []
+    for p in param_defs:
+        cat_list = p.get("ObservedOnCategories", [])
+        cls_list = p.get("ObservedOnClasses", [])
+        cat_str = ", ".join(cat_list) if isinstance(cat_list, list) else str(cat_list)
+        cls_str = ", ".join(cls_list) if isinstance(cls_list, list) else str(cls_list)
+        rows.append({
+            "run_id": run_id,
+            "source_model": source_model,
+            "scan_mode": scan_mode,
+            "category": cat_str,
+            "class_name": cls_str,
+            "parameter_name": p.get("ParameterName", ""),
+            "storage_type": p.get("StorageType", ""),
+            "built_in_parameter_id": p.get("BuiltInParameterId", ""),
+            "is_read_only": p.get("IsReadOnly", False),
+            "is_instance_param": p.get("IsInstanceParam", False),
+            "is_type_param": p.get("IsTypeParam", False),
+            "observed_count": p.get("ObservedCount", 0),
+            "observed_on_categories": cat_str,
+            "observed_on_classes": cls_str,
+            "data_type_id": p.get("DataTypeId", ""),
+            "data_type_label": p.get("DataTypeLabel", ""),
+            "group_type_id": p.get("GroupTypeId", ""),
+            "group_type_label": p.get("GroupTypeLabel", ""),
+            "is_measurable_spec": p.get("IsMeasurableSpec", False),
+            "unit_type_id": p.get("UnitTypeId", ""),
+            "unit_label": p.get("UnitLabel", ""),
+            "discipline_label": p.get("DisciplineLabel", ""),
+        })
+    if not rows:
+        rows = [dict.fromkeys(PARAMETER_SCHEMA_PARQUET_SCHEMA.names)]
+    arrays = {}
+    for field in PARAMETER_SCHEMA_PARQUET_SCHEMA:
+        values = [row.get(field.name) for row in rows]
+        arrays[field.name] = values
+    table = pa.table(arrays, schema=PARAMETER_SCHEMA_PARQUET_SCHEMA)
+    pq.write_table(table, str(path))
+    return path
+
+
+def persist_parameter_schema(
+    param_defs: list[dict],
+    output_dir: Path,
+    run_id: str,
+    source_model: str = "",
+    scan_mode: str = "category_parameter_schema",
+) -> dict[str, Path]:
+    """Persist parameter schema definitions to JSONL, Parquet, and summary."""
+    run_dir = output_dir / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    paths: dict[str, Path] = {}
+    paths["jsonl"] = write_parameter_schema_jsonl(
+        param_defs, run_dir / "parameter_schema.jsonl",
+    )
+    paths["parquet"] = write_parameter_schema_parquet(
+        param_defs, run_dir / "parameter_schema.parquet",
+        run_id=run_id, source_model=source_model, scan_mode=scan_mode,
+    )
+    return paths
+
+
+OBJECT_REGISTRY_PARQUET_SCHEMA = pa.schema([
+    ("run_id", pa.string()),
+    ("source_model", pa.string()),
+    ("element_id", pa.int64()),
+    ("category", pa.string()),
+    ("class_name", pa.string()),
+    ("name", pa.string()),
+    ("family_name", pa.string()),
+    ("type_name", pa.string()),
+    ("level_name", pa.string()),
+    ("is_type", pa.bool_()),
+])
+
+
+def persist_object_registry(
+    elements: list[dict],
+    output_dir: Path,
+    run_id: str,
+    source_model: str = "",
+) -> dict[str, Path]:
+    """Persist object schema elements as an object registry candidate."""
+    run_dir = output_dir / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    paths: dict[str, Path] = {}
+
+    # JSONL
+    jsonl_path = run_dir / "revit_object_registry.jsonl"
+    with open(jsonl_path, "w", encoding="utf-8") as f:
+        for elem in elements:
+            f.write(json.dumps(elem, default=str) + "\n")
+    paths["jsonl"] = jsonl_path
+
+    # Parquet
+    parquet_path = run_dir / "revit_object_registry.parquet"
+    rows: list[dict] = []
+    for elem in elements:
+        rows.append({
+            "run_id": run_id,
+            "source_model": source_model,
+            "element_id": elem.get("ElementId", 0),
+            "category": elem.get("Category", ""),
+            "class_name": elem.get("ClassName", ""),
+            "name": elem.get("Name", ""),
+            "family_name": elem.get("FamilyName", ""),
+            "type_name": elem.get("TypeName", ""),
+            "level_name": elem.get("LevelName", ""),
+            "is_type": elem.get("IsType", False),
+        })
+    if not rows:
+        rows = [dict.fromkeys(OBJECT_REGISTRY_PARQUET_SCHEMA.names)]
+    arrays = {}
+    for fld in OBJECT_REGISTRY_PARQUET_SCHEMA:
+        arrays[fld.name] = [r.get(fld.name) for r in rows]
+    table = pa.table(arrays, schema=OBJECT_REGISTRY_PARQUET_SCHEMA)
+    pq.write_table(table, str(parquet_path))
+    paths["parquet"] = parquet_path
+
+    return paths
 
 
 def persist_inventory(

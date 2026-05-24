@@ -1,0 +1,81 @@
+# CreateLevels Behavior Regression Cases
+#
+# Machine-readable regression cases for level prompt resolution.
+# Captures clarification triggers, keyword collision guards, and explicit cases.
+
+cases:
+  - case_id: regression_floors_clarification
+    behavior_ref: null
+    prompt: "create 3 floors 12 feet apart"
+    previous_behavior: null
+    expected_capability: CreateLevels
+    expected_status: CLARIFICATION_NEEDED
+    expected_success: false
+    expected_message_contains:
+      - "floor"
+      - "level"
+    notes: "'floors' is ambiguous — could mean Revit Levels or floor slabs. Clarification required."
+
+  - case_id: regression_stories_clarification
+    behavior_ref: null
+    prompt: "add 5 stories at 10 ft spacing"
+    previous_behavior: null
+    expected_capability: CreateLevels
+    expected_status: CLARIFICATION_NEEDED
+    expected_success: false
+    expected_message_contains:
+      - "stor"
+      - "level"
+    notes: "'stories' is ambiguous — could mean Revit Levels or structural stories. Clarification required."
+
+  - case_id: regression_grid_prompt_not_hijacked
+    behavior_ref: BHV-003
+    prompt: "Create grids at level 2"
+    previous_behavior: "Resolved to CreateLevels because 'level' keyword was detected"
+    expected_capability: CreateGrids
+    expected_status: RESOLVED
+    expected_success: true
+    expected_message_contains: []
+    notes: "Grid keywords take priority over level keywords when both appear in the prompt."
+
+  # --- Explicit prompts that must resolve correctly ---
+
+  - case_id: explicit_levels_uniform
+    behavior_ref: null
+    prompt: "create 5 levels spaced 12 feet apart"
+    previous_behavior: null
+    expected_capability: CreateLevels
+    expected_status: RESOLVED
+    expected_success: true
+    expected_message_contains: []
+    notes: "Standard level creation with explicit 'levels' keyword."
+
+  - case_id: explicit_single_level
+    behavior_ref: null
+    prompt: "create 1 level at 15 feet"
+    previous_behavior: null
+    expected_capability: CreateLevels
+    expected_status: RESOLVED
+    expected_success: true
+    expected_message_contains: []
+    notes: "Single level creation must resolve cleanly."
+
+  - case_id: explicit_add_keyword
+    behavior_ref: null
+    prompt: "add 3 levels at 10 foot spacing"
+    previous_behavior: null
+    expected_capability: CreateLevels
+    expected_status: RESOLVED
+    expected_success: true
+    expected_message_contains: []
+    notes: "'add' keyword works the same as 'create' for levels."
+
+  - case_id: grid_prompt_not_level
+    behavior_ref: BHV-003
+    prompt: "create 10 vertical grids spaced 5 ft apart"
+    previous_behavior: null
+    expected_capability: CreateGrids
+    expected_status: RESOLVED
+    expected_success: true
+    expected_message_contains: []
+    notes: "Grid prompts must not be hijacked by the level resolver even if 'level' appears elsewhere in the model context."

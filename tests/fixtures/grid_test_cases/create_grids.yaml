@@ -238,13 +238,52 @@ test_cases:
   - test_id: mismatch_count_spacing
     prompt: "Create 3 vertical grids with spacings 10, 5, 20, 10"
     expected_capability: CreateGrids
+    expected_status: CLARIFICATION_NEEDED
+    expected_created_count: 0
+    expected_success: false
+    mode: simulate
+    notes: "Count says 3 but 4 spacings provided — resolver returns clarification instead of silently adjusting"
+
+  # ── Arithmetic spacing phrases ──────────────────────────────────────
+  - test_id: arithmetic_spacing_and_so_on
+    prompt: "create 10 vertical grids spaced 5', 10', 15' and so on apart"
+    expected_capability: CreateGrids
+    expected_status: CLARIFICATION_NEEDED
+    expected_created_count: 0
+    expected_success: false
+    mode: simulate
+    notes: "Arithmetic spacing sequence with 'and so on' — requires clarification"
+
+  - test_id: arithmetic_spacing_etc
+    prompt: "create grids spaced 10, 20, 30 ft etc"
+    expected_capability: CreateGrids
+    expected_status: CLARIFICATION_NEEDED
+    expected_created_count: 0
+    expected_success: false
+    mode: simulate
+    notes: "Arithmetic spacing sequence with 'etc' — requires clarification"
+
+  # ── Ambiguous orientation with variable spacing ────────────────────
+  - test_id: generic_grids_variable_spacing_no_orientation
+    prompt: "create 3 grids spaced 5, 6, and 20 feet apart"
+    expected_capability: CreateGrids
+    expected_status: CLARIFICATION_NEEDED
+    expected_created_count: 0
+    expected_success: false
+    mode: simulate
+    notes: "Generic 'grids' with variable spacing but no orientation — requires clarification"
+
+  # ── Explicit orientation with matching variable spacing (should work) ──
+  - test_id: explicit_4_vertical_3_spacings
+    prompt: "create 4 vertical grids with spacings 5, 6, and 20 feet"
+    expected_capability: CreateGrids
     expected_parameters:
-      HorizontalCount: 5
+      HorizontalCount: 4
       VerticalCount: 0
-    expected_created_count: 5
+    expected_created_count: 4
     expected_success: true
     mode: simulate
-    notes: "Count says 3 but 4 spacings provided — resolver adjusts count to match spacing array + 1"
+    notes: "4 vertical grids with 3 spacings — count matches, orientation explicit, should succeed"
 
   # ── Unsupported prompt ─────────────────────────────────────────────
   - test_id: unsupported_prompt
