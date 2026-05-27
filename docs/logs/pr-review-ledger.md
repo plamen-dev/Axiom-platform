@@ -4,7 +4,7 @@
 
 **Branch:** `revit-2027-compatibility`
 **Base:** `main`
-**Status:** Merge-ready (live Revit 2027 validation passed)
+**Status:** Merged (2026-05-06)
 **Scope:** Revit 2027 compatibility, schema-centric inventory, adaptive planner, safety hardening, full registry coverage workflow
 
 ---
@@ -99,18 +99,190 @@ Level filter is **post-collector / pre-extraction**: C# iterates all elements, s
 - [ ] Constrained sample values
 - [ ] Level filter performance profiling
 
+**Phase 3: Full plan execution + export collision fix (2026-05-06):**
+
+| Mode | Result | Details |
+|------|--------|---------|
+| Full parameter schema plan | PASS | 278 successful exports, 1 skipped unsupported ((No Category)), 0 failed |
+| Export collision fix (PR #9) | PASS | 278 distinct export paths, 0 duplicates (was 26 before fix) |
+| inventory-import-batch | PASS | All 278 exports imported |
+| parameter-registry-build | PASS | 6,444 unique definitions, 1,878 parameter names, 1,748 runs, 5 models |
+| Priority coverage | PASS | 20/20 executed, 20/20 with definitions |
+| Revit stability | PASS | Full plan completed without crash |
+
+**Source models:** Snowdon Towers Architectural, Electrical, HVAC, Plumbing, Structural
+
 ### Progressive Coverage Validation Roadmap
 
-The queue mechanism is validated, but full-model coverage is not yet validated. Only capped and priority plan execution have been validated so far. Direct full-model extraction remains blocked.
+Queue mechanism validated through full plan (278 categories). Direct full-model extraction remains blocked.
 
-**Next steps (progressive validation):**
+**Completed:**
+- [x] `max 10` — 10/10 (Phase 2)
+- [x] `priority only` — 16/16 (Phase 2)
+- [x] Full plan — 278/278 successful, 1 skipped unsupported (Phase 3)
 
-1. `Run InventoryModel parameter schema plan max 50` — expand coverage boundary
-2. `Run InventoryModel parameter schema plan max 100` — stress test with larger batch
-3. `Run InventoryModel parameter schema plan resume` — validate resume on partially completed manifest
-4. `Run InventoryModel parameter schema plan` (full) — only if steps 1-3 are stable
+**Next steps (broader coverage):**
+1. Non-Snowdon models — broaden object/property coverage beyond the Snowdon Towers set
+2. Family/library coverage — scan family parameters and shared parameter definitions
+3. Resume validation — test resume on partially completed manifests from larger model sets
 
-Do not skip directly to full plan. Each step validates Revit stability at increasing scale before proceeding.
+---
+
+## PR #8: Registry Coverage Reporting (Superseded by PR #9)
+
+**Branch:** `devin/1779537413-registry-coverage-reporting` (deleted)
+**Base:** `main`
+**Status:** Superseded — closed, branch deleted. All changes cherry-picked into PR #9.
+**Scope:** Registry coverage reporting improvements (executed vs definitions vs zero-definitions vs not-executed)
+
+PR #8 was created to fix misleading "missing coverage" terminology in registry summaries. Before it could be merged, the export path collision bug was discovered (BUG-018). PR #9 was created to fix both issues together — the collision fix plus the reporting improvements from PR #8 (via cherry-pick). PR #8 was closed and its branch deleted after PR #9 merged.
+
+---
+
+## PR #9: Export Path Collision Fix — Unique Filenames per Category + Duplicate Detection
+
+**Branch:** `devin/1779605963-fix-export-path-collision`
+**Base:** `main`
+**Status:** Merged (2026-05-06)
+**Scope:** C# export filename uniqueness, Python manifest duplicate detection, registry coverage reporting improvements
+
+---
+
+### Root Cause
+
+`PersistInventoryJson` used `inv_YYYYMMDD_HHmmss.json` — second-level timestamp precision. When the full parameter schema plan processed multiple categories within the same second, they wrote to identical filenames, causing overwrites (278 exports → 26 unique files → 252 lost).
+
+### Fix
+
+1. **C# filename format:** `inv_YYYYMMDD_HHmmss_fff_NNN_category_slug.json`
+   - `fff` = milliseconds
+   - `NNN` = atomic sequence counter (`System.Threading.Interlocked.Increment`)
+   - `category_slug` = sanitized category name
+2. **Python import-batch:** Detects and warns on duplicate `export_path` values in manifests
+3. **Registry coverage reporting:** Distinguishes executed vs with-definitions vs zero-definitions vs not-executed
+
+### Live Validation
+
+| Test | Result | Details |
+|------|--------|---------|
+| Full parameter schema plan | PASS | 278 successful exports, 0 duplicate paths |
+| Manifest import | PASS | All 278 exports imported |
+| Registry build | PASS | 6,444 unique definitions, 1,878 parameter names |
+| Priority coverage | PASS | 20/20 executed, 20/20 with definitions |
+
+### Test Results
+
+| Suite | Count | Status |
+|-------|-------|--------|
+| pytest | 402 | All passing |
+| ruff lint | 0 errors | Clean |
+
+---
+
+## PR #6: Axiom Local Runner v0 — Restricted Local Execution Harness
+
+**Branch:** `feature/axiom-local-runner-v0`
+**Base:** `main`
+**Status:** Merged (2026-05-06)
+**Scope:** Local task runner with allowlisted actions, workspace restriction, artifact capture
+
+---
+
+### Key Changes
+
+1. **Allowlisted actions only:** 9 named actions (pytest, ruff, test_grids, test_levels, git_status, dotnet_build_revit_2027, deploy_revit_2027, collect_revit_journals, kill_revit). Arbitrary `command`/`shell`/`cmd` fields rejected.
+2. **Workspace restriction:** `C:\Dev\Axiom` (Windows) / `~/repos` (Linux)
+3. **Artifact capture:** stdout.txt, stderr.txt, run_log.json, failure_summary.md per run
+4. **Timeout handling:** Process killed on expiry
+5. **Command fix:** Changed from `python -m poetry run ...` to `poetry run ...` (Poetry is a CLI tool, not a venv module)
+
+### Live Validation
+
+| Task | Result |
+|------|--------|
+| git_status.task.json | PASS |
+| test_grids.task.json | PASS |
+| test_levels.task.json | PASS |
+| ruff.task.json | PASS |
+| Failure artifact capture | PASS |
+
+### What Did NOT Change
+
+- No InventoryModel, CreateGrids, CreateLevels behavior modified
+- No Revit add-in code touched
+- 2024 baseline unaffected
+
+### Known Limitations
+
+- `collect_revit_journals` and `kill_revit` are NOT_IMPLEMENTED placeholders
+- No parallel task execution
+
+### Test Results
+
+| Suite | Count | Status |
+|-------|-------|--------|
+| Local runner tests | 22/22 | All passing |
+| ruff lint | 0 errors | Clean |
+
+---
+
+## Post-Merge Registry Milestone (2026-05-06)
+
+PRs #5, #6, and #9 are all merged to main. The parameter registry workflow is end-to-end validated on live Revit 2027.
+
+### Milestone Summary
+
+| Metric | Value |
+|--------|-------|
+| Unique parameter/property definitions | 6,444 |
+| Unique parameter names | 1,878 |
+| Source runs | 1,748 |
+| Source models | 5 (Snowdon Towers: Architectural, Electrical, HVAC, Plumbing, Structural) |
+| Full plan categories executed | 278 successful, 1 skipped unsupported, 0 failed |
+| Export path duplicates | 0 (was 252 before PR #9 fix) |
+| Priority categories executed | 20/20 |
+| Priority categories with definitions | 20/20 |
+
+### Safety Status
+
+| Command | Status |
+|---------|--------|
+| Run full InventoryModel | BLOCKED |
+| Run InventoryModel sample values (whole-model) | BLOCKED |
+| Run InventoryModel parameter schema (whole-model) | BLOCKED |
+| Plan queue category_parameter_schema | ALLOWED (validated) |
+| CreateGrids / CreateLevels | Unchanged |
+| Revit 2024 baseline | Protected |
+
+### Validated Workflow
+
+```
+1. Run InventoryModel schema                          → object schema (45K elements)
+2. axiom inventory-import --file <object_schema.json>  → import + object registry
+3. axiom inventory-plan --mode parameter-schema        → plan (278 categories)
+4. Run InventoryModel parameter schema plan            → 278 exports via structured dispatch
+5. axiom inventory-import-batch --manifest <path>      → batch import
+6. axiom parameter-registry-build --from-inventory ... --object-registry ...  → 6,444 definitions
+```
+
+### Artifact Locations
+
+| Artifact | Path |
+|----------|------|
+| Registry JSONL | `artifacts/parameter_registry_candidates/<run_id>/revit_property_registry.jsonl` |
+| Registry Parquet | `artifacts/parameter_registry_candidates/<run_id>/revit_property_registry.parquet` |
+| Registry summary | `artifacts/parameter_registry_candidates/<run_id>/summary.md` |
+| Run metadata | `artifacts/parameter_registry_candidates/<run_id>/run_metadata.json` |
+| Inventory runs | `artifacts/model_inventory_runs/` |
+| Object registry | `artifacts/object_registry_candidates/<run_id>/` |
+
+### Known Next Gaps
+
+1. **Broader model coverage:** Only Snowdon Towers validated. Need non-Snowdon models for wider parameter diversity.
+2. **Family/library coverage:** Family-level and shared parameter definitions not yet scanned.
+3. **Resume validation:** `plan resume` mode not yet tested on large partial manifests.
+4. **Level scan / category+level scan:** Not yet live-validated on real models.
+5. **Constrained sample values:** Not yet live-validated.
 
 ---
 

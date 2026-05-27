@@ -145,7 +145,7 @@ Run InventoryModel parameter schema plan              → all categories (only a
 Each category executes via structured dispatch (CategoryFilter + ScanMode) — no NLP parsing.
 Writes per-category export JSON and manifest to `%LOCALAPPDATA%\Axiom\inventory_exports\`.
 
-**Important:** The queue mechanism is validated, but full-model coverage is not yet validated. Only `max 10` (10/10) and `priority only` (16/16) have been live-validated. Use progressive coverage: max 50 → max 100 → resume → full plan. Do not skip directly to full plan run.
+**Validated (2026-05-06):** Full plan execution validated — 278 successful exports, 1 skipped unsupported, 0 failed. Registry: 6,444 unique definitions, 1,878 parameter names, 1,748 runs, 5 source models (Snowdon Towers). 20/20 priority categories with definitions.
 
 **Step 5: Batch import from manifest**
 ```
@@ -267,8 +267,9 @@ The dialog shows scan mode, element/type counts, and (for non-summary scans) par
 
 When InventoryModel runs from the Revit Prompt dialog, it writes a JSON export to:
 ```
-%LOCALAPPDATA%\Axiom\inventory_exports\inv_YYYYMMDD_HHmmss.json
+%LOCALAPPDATA%\Axiom\inventory_exports\inv_YYYYMMDD_HHmmss_fff_NNN_category_slug.json
 ```
+Where `fff` = milliseconds, `NNN` = atomic sequence counter, `category_slug` = sanitized category name. This format prevents filename collisions when multiple categories are processed within the same second (BUG-018 fix).
 
 To persist this into the standard Parquet/SQLite artifact pipeline:
 ```bash
@@ -491,24 +492,18 @@ These are small C# changes to be made when the Revit real execution is validated
 
 ## Full Registry Coverage Workflow
 
-Complete parameter discovery across all Revit object categories:
+Complete parameter discovery across all Revit object categories. **Validated end-to-end on Revit 2027 (2026-05-06).**
 
 ```
-1. Run InventoryModel                                    → summary (get category counts)
-2. Run InventoryModel schema                             → object_schema (full element/class inventory)
-3. axiom inventory-import --file <object_schema.json>    → creates object registry candidate
-4. axiom inventory-plan --file <summary.json> --mode parameter-schema
-                                                         → generates all-category plan with prompts
-5. Copy-paste each prompt from the plan into Revit:
-     Run InventoryModel for Walls parameter schema
-     Run InventoryModel for Doors parameter schema
-     Run InventoryModel for Ceilings parameter schema
-     ... (all categories from plan)
-6. axiom inventory-import-batch --dir <exports-dir> --scan-mode category_parameter_schema
-                                                         → batch import all category parameter schemas
-7. axiom parameter-registry-build --from-inventory artifacts/model_inventory_runs
-     --object-registry artifacts/object_registry_candidates
-                                                         → build property registry + coverage report
+1. Run InventoryModel schema                             → object_schema (45K elements)
+2. axiom inventory-import --file <object_schema.json>    → creates object registry candidate
+3. axiom inventory-plan --file <summary.json> --mode parameter-schema
+                                                         → generates all-category plan (278 categories)
+4. Run InventoryModel parameter schema plan              → 278 exports via structured dispatch
+5. axiom inventory-import-batch --manifest <manifest>    → batch import all exports
+6. axiom parameter-registry-build --from-inventory artifacts/model_inventory_runs
+     --object-registry artifacts/object_registry_candidates/<run_id>
+                                                         → build property registry (6,444 definitions)
 ```
 
 ### Artifacts produced:
@@ -519,9 +514,9 @@ Complete parameter discovery across all Revit object categories:
 ### Registry deduplication key:
 ObjectCategory, ClassName, ParameterName, BuiltInParameterId, DataTypeId, StorageType, IsInstanceParam, IsTypeParam
 
-### Automatic multi-category execution:
+### Plan execution queue (validated):
 
-Instead of copy-pasting 279 prompts, use the plan execution queue:
+Automatic multi-category execution via structured dispatch:
 
 ```
 Run InventoryModel parameter schema plan              → executes all categories from plan
@@ -578,6 +573,24 @@ axiom parameter-registry-build --from-inventory artifacts/model_inventory_runs \
 # 8. Review coverage
 axiom inventory-plan-status
 ```
+
+### Registry Milestone Results (2026-05-06)
+
+| Metric | Value |
+|--------|-------|
+| Unique parameter/property definitions | 6,444 |
+| Unique parameter names | 1,878 |
+| Source runs | 1,748 |
+| Source models | 5 (Snowdon Towers: Architectural, Electrical, HVAC, Plumbing, Structural) |
+| Full plan categories executed | 278 successful, 1 skipped unsupported, 0 failed |
+| Export path duplicates | 0 |
+| Priority categories executed | 20/20 |
+| Priority categories with definitions | 20/20 |
+
+**Known next gaps:**
+1. Non-Snowdon models — need broader parameter diversity
+2. Family/library coverage — family-level and shared parameter definitions
+3. Resume validation — `plan resume` on large partial manifests
 
 ### BLOCKED commands (never recommended by planner):
 - `Run InventoryModel parameter schema` (whole-model — crashed Revit 2027)

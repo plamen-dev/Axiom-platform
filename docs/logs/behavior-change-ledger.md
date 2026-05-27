@@ -366,4 +366,40 @@ See `docs/runbooks/behavior-regression-runbook.md` for philosophy and process.
 | **related_bug_id** | — |
 | **related_test_case** | `test_planner_skips_non_executable_categories`, `test_structured_dispatch_bypasses_resolver` |
 | **related_artifact_path** | `src/axiom_revit/Axiom.Core/Bridge/PromptDispatcher.cs`, `src/axiom_revit/Axiom.RevitAddin/PromptCommand.cs`, `src/axiom_core/inventory/extraction_planner.py` |
-| **notes** | Live Revit 2027 validation: max 10 = 10/10 completed, priority only = 16/16 completed, 0 BLOCKED_UNSAFE. |
+| **notes** | Live Revit 2027 validation: max 10 = 10/10 completed, priority only = 16/16 completed, full plan = 278/278 successful, 0 BLOCKED_UNSAFE. |
+
+
+## BHV-021: Export path collision fix — unique filenames per category
+
+| Field | Value |
+|-------|-------|
+| **behavior_id** | BHV-021 |
+| **date** | 2026-05-06 |
+| **capability** | InventoryModel |
+| **observed_prompt** | `Run InventoryModel parameter schema plan` |
+| **previous_behavior** | `PersistInventoryJson` used `inv_YYYYMMDD_HHmmss.json` — second-level timestamp precision. Multiple categories processed within the same second wrote to the same filename, causing 252 overwrites out of 278 exports (only 26 unique files). |
+| **expected_behavior** | Every category export gets a unique filename. No overwrites. |
+| **current_behavior** | Filename format: `inv_YYYYMMDD_HHmmss_fff_NNN_category_slug.json`. Milliseconds + atomic sequence counter + sanitized category name. 278 exports → 278 unique files, 0 duplicates. |
+| **status** | validated |
+| **related_bug_id** | BUG-018 |
+| **related_test_case** | `test_unique_export_paths_within_same_second`, `test_manifest_duplicate_detection`, `test_import_batch_warns_on_duplicate_paths`, `test_category_slug_sanitization` |
+| **related_artifact_path** | `src/axiom_revit/Axiom.RevitAddin/PromptCommand.cs` |
+| **notes** | Atomic counter uses `System.Threading.Interlocked.Increment` for thread safety. Category slug sanitizes spaces to `_` and removes special characters. Manifest duplicate detection added to `inventory-import-batch` as defense-in-depth. |
+
+
+## BHV-022: Registry coverage reporting — executed vs definitions vs zero-definitions
+
+| Field | Value |
+|-------|-------|
+| **behavior_id** | BHV-022 |
+| **date** | 2026-05-06 |
+| **capability** | InventoryModel |
+| **observed_prompt** | `axiom parameter-registry-build --from-inventory ... --object-registry ...` |
+| **previous_behavior** | Registry summary reported "Categories with coverage: 33" and "Categories missing coverage: 171" — misleading because many categories were successfully executed but had zero parameter definitions (tags, annotation symbols, etc.). |
+| **expected_behavior** | Distinguish: executed categories, categories with definitions, categories with zero definitions, categories not executed/imported. |
+| **current_behavior** | Summary reports: categories executed successfully (278), categories with parameter definitions (33+), categories with zero parameter definitions (245), discovered object categories (204), not executed/imported (0). Scans `run_metadata.json` to identify zero-definition categories. Summary.md includes "Executed With Zero Parameter Definitions" section. |
+| **status** | validated |
+| **related_bug_id** | — |
+| **related_test_case** | `test_registry_zero_definitions_reporting` |
+| **related_artifact_path** | `src/axiom_cli/main.py` |
+| **notes** | Reporting/accounting change only. No extraction behavior modified. Zero-definition categories are genuine — Revit tags, annotation symbols, and similar categories have elements but no exposed parameter definitions. |

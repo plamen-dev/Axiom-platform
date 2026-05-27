@@ -7,18 +7,21 @@ For regression fixture files, see `tests/fixtures/behavior_regressions/`.
 
 ---
 
-## Live Revit 2027 Validation Results (2026-05-23)
+## Live Revit 2027 Validation Results (2026-05-23 → 2026-05-06)
 
-Plan execution queue validated with structured dispatch:
+Plan execution queue validated with structured dispatch. Full plan validated after export collision fix (PR #9).
 
 | Test | Result | Details |
 |------|--------|---------|
 | `Run InventoryModel parameter schema plan max 10` | PASS | 10/10 completed, 0 failed, 0 skipped |
 | `Run InventoryModel parameter schema plan priority only` | PASS | 16/16 completed, 0 failed, 0 skipped |
-| `inventory-import-batch --manifest` | PASS | Successful exports imported |
-| `parameter-registry-build` | PASS | 1,030 unique definitions, 21 source runs |
+| `Run InventoryModel parameter schema plan` (full) | PASS | 278 successful, 1 skipped unsupported, 0 failed |
+| `inventory-import-batch --manifest` | PASS | All 278 exports imported |
+| `parameter-registry-build` | PASS | 6,444 unique definitions, 1,878 parameter names, 1,748 runs, 5 models |
+| Priority coverage | PASS | 20/20 executed, 20/20 with definitions |
+| Export path uniqueness (post PR #9) | PASS | 278 distinct paths, 0 duplicates |
 | Manifest creation | PASS | Written to `%LOCALAPPDATA%\Axiom\inventory_exports\` |
-| Revit stability | PASS | No crashes during queue execution |
+| Revit stability | PASS | No crashes during full plan execution |
 | Structured dispatch | PASS | All categories dispatched directly (no NLP fallback) |
 
 ---
@@ -215,6 +218,27 @@ Plan execution queue validated with structured dispatch:
   - `Run InventoryModel for Walls on Level 1 parameter schema`
 - **Test coverage:** `test_parameter_schema_whole_model_blocked`, `test_parameter_schema_with_batch_blocked`, `test_param_schema_alias_blocked`, `test_whole_model_parameter_schema_always_blocked`, `test_parameter_schema_category`, `test_parameter_schema_ceilings`, `test_parameter_schema_plumbing`, `test_parameter_schema_on_level`, `test_parameter_schema_category_and_level`
 - **Status:** Fixed. Category parameter schema pending live Revit 2027 validation.
+
+### BUG-018: Export path collision — second-level timestamp overwrites
+
+- **Discovered by:** Full plan execution diagnostic — 278 successful exports but only 26 unique file paths
+- **Resolved in:** PR #9 (`devin/1779605963-fix-export-path-collision`)
+- **Description:** `PersistInventoryJson` used `inv_YYYYMMDD_HHmmss.json` — second-level timestamp precision. When the full plan processed multiple categories within the same second, they wrote to identical filenames. Result: 278 successful exports, 26 unique files, 252 overwrites. This caused registry coverage undercounting.
+- **Root cause:** `DateTime.Now.ToString("yyyyMMdd_HHmmss")` does not distinguish sub-second operations.
+- **Fix:** Changed filename format to `inv_YYYYMMDD_HHmmss_fff_NNN_category_slug.json` where:
+  - `fff` = milliseconds
+  - `NNN` = atomic sequence counter (`System.Threading.Interlocked.Increment`)
+  - `category_slug` = sanitized category name
+- **Additional fixes:**
+  - Python `inventory-import-batch` detects duplicate `export_path` values in manifests
+  - Registry coverage reporting distinguishes executed vs with-definitions vs zero-definitions vs not-executed
+- **Files changed:**
+  - `src/axiom_revit/Axiom.RevitAddin/PromptCommand.cs` — `PersistInventoryJson()` new filename format + atomic counter
+  - `src/axiom_cli/main.py` — manifest duplicate detection, registry coverage reporting
+  - `tests/test_inventory.py` — 4 new collision tests + 1 zero-defs test
+- **Test coverage:** `test_unique_export_paths_within_same_second`, `test_manifest_duplicate_detection`, `test_import_batch_warns_on_duplicate_paths`, `test_category_slug_sanitization`, `test_registry_zero_definitions_reporting`
+- **Validation:** After fix: 278 successful exports, 278 distinct paths, 0 duplicates. Registry: 6,444 unique definitions, 20/20 priority coverage.
+- **Behavior change:** See `docs/logs/behavior-change-ledger.md` BHV-021, BHV-022
 
 ### BUG-013: inventory-import fails on UTF-8 BOM JSON from Revit/C#
 
