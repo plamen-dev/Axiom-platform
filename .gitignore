@@ -60,6 +60,20 @@ Thumbs.db
 artifacts/grid_test_runs/
 artifacts/level_test_runs/
 
+# Generated Axiom artifacts
+artifacts/inventory_plans/
+artifacts/local_runner_runs/
+artifacts/model_inventory_runs/
+artifacts/object_registry_candidates/
+artifacts/parameter_registry_candidates/
+artifacts/scratch/
+
+# Visual Studio local state
+.vs/
+
+# Local documentation backups
+docs-local-backup-*/
+
 # Project specific
 *.rvt
 *.rfa

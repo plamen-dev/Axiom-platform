@@ -20,7 +20,7 @@ console = Console()
 @click.group()
 @click.version_option(version="0.1.0")
 def cli():
-    """Axiom Platform CLI - AI-powered autonomous Revit workflows."""
+    """Axiom Platform CLI - safety-first Revit automation, inventory, validation, and evidence workflows."""
     pass
 
 
