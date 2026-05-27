@@ -113,6 +113,12 @@ def _get_allowed_actions() -> dict[str, dict]:
             ],
             "description": "Run PR evidence snapshot workflow tests.",
         },
+        "test_set_parameter_value": {
+            "commands": [
+                ["poetry", "run", "pytest", "tests/test_set_parameter_value.py"],
+            ],
+            "description": "Run SetParameterValue v0 tests.",
+        },
     }
 
 
@@ -286,7 +292,7 @@ def _interpret_result(result: RunResult) -> str:
         action = result.resolved_action or result.action
         if action == "ruff":
             return "No lint violations reported."
-        if action in ("pytest", "test_grids", "test_levels", "test_pr_snapshot"):
+        if action.startswith("test_") or action == "pytest":
             # Parse pytest summary line: "X passed, Y skipped, Z failed"
             match = re.search(
                 r"(\d+ passed(?:, \d+ \w+)*)",

@@ -2607,6 +2607,128 @@ def parameter_registry_build(input_dir, output_dir, run_id, object_registry_dir)
                       f"Use plan execution queue to scan remaining categories.[/dim]")
 
 
+@cli.command("set-parameter-value")
+@click.argument("prompt_text", nargs=-1, required=True)
+@click.option("--registry", "registry_path", default=None,
+              type=click.Path(exists=True),
+              help="Path to revit_property_registry.jsonl")
+@click.option("--registry-dir", "registry_dir", default=None,
+              type=click.Path(exists=True),
+              help="Path to directory containing revit_property_registry.jsonl")
+@click.option("--artifact-dir", "artifact_dir",
+              default="artifacts/parameter_edit_runs",
+              help="Base directory for evidence artifacts")
+@click.option("--model-name", "model_name", default="",
+              help="Revit model name for evidence")
+@click.option("--simulate", is_flag=True, default=True,
+              help="Simulation mode (no live Revit connection)")
+def set_parameter_value(prompt_text, registry_path, registry_dir,
+                        artifact_dir, model_name, simulate):
+    """Preview or apply a constrained text parameter edit.
+
+    v0 constraints: text parameters only, instance only, writable only,
+    category-constrained, max 5 elements, preview by default.
+
+    \b
+    Examples:
+      axiom set-parameter-value "Set Comments to Axiom test 001 for 3 Walls"
+      axiom set-parameter-value "Apply Set Mark to AX-TEST for 2 Doors"
+    """
+    from pathlib import Path
+
+    from axiom_core.set_parameter_value import (
+        load_registry_jsonl,
+        parse_set_parameter_prompt,
+        run_set_parameter_preview,
+        validate_against_registry,
+        write_evidence,
+    )
+
+    prompt = " ".join(prompt_text)
+    console.print("\n[bold blue]Axiom SetParameterValue v0[/bold blue]\n")
+    console.print(f"[dim]Prompt: {prompt}[/dim]")
+
+    # Parse prompt
+    req = parse_set_parameter_prompt(prompt)
+    if req.parse_errors:
+        for err in req.parse_errors:
+            console.print(f"[red]Parse error: {err}[/red]")
+        return
+
+    console.print(f"[dim]Mode: {req.mode}[/dim]")
+    console.print(f"[dim]Category: {req.category}[/dim]")
+    console.print(f"[dim]Parameter: {req.parameter_name}[/dim]")
+    console.print(f'[dim]Value: "{req.value}"[/dim]')
+    console.print(f"[dim]Count: {req.element_count}[/dim]")
+
+    # Load registry
+    registry_entries: list[dict] = []
+    if registry_path:
+        registry_entries = load_registry_jsonl(registry_path)
+    elif registry_dir:
+        jsonl_path = Path(registry_dir) / "revit_property_registry.jsonl"
+        if jsonl_path.exists():
+            registry_entries = load_registry_jsonl(str(jsonl_path))
+    else:
+        # Search default locations
+        candidates = sorted(
+            Path("artifacts/parameter_registry_candidates").glob(
+                "*/revit_property_registry.jsonl"
+            )
+        )
+        if candidates:
+            registry_entries = load_registry_jsonl(str(candidates[-1]))
+            console.print(f"[dim]Registry: {candidates[-1]}[/dim]")
+
+    if not registry_entries:
+        console.print("[yellow]Warning: No registry data found. "
+                      "Validation will be limited.[/yellow]")
+
+    # Validate against registry
+    registry_match = validate_against_registry(req, registry_entries)
+
+    # Execute preview/apply
+    result = run_set_parameter_preview(
+        req, registry_match, simulated_elements=None
+    )
+    result.model_name = model_name
+
+    # Write evidence
+    evidence_dir = write_evidence(req, registry_match, result,
+                                  artifact_base=artifact_dir)
+
+    # Display result
+    console.print()
+    if result.status == "rejected":
+        console.print(f"[red]REJECTED: {result.rejection_reason}[/red]")
+    elif result.status == "success" and result.mode == "preview":
+        console.print("[green]PREVIEW — model not modified[/green]")
+        if result.elements:
+            table = Table(title="Element Preview")
+            table.add_column("Element ID")
+            table.add_column("Category")
+            table.add_column("Old Value")
+            table.add_column("New Value")
+            table.add_column("Status")
+            for e in result.elements:
+                table.add_row(
+                    str(e.element_id),
+                    e.category,
+                    e.old_value or "(empty)",
+                    e.new_value,
+                    e.status,
+                )
+            console.print(table)
+    elif result.status == "success" and result.mode == "apply":
+        console.print("[bold green]APPLIED — model modified[/bold green]")
+        success_n = sum(1 for e in result.elements if e.status == "success")
+        console.print(f"[green]{success_n}/{len(result.elements)} "
+                      f"elements updated[/green]")
+
+    console.print(f"\n[dim]Evidence: {evidence_dir}[/dim]")
+    console.print(f"[dim]Run ID: {result.run_id}[/dim]")
+
+
 @cli.command("pr-snapshot")
 @click.option("--pr", "pr_number", required=True, type=int,
               help="PR number to snapshot")

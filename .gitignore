@@ -66,6 +66,7 @@ artifacts/local_runner_runs/
 artifacts/model_inventory_runs/
 artifacts/object_registry_candidates/
 artifacts/parameter_registry_candidates/
+artifacts/parameter_edit_runs/
 artifacts/scratch/
 
 # Visual Studio local state

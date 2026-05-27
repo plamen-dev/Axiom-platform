@@ -137,6 +137,14 @@ class TestAllowedActions:
         cmd = defn["commands"][0]
         assert cmd == ["poetry", "run", "pytest", "tests/test_pr_snapshot.py"]
 
+    def test_set_parameter_value_is_allowlisted(self):
+        assert "test_set_parameter_value" in ALLOWED_ACTIONS
+
+    def test_set_parameter_value_maps_to_correct_test_file(self):
+        defn = ALLOWED_ACTIONS["test_set_parameter_value"]
+        assert len(defn["commands"]) == 1
+        cmd = defn["commands"][0]
+        assert cmd == ["poetry", "run", "pytest", "tests/test_set_parameter_value.py"]
 
 
 class TestTaskExecution:

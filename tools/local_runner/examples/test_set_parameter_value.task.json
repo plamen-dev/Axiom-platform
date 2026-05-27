@@ -1,0 +1,10 @@
+{
+  "action": "test_set_parameter_value",
+  "prompt": "Validate SetParameterValue v0 parser, registry validation, preview/apply gating, and evidence generation tests.",
+  "timeout_seconds": 180,
+  "workspace": "C:\\Dev\\Axiom\\Code\\Axiom-platform",
+  "metadata": {
+    "requested_by": "agent",
+    "purpose": "validate constrained parameter edit capability tests"
+  }
+}
