@@ -2607,5 +2607,472 @@ def parameter_registry_build(input_dir, output_dir, run_id, object_registry_dir)
                       f"Use plan execution queue to scan remaining categories.[/dim]")
 
 
+@cli.command("pr-snapshot")
+@click.option("--pr", "pr_number", required=True, type=int,
+              help="PR number to snapshot")
+@click.option("--title", required=True, help="PR title")
+@click.option("--branch", required=True, help="PR branch name")
+@click.option("--status", "pr_status", required=True,
+              type=click.Choice(["open", "merged", "closed", "superseded"]),
+              help="PR status")
+@click.option("--merge-status", "merge_status", default=None,
+              help="Merge status details (e.g. 'merged to main 2026-05-06')")
+@click.option("--summary-file", type=click.Path(exists=True),
+              help="Path to markdown file with PR summary/description")
+@click.option("--validation-file", type=click.Path(exists=True),
+              help="Path to markdown/text file with validation results")
+@click.option("--changed-files", type=click.Path(exists=True),
+              help="Path to text file listing changed files (one per line)")
+@click.option("--commits-file", type=click.Path(exists=True),
+              help="Path to text file listing commits (one per line)")
+@click.option("--source-url", default=None,
+              help="URL to the PR on GitHub/GitLab")
+@click.option("--verification-method", "verification_method", default="unverified",
+              type=click.Choice(["gh_cli", "github_pr_api", "github_ui_manual",
+                                 "git_inferred", "unverified"]),
+              help="How the PR status was verified")
+@click.option("--status-source", "status_source", default=None,
+              help="Description of how status was determined "
+                   "(e.g. 'gh pr view 9 --json state')")
+@click.option("--out", "out_dir", default=None, type=click.Path(),
+              help="Output directory (default: artifacts/pr_reviews/pr_NNNN/)")
+def pr_snapshot(pr_number, title, branch, pr_status, merge_status,
+                summary_file, validation_file, changed_files, commits_file,
+                source_url, verification_method, status_source, out_dir):
+    """Capture a durable PR review/evidence snapshot as repo-native artifacts.
+
+    Creates JSON + Markdown snapshot files under artifacts/pr_reviews/pr_NNNN/.
+    Accepts PR metadata via flags and summary/validation content from local files.
+    No GitHub API dependency — paste PR description into a local file and point to it.
+    """
+    import json
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    if out_dir is None:
+        out_dir = f"artifacts/pr_reviews/pr_{pr_number:04d}"
+
+    out_path = Path(out_dir)
+    out_path.mkdir(parents=True, exist_ok=True)
+
+    summary_text = ""
+    if summary_file:
+        summary_text = Path(summary_file).read_text(encoding="utf-8")
+
+    validation_text = ""
+    if validation_file:
+        validation_text = Path(validation_file).read_text(encoding="utf-8")
+
+    # Parse structured sections from summary text
+    sections = _parse_pr_summary_sections(summary_text)
+
+    snapshot = {
+        "pr_number": pr_number,
+        "title": title,
+        "branch": branch,
+        "status": pr_status,
+        "merge_status": merge_status or pr_status,
+        "summary": sections.get("summary", summary_text),
+        "review_checklist": sections.get("review_checklist", ""),
+        "notes": sections.get("notes", ""),
+        "root_cause": sections.get("root_cause", ""),
+        "changes": sections.get("changes", ""),
+        "what_did_not_change": sections.get("what_did_not_change", ""),
+        "validation_commands": sections.get("validation_commands", ""),
+        "validation_results": validation_text or sections.get("validation_results", ""),
+        "safety_notes": sections.get("safety_notes", ""),
+        "known_limitations": sections.get("known_limitations", ""),
+        "follow_up_tasks": sections.get("follow_up_tasks", ""),
+        "artifact_paths": sections.get("artifact_paths", ""),
+        "source_url": source_url,
+        "verification_method": verification_method,
+        "status_source": status_source or _default_status_source(verification_method),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    # Write JSON
+    json_path = out_path / "review_snapshot.json"
+    json_path.write_text(json.dumps(snapshot, indent=2, ensure_ascii=False) + "\n",
+                         encoding="utf-8")
+
+    # Write Markdown
+    md_path = out_path / "review_snapshot.md"
+    md_path.write_text(_render_snapshot_markdown(snapshot), encoding="utf-8")
+
+    # Copy changed_files and commits if provided
+    if changed_files:
+        content = Path(changed_files).read_text(encoding="utf-8")
+        (out_path / "changed_files.txt").write_text(content, encoding="utf-8")
+
+    if commits_file:
+        content = Path(commits_file).read_text(encoding="utf-8")
+        (out_path / "commits.txt").write_text(content, encoding="utf-8")
+
+    console.print(f"\n[bold blue]PR Snapshot[/bold blue] — PR #{pr_number}\n")
+    console.print(f"[green]Created:[/green] {json_path}")
+    console.print(f"[green]Created:[/green] {md_path}")
+    if changed_files:
+        console.print(f"[green]Created:[/green] {out_path / 'changed_files.txt'}")
+    if commits_file:
+        console.print(f"[green]Created:[/green] {out_path / 'commits.txt'}")
+    console.print("\n[dim]To generate ledger entries:[/dim]")
+    console.print(f"  axiom evidence-update --from-pr-snapshot {out_dir}")
+
+
+def _default_status_source(verification_method: str) -> str:
+    """Return default status_source text for a given verification method."""
+    return {
+        "gh_cli": "gh pr view --json state,mergedAt,mergeCommit,url",
+        "github_pr_api": "GitHub PR API (git_view_pr) verified",
+        "github_ui_manual": "Manually verified from GitHub PR page",
+        "git_inferred": "Git log/diff only; PR state not verified from GitHub",
+        "unverified": "PR status not verified from any authoritative source",
+    }.get(verification_method, "PR status not verified from any authoritative source")
+
+
+# Verification methods that confirm PR state authoritatively
+_VERIFIED_METHODS = {"gh_cli", "github_pr_api", "github_ui_manual"}
+
+
+def _qualified_status(snapshot: dict) -> str:
+    """Return status text qualified by verification method.
+
+    Only gh_cli, github_pr_api, and github_ui_manual are considered authoritative.
+    All other methods produce qualified status labels.
+    """
+    status = snapshot.get("status", "unknown")
+    method = snapshot.get("verification_method", "unverified")
+
+    if method in _VERIFIED_METHODS:
+        return f"{status.capitalize()} (verified: {method})"
+
+    if method == "git_inferred":
+        if status == "merged":
+            return "Code present on main (git-inferred; PR merge not verified)"
+        return f"{status.capitalize()} (git-inferred; not verified from GitHub)"
+
+    # unverified
+    if status == "merged":
+        return "Merged (UNVERIFIED — status not confirmed from GitHub)"
+    return f"{status.capitalize()} (unverified)"
+
+
+def _parse_pr_summary_sections(text: str) -> dict[str, str]:
+    """Parse a PR summary/description into named sections.
+
+    Recognizes common headings from PR templates:
+    ## Summary, ## Review & Testing Checklist, ### Notes,
+    ## Root Cause, ## Changes, ## What Did NOT Change,
+    ## Validation, ## Safety, ## Known Limitations, etc.
+    """
+    import re
+
+    sections: dict[str, str] = {}
+    if not text.strip():
+        return sections
+
+    # Order matters: more specific aliases first to avoid false matches.
+    # E.g. "safety notes" must match safety_notes before "notes" matches notes.
+    heading_map = [
+        ("review_checklist", ["review", "checklist", "testing checklist"]),
+        ("root_cause", ["root cause"]),
+        ("what_did_not_change", ["what did not change", "did not change", "unchanged"]),
+        ("validation_commands", ["validation commands", "to validate"]),
+        ("validation_results", ["validation results", "live validation",
+                                 "test results"]),
+        ("safety_notes", ["safety notes", "safety status", "safety"]),
+        ("known_limitations", ["known limitations", "limitations", "known gaps",
+                                "known issues"]),
+        ("follow_up_tasks", ["follow up", "follow-up", "next steps", "todo"]),
+        ("artifact_paths", ["artifact locations", "artifact paths", "artifacts",
+                             "artifact"]),
+        ("changes", ["changes", "changed files", "what changed"]),
+        ("summary", ["summary"]),
+        ("notes", ["notes"]),
+    ]
+
+    # Split by markdown headings (## or ###)
+    parts = re.split(r"^(#{2,3}\s+.+)$", text, flags=re.MULTILINE)
+
+    current_key: str | None = None
+    for part in parts:
+        heading_match = re.match(r"^#{2,3}\s+(.+)$", part.strip())
+        if heading_match:
+            heading_text = heading_match.group(1).strip().lower()
+            # Remove trailing punctuation
+            heading_text = re.sub(r"[:\-—]+$", "", heading_text).strip()
+            current_key = None
+            for key, aliases in heading_map:
+                for alias in aliases:
+                    if alias in heading_text:
+                        current_key = key
+                        break
+                if current_key:
+                    break
+        elif current_key:
+            existing = sections.get(current_key, "")
+            sections[current_key] = (existing + part).strip()
+
+    return sections
+
+
+def _render_snapshot_markdown(snapshot: dict) -> str:
+    """Render a snapshot dict as a readable Markdown document."""
+    lines = [
+        f"# PR #{snapshot['pr_number']}: {snapshot['title']}",
+        "",
+        f"**Branch:** `{snapshot['branch']}`",
+        f"**Status:** {_qualified_status(snapshot)}",
+        f"**Merge status:** {snapshot['merge_status']}",
+        f"**Verification method:** {snapshot.get('verification_method', 'unverified')}",
+        f"**Status source:** {snapshot.get('status_source', 'not specified')}",
+    ]
+    if snapshot.get("source_url"):
+        lines.append(f"**URL:** {snapshot['source_url']}")
+    lines.append(f"**Snapshot created:** {snapshot['created_at']}")
+    lines.append("")
+
+    section_labels = [
+        ("summary", "Summary"),
+        ("review_checklist", "Review & Testing Checklist"),
+        ("notes", "Notes"),
+        ("root_cause", "Root Cause"),
+        ("changes", "Changes"),
+        ("what_did_not_change", "What Did NOT Change"),
+        ("validation_commands", "Validation Commands"),
+        ("validation_results", "Validation Results"),
+        ("safety_notes", "Safety Notes"),
+        ("known_limitations", "Known Limitations"),
+        ("follow_up_tasks", "Follow-Up Tasks"),
+        ("artifact_paths", "Artifact Paths"),
+    ]
+
+    for key, label in section_labels:
+        value = snapshot.get(key, "")
+        if value and value.strip():
+            lines.append(f"## {label}")
+            lines.append("")
+            lines.append(value.strip())
+            lines.append("")
+
+    return "\n".join(lines) + "\n"
+
+
+@cli.command("evidence-update")
+@click.option("--from-pr-snapshot", "snapshot_dir", required=True,
+              type=click.Path(exists=True),
+              help="Path to PR snapshot directory containing review_snapshot.json")
+@click.option("--apply", "apply_flag", is_flag=True, default=False,
+              help="Auto-append generated entries to ledger files (use with caution)")
+@click.option("--out", "out_file", default=None, type=click.Path(),
+              help="Write proposed ledger text to file (default: stdout + snapshot dir)")
+def evidence_update(snapshot_dir, apply_flag, out_file):
+    """Generate proposed ledger entries from a PR snapshot.
+
+    Reads review_snapshot.json from the snapshot directory and generates
+    Markdown blocks suitable for:
+    - docs/logs/pr-review-ledger.md
+    - docs/logs/bug-validation-log.md
+    - docs/logs/behavior-change-ledger.md
+    - docs/logs/founders-evidence-log.md
+
+    By default, prints the proposed text and saves to the snapshot directory.
+    Use --apply to auto-append to the actual ledger files (use with caution).
+    """
+    import json
+    from pathlib import Path
+
+    snapshot_path = Path(snapshot_dir) / "review_snapshot.json"
+    if not snapshot_path.exists():
+        console.print(f"[red]Error: {snapshot_path} not found[/red]")
+        raise SystemExit(1)
+
+    snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    proposed = _generate_ledger_entries(snapshot)
+
+    # Write proposed text
+    if out_file:
+        Path(out_file).write_text(proposed, encoding="utf-8")
+        console.print(f"[green]Proposed ledger entries written to: {out_file}[/green]")
+    else:
+        # Save to snapshot dir
+        proposed_path = Path(snapshot_dir) / "proposed_ledger_entries.md"
+        proposed_path.write_text(proposed, encoding="utf-8")
+        console.print(f"\n[bold blue]Evidence Update[/bold blue] — PR #{snapshot['pr_number']}\n")
+        console.print(f"[green]Proposed ledger entries saved to: {proposed_path}[/green]\n")
+        console.print("[dim]--- Proposed entries below ---[/dim]\n")
+        console.print(proposed)
+
+    if apply_flag:
+        _apply_ledger_entries(snapshot, proposed)
+
+
+def _generate_ledger_entries(snapshot: dict) -> str:
+    """Generate proposed Markdown entries for all relevant ledger files."""
+    pr_num = snapshot["pr_number"]
+    title = snapshot["title"]
+    branch = snapshot["branch"]
+    status = snapshot["status"]
+    created_at = snapshot.get("created_at", "")
+    date_str = created_at[:10] if created_at else "TBD"
+
+    lines: list[str] = []
+
+    # --- pr-review-ledger entry ---
+    lines.append("=" * 60)
+    lines.append("## For: docs/logs/pr-review-ledger.md")
+    lines.append("=" * 60)
+    lines.append("")
+    lines.append(f"## PR #{pr_num}: {title}")
+    lines.append("")
+    lines.append(f"**Branch:** `{branch}`")
+    lines.append("**Base:** `main`")
+    qualified = _qualified_status(snapshot)
+    lines.append(f"**Status:** {qualified} ({date_str})")
+    if snapshot.get("summary"):
+        lines.append("")
+        lines.append("### Summary")
+        lines.append("")
+        lines.append(snapshot["summary"].strip())
+    if snapshot.get("root_cause"):
+        lines.append("")
+        lines.append("### Root Cause")
+        lines.append("")
+        lines.append(snapshot["root_cause"].strip())
+    if snapshot.get("changes"):
+        lines.append("")
+        lines.append("### Changes")
+        lines.append("")
+        lines.append(snapshot["changes"].strip())
+    if snapshot.get("validation_results"):
+        lines.append("")
+        lines.append("### Validation Results")
+        lines.append("")
+        lines.append(snapshot["validation_results"].strip())
+    if snapshot.get("safety_notes"):
+        lines.append("")
+        lines.append("### Safety Notes")
+        lines.append("")
+        lines.append(snapshot["safety_notes"].strip())
+    if snapshot.get("what_did_not_change"):
+        lines.append("")
+        lines.append("### What Did NOT Change")
+        lines.append("")
+        lines.append(snapshot["what_did_not_change"].strip())
+    if snapshot.get("known_limitations"):
+        lines.append("")
+        lines.append("### Known Limitations")
+        lines.append("")
+        lines.append(snapshot["known_limitations"].strip())
+    lines.append("")
+
+    # --- founders-evidence-log entry ---
+    lines.append("=" * 60)
+    lines.append("## For: docs/logs/founders-evidence-log.md")
+    lines.append("=" * 60)
+    lines.append("")
+    lines.append(f"### EVID-NNN: PR #{pr_num} — {title}")
+    lines.append("")
+    lines.append(f"- **Date:** {date_str}")
+    lines.append("- **Workstream:** TBD")
+    lines.append(f"- **PR:** #{pr_num} (`{branch}`)")
+    qualified = _qualified_status(snapshot)
+    lines.append(f"- **Status:** {qualified}")
+    lines.append(f"- **Verification:** {snapshot.get('verification_method', 'unverified')} "
+                 f"— {snapshot.get('status_source', 'not specified')}")
+    if snapshot.get("summary"):
+        lines.append(f"- **Work performed:** {_first_paragraph(snapshot['summary'])}")
+    if snapshot.get("validation_results"):
+        lines.append(f"- **Validation:** {_first_paragraph(snapshot['validation_results'])}")
+    lines.append(f"- **Evidence source:** PR #{pr_num}")
+    lines.append("- **Estimated hours:** TBD")
+    if snapshot.get("artifact_paths"):
+        lines.append(f"- **Validation artifact:** {_first_paragraph(snapshot['artifact_paths'])}")
+    lines.append("")
+
+    # --- bug-validation-log entry (only if root_cause present) ---
+    if snapshot.get("root_cause"):
+        lines.append("=" * 60)
+        lines.append("## For: docs/logs/bug-validation-log.md")
+        lines.append("=" * 60)
+        lines.append("")
+        lines.append(f"### BUG-NNN: {title}")
+        lines.append("")
+        lines.append(f"- **Discovered:** {date_str}")
+        lines.append(f"- **PR:** #{pr_num}")
+        lines.append(f"- **Root cause:** {_first_paragraph(snapshot['root_cause'])}")
+        if snapshot.get("changes"):
+            lines.append(f"- **Fix:** {_first_paragraph(snapshot['changes'])}")
+        if snapshot.get("validation_results"):
+            lines.append(f"- **Validation:** "
+                         f"{_first_paragraph(snapshot['validation_results'])}")
+        lines.append(f"- **Status:** {status}")
+        lines.append("")
+
+    # --- behavior-change-ledger entry (only if changes suggest behavior change) ---
+    if snapshot.get("changes") or snapshot.get("what_did_not_change"):
+        lines.append("=" * 60)
+        lines.append("## For: docs/logs/behavior-change-ledger.md")
+        lines.append("=" * 60)
+        lines.append("")
+        lines.append(f"## BHV-NNN: {title}")
+        lines.append("")
+        lines.append("| Field | Value |")
+        lines.append("|-------|-------|")
+        lines.append("| **behavior_id** | BHV-NNN |")
+        lines.append(f"| **date** | {date_str} |")
+        lines.append("| **capability** | TBD |")
+        if snapshot.get("changes"):
+            lines.append(f"| **current_behavior** | "
+                         f"{_first_paragraph(snapshot['changes'])} |")
+        if snapshot.get("what_did_not_change"):
+            lines.append(f"| **what_did_not_change** | "
+                         f"{_first_paragraph(snapshot['what_did_not_change'])} |")
+        lines.append(f"| **status** | {status} |")
+        lines.append("| **related_bug_id** | — |")
+        lines.append(f"| **notes** | See PR #{pr_num} |")
+        lines.append("")
+
+    return "\n".join(lines) + "\n"
+
+
+def _first_paragraph(text: str) -> str:
+    """Extract the first non-empty paragraph from text, truncated to one line."""
+    for line in text.strip().splitlines():
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#"):
+            # Truncate long lines
+            if len(stripped) > 200:
+                return stripped[:197] + "..."
+            return stripped
+    return text.strip()[:200] if text.strip() else ""
+
+
+def _apply_ledger_entries(snapshot: dict, proposed: str):
+    """Auto-append proposed entries to ledger files."""
+    import re
+    from pathlib import Path
+    sections = re.split(r"^={60}\n## For: (.+)\n={60}$", proposed, flags=re.MULTILINE)
+
+    applied = []
+    for i in range(1, len(sections), 2):
+        target_file = sections[i].strip()
+        content = sections[i + 1].strip()
+        if not content:
+            continue
+
+        target_path = Path(target_file)
+        if target_path.exists():
+            with target_path.open("a", encoding="utf-8") as f:
+                f.write("\n\n---\n\n" + content + "\n")
+            applied.append(target_file)
+            console.print(f"[green]Appended to: {target_file}[/green]")
+        else:
+            console.print(f"[yellow]Skipped (not found): {target_file}[/yellow]")
+
+    if not applied:
+        console.print("[yellow]No ledger files updated.[/yellow]")
+
+
 if __name__ == "__main__":
     cli()

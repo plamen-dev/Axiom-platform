@@ -107,6 +107,12 @@ def _get_allowed_actions() -> dict[str, dict]:
             "not_implemented": True,
             "requires_flag": "allow_kill_revit",
         },
+        "test_pr_snapshot": {
+            "commands": [
+                ["poetry", "run", "pytest", "tests/test_pr_snapshot.py"],
+            ],
+            "description": "Run PR evidence snapshot workflow tests.",
+        },
     }
 
 

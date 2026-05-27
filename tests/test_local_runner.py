@@ -128,6 +128,15 @@ class TestAllowedActions:
         assert ALLOWED_ACTIONS["collect_revit_journals"].get("not_implemented") is True
         assert ALLOWED_ACTIONS["kill_revit"].get("not_implemented") is True
 
+    def test_pr_snapshot_is_allowlisted(self):
+        assert "test_pr_snapshot" in ALLOWED_ACTIONS
+
+    def test_pr_snapshot_maps_to_correct_test_file(self):
+        defn = ALLOWED_ACTIONS["test_pr_snapshot"]
+        assert len(defn["commands"]) == 1
+        cmd = defn["commands"][0]
+        assert cmd == ["poetry", "run", "pytest", "tests/test_pr_snapshot.py"]
+
 
 
 class TestTaskExecution:
@@ -371,6 +380,7 @@ class TestRunbookExists:
             "test_levels.task.json",
             "ruff.task.json",
             "deploy_revit_2027.task.json",
+            "test_pr_snapshot.task.json",
         ]
         for name in expected:
             assert (examples_dir / name).exists(), f"Missing example: {name}"

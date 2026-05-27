@@ -27,6 +27,7 @@ This is **infrastructure tooling**, not Revit product functionality. It does not
 | `test_levels` | `poetry run axiom test-levels --mode simulate` | Level harness |
 | `dotnet_build_revit_2027` | `dotnet build src/axiom_revit/Axiom.Revit.2027.sln -c Release -p:Platform=x64` | Build only |
 | `deploy_revit_2027` | `.\scripts\deploy-revit-2027.ps1` | Build and deploy |
+| `test_pr_snapshot` | `poetry run pytest tests/test_pr_snapshot.py` | PR evidence snapshot tests |
 | `collect_revit_journals` | *placeholder* | NOT_IMPLEMENTED — planned journal collection |
 | `kill_revit` | *placeholder* | NOT_IMPLEMENTED — requires `allow_kill_revit=true` |
 
@@ -136,6 +137,7 @@ Located in `tools/local_runner/examples/`:
 - `test_levels.task.json` — run level simulation harness
 - `ruff.task.json` — lint check
 - `deploy_revit_2027.task.json` — build and deploy to Revit 2027
+- `test_pr_snapshot.task.json` — run PR evidence snapshot tests
 
 ## Encoding Notes
 
