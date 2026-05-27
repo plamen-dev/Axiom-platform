@@ -1,5 +1,6 @@
 {
   "action": "test_levels",
+  "prompt": "Validate level simulation harness after changes.",
   "timeout_seconds": 300,
   "workspace": "C:\\Dev\\Axiom\\Code\\Axiom-platform",
   "metadata": {

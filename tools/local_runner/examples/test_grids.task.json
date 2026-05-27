@@ -1,5 +1,6 @@
 {
   "action": "test_grids",
+  "prompt": "Validate grid simulation harness after changes.",
   "timeout_seconds": 300,
   "workspace": "C:\\Dev\\Axiom\\Code\\Axiom-platform",
   "metadata": {

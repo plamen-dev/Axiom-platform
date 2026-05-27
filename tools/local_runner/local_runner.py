@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import os
 import platform
+import re
 import subprocess
 import sys
 import time
@@ -133,6 +134,9 @@ class RunResult:
         self.stderr: str = ""
         self.error_message: str = ""
         self.artifact_dir: str = ""
+        self.prompt: str = ""
+        self.resolved_action: str = ""
+        self.command_display: str = ""
 
 
 def validate_workspace(workspace: str) -> str | None:
@@ -262,6 +266,105 @@ def _write_failure_summary(result: RunResult, artifact_dir: Path) -> Path:
     return path
 
 
+def _format_command_display(action_def: dict) -> str:
+    """Format the allowlisted commands as a human-readable string."""
+    commands = action_def.get("commands", [])
+    if not commands:
+        return "(not implemented)"
+    return " && ".join(" ".join(cmd) for cmd in commands)
+
+
+def _interpret_result(result: RunResult) -> str:
+    """Produce a human-readable interpretation of the run result."""
+    if result.status == "success":
+        action = result.resolved_action or result.action
+        if action == "ruff":
+            return "No lint violations reported."
+        if action in ("pytest", "test_grids", "test_levels", "test_pr_snapshot"):
+            # Parse pytest summary line: "X passed, Y skipped, Z failed"
+            match = re.search(
+                r"(\d+ passed(?:, \d+ \w+)*)",
+                result.stdout,
+            )
+            if match:
+                return match.group(1) + "."
+            return "Tests passed (summary not parsed)."
+        if action == "git_status":
+            return "Repository state captured."
+        return "Action completed successfully."
+    if result.status == "timed_out":
+        return "Action timed out. See failure_summary.md for details."
+    if result.status == "not_implemented":
+        return f"Action not yet implemented: {result.error_message}"
+    if result.status == "failed":
+        # Include last useful line from stderr or stdout
+        for source in (result.stderr, result.stdout):
+            lines = [ln.strip() for ln in source.splitlines() if ln.strip()]
+            if lines:
+                last = lines[-1][:200]
+                return f"Action failed (exit code {result.exit_code}). Last output: {last}\nSee failure_summary.md for details."
+        return f"Action failed with exit code {result.exit_code}. See failure_summary.md for details."
+    return f"Status: {result.status}"
+
+
+def _write_result_summary(result: RunResult, task: dict, artifact_dir: Path) -> Path:
+    """Write result_summary.md for every run (success or failure)."""
+    path = artifact_dir / "result_summary.md"
+
+    prompt = result.prompt or "N/A"
+    interpretation = _interpret_result(result)
+
+    artifacts_list = [
+        "task.json",
+        "run_log.json",
+        "environment_summary.json",
+        "stdout.txt",
+        "stderr.txt",
+        "result_summary.md",
+    ]
+    if result.status != "success":
+        artifacts_list.append("failure_summary.md")
+
+    lines = [
+        f"# Result Summary: {result.resolved_action or result.action}",
+        "",
+        "## Original Prompt/Request",
+        "",
+        prompt,
+        "",
+        "## Resolved Action",
+        "",
+        result.resolved_action or result.action,
+        "",
+        "## Command Executed",
+        "",
+        f"`{result.command_display}`" if result.command_display else "(none)",
+        "",
+        "## Execution Metadata",
+        "",
+        f"- **Status:** {result.status}",
+        f"- **Exit code:** {result.exit_code}",
+        f"- **Duration:** {result.duration_ms}ms",
+        f"- **Workspace:** {result.workspace}",
+        f"- **Timed out:** {result.timed_out}",
+        f"- **Started at:** {result.started_at}",
+        f"- **Completed at:** {result.completed_at}",
+        "",
+        "## Result",
+        "",
+        interpretation,
+        "",
+        "## Artifacts",
+        "",
+    ]
+    for name in artifacts_list:
+        lines.append(f"- `{name}`")
+    lines.append("")
+
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return path
+
+
 def execute_task(task: dict, artifact_base: str = "artifacts/local_runner_runs") -> RunResult:
     """Execute a validated task and produce artifacts.
 
@@ -276,6 +379,8 @@ def execute_task(task: dict, artifact_base: str = "artifacts/local_runner_runs")
     result.action = task.get("action", "")
     result.workspace = task.get("workspace", "")
     result.run_id = datetime.now(timezone.utc).strftime("run_%Y%m%d_%H%M%S")
+    result.prompt = task.get("prompt", "") or task.get("metadata", {}).get("purpose", "") or ""
+    result.resolved_action = result.action
 
     # Validate
     error = validate_task(task)
@@ -304,6 +409,8 @@ def execute_task(task: dict, artifact_base: str = "artifacts/local_runner_runs")
     env_path = artifact_dir / "environment_summary.json"
     env_path.write_text(json.dumps(env_summary, indent=2), encoding="utf-8")
 
+    result.command_display = _format_command_display(action_def)
+
     # Handle not-implemented actions
     if action_def.get("not_implemented"):
         requires_flag = action_def.get("requires_flag")
@@ -321,11 +428,12 @@ def execute_task(task: dict, artifact_base: str = "artifacts/local_runner_runs")
         result.completed_at = result.started_at
         result.command_executed = result.action
 
-        # Write run log
-        _write_run_log(result, artifact_dir)
-        _write_failure_summary(result, artifact_dir)
+        # Write artifacts
         (artifact_dir / "stdout.txt").write_text("", encoding="utf-8")
         (artifact_dir / "stderr.txt").write_text(result.error_message, encoding="utf-8")
+        _write_run_log(result, artifact_dir)
+        _write_failure_summary(result, artifact_dir)
+        _write_result_summary(result, task, artifact_dir)
         return result
 
     # Execute commands
@@ -384,6 +492,8 @@ def execute_task(task: dict, artifact_base: str = "artifacts/local_runner_runs")
     if result.status != "success":
         _write_failure_summary(result, artifact_dir)
 
+    _write_result_summary(result, task, artifact_dir)
+
     return result
 
 
@@ -393,6 +503,9 @@ def _write_run_log(result: RunResult, artifact_dir: Path) -> Path:
     log = {
         "run_id": result.run_id,
         "action": result.action,
+        "prompt": result.prompt or "N/A",
+        "resolved_action": result.resolved_action or result.action,
+        "command_executed": result.command_display or result.command_executed,
         "workspace": result.workspace,
         "started_at": result.started_at,
         "completed_at": result.completed_at,
@@ -400,9 +513,9 @@ def _write_run_log(result: RunResult, artifact_dir: Path) -> Path:
         "exit_code": result.exit_code,
         "timed_out": result.timed_out,
         "status": result.status,
-        "command_executed": result.command_executed,
         "stdout_path": str(artifact_dir / "stdout.txt"),
         "stderr_path": str(artifact_dir / "stderr.txt"),
+        "result_summary_path": str(artifact_dir / "result_summary.md"),
         "failure_summary_path": (
             str(artifact_dir / "failure_summary.md")
             if result.status != "success" else ""
@@ -424,7 +537,7 @@ def run_from_task_file(task_path: str, artifact_base: str = "artifacts/local_run
         return result
 
     try:
-        task = json.loads(task_file.read_text(encoding="utf-8"))
+        task = json.loads(task_file.read_text(encoding="utf-8-sig"))
     except (json.JSONDecodeError, OSError) as e:
         result = RunResult()
         result.status = "blocked"

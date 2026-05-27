@@ -1,26 +1,45 @@
 """Tests for Axiom Local Runner v0 — allowlisted action execution harness."""
 
 import json
+import platform
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add tools/ to path so we can import local_runner
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
 from local_runner.local_runner import (  # noqa: E402
     ALLOWED_ACTIONS,
+    ALLOWED_WORKSPACE_BASES_WINDOWS,
     execute_task,
+    run_from_task_file,
     validate_task,
     validate_workspace,
 )
+
+# Workspace path that is valid on the current platform
+_REPO_ROOT = str(Path(__file__).resolve().parents[1])
+_VALID_WORKSPACE = _REPO_ROOT
 
 
 class TestWorkspaceValidation:
     """Workspace path must be within allowed bases."""
 
+    @pytest.mark.skipif(platform.system() == "Windows", reason="POSIX workspace test")
     def test_allowed_workspace_posix(self):
         home = str(Path.home() / "repos" / "Axiom-platform")
         assert validate_workspace(home) is None
+
+    @pytest.mark.skipif(platform.system() != "Windows", reason="Windows workspace test")
+    def test_allowed_workspace_windows(self):
+        r"""Windows workspace allows C:\Dev\Axiom\Code\Axiom-platform."""
+        assert validate_workspace(r"C:\Dev\Axiom\Code\Axiom-platform") is None
+
+    def test_allowed_workspace_windows_policy(self):
+        r"""Windows workspace policy allows C:\Dev\Axiom and subdirectories."""
+        assert r"C:\Dev\Axiom" in ALLOWED_WORKSPACE_BASES_WINDOWS
 
     def test_blocked_workspace_root(self):
         error = validate_workspace("/tmp/evil")
@@ -40,13 +59,13 @@ class TestTaskValidation:
     """Task validation blocks invalid or unsafe tasks."""
 
     def test_unknown_action_blocked(self):
-        task = {"action": "rm_rf_everything", "workspace": str(Path.home() / "repos")}
+        task = {"action": "rm_rf_everything", "workspace": _VALID_WORKSPACE}
         error = validate_task(task)
         assert error is not None
         assert "Unknown action" in error
 
     def test_missing_action_blocked(self):
-        task = {"workspace": str(Path.home() / "repos")}
+        task = {"workspace": _VALID_WORKSPACE}
         error = validate_task(task)
         assert error is not None
         assert "Missing required field: action" in error
@@ -60,7 +79,7 @@ class TestTaskValidation:
     def test_arbitrary_command_blocked(self):
         task = {
             "action": "git_status",
-            "workspace": str(Path.home() / "repos"),
+            "workspace": _VALID_WORKSPACE,
             "command": "rm -rf /",
         }
         error = validate_task(task)
@@ -70,7 +89,7 @@ class TestTaskValidation:
     def test_shell_field_blocked(self):
         task = {
             "action": "git_status",
-            "workspace": str(Path.home() / "repos"),
+            "workspace": _VALID_WORKSPACE,
             "shell": "bash -c 'cat /etc/shadow'",
         }
         error = validate_task(task)
@@ -80,7 +99,7 @@ class TestTaskValidation:
     def test_valid_task_passes(self):
         task = {
             "action": "git_status",
-            "workspace": str(Path.home() / "repos" / "Axiom-platform"),
+            "workspace": _VALID_WORKSPACE,
         }
         error = validate_task(task)
         assert error is None
@@ -110,12 +129,13 @@ class TestAllowedActions:
         assert ALLOWED_ACTIONS["kill_revit"].get("not_implemented") is True
 
 
+
 class TestTaskExecution:
     """End-to-end execution tests."""
 
     def test_git_status_execution(self, tmp_path):
         """Runner can execute git_status and produce artifacts."""
-        workspace = str(Path(__file__).resolve().parents[1])
+        workspace = _REPO_ROOT
         task = {
             "action": "git_status",
             "timeout_seconds": 30,
@@ -133,6 +153,9 @@ class TestTaskExecution:
         assert (artifact_dir / "stderr.txt").exists()
         assert (artifact_dir / "environment_summary.json").exists()
 
+        # Verify result_summary.md created
+        assert (artifact_dir / "result_summary.md").exists()
+
         # Verify run_log.json content
         run_log = json.loads((artifact_dir / "run_log.json").read_text())
         assert run_log["action"] == "git_status"
@@ -140,7 +163,9 @@ class TestTaskExecution:
         assert run_log["exit_code"] == 0
         assert run_log["timed_out"] is False
         assert run_log["duration_ms"] >= 0
-        assert run_log["command_executed"] == "git_status"
+        assert "resolved_action" in run_log
+        assert "command_executed" in run_log
+        assert "result_summary_path" in run_log
 
         # Verify task.json was copied
         task_copy = json.loads((artifact_dir / "task.json").read_text())
@@ -150,7 +175,7 @@ class TestTaskExecution:
         """Blocked actions return error without executing."""
         task = {
             "action": "evil_command",
-            "workspace": str(Path.home() / "repos"),
+            "workspace": _VALID_WORKSPACE,
         }
         result = execute_task(task, artifact_base=str(tmp_path))
         assert result.status == "blocked"
@@ -158,7 +183,7 @@ class TestTaskExecution:
 
     def test_not_implemented_action(self, tmp_path):
         """Not-implemented actions return NOT_IMPLEMENTED with artifacts."""
-        workspace = str(Path(__file__).resolve().parents[1])
+        workspace = _REPO_ROOT
         task = {
             "action": "collect_revit_journals",
             "workspace": workspace,
@@ -171,12 +196,13 @@ class TestTaskExecution:
         artifact_dir = Path(result.artifact_dir)
         assert (artifact_dir / "run_log.json").exists()
         assert (artifact_dir / "failure_summary.md").exists()
+        assert (artifact_dir / "result_summary.md").exists()
         assert (artifact_dir / "stdout.txt").exists()
         assert (artifact_dir / "stderr.txt").exists()
 
     def test_failure_summary_created_on_nonzero_exit(self, tmp_path):
         """failure_summary.md should be created when exit code is nonzero."""
-        workspace = str(Path(__file__).resolve().parents[1])
+        workspace = _REPO_ROOT
         # ruff on a nonexistent dir will succeed, so use a task that will
         # intentionally fail. Let's use a made-up failing scenario by
         # overriding an action's commands temporarily.
@@ -198,7 +224,7 @@ class TestTaskExecution:
         import subprocess
         from unittest.mock import patch
 
-        workspace = str(Path(__file__).resolve().parents[1])
+        workspace = _REPO_ROOT
         task = {
             "action": "git_status",
             "timeout_seconds": 1,
@@ -219,12 +245,115 @@ class TestTaskExecution:
         """task.json cannot smuggle arbitrary commands."""
         task = {
             "action": "git_status",
-            "workspace": str(Path.home() / "repos" / "Axiom-platform"),
+            "workspace": _VALID_WORKSPACE,
             "cmd": "rm -rf /",
         }
         result = execute_task(task, artifact_base=str(tmp_path))
         assert result.status == "blocked"
         assert "Arbitrary command" in result.error_message
+
+
+class TestResultSummary:
+    """result_summary.md generation tests."""
+
+    def test_success_result_summary_created(self, tmp_path):
+        """Successful runs produce result_summary.md."""
+        task = {
+            "action": "git_status",
+            "prompt": "Check repo state before merge.",
+            "workspace": _REPO_ROOT,
+        }
+        result = execute_task(task, artifact_base=str(tmp_path))
+        assert result.status == "success"
+
+        summary_path = Path(result.artifact_dir) / "result_summary.md"
+        assert summary_path.exists()
+        content = summary_path.read_text()
+        assert "Check repo state before merge." in content
+        assert "git_status" in content
+        assert "Repository state captured." in content
+        assert "**Status:** success" in content
+
+    def test_result_summary_prompt_from_metadata_fallback(self, tmp_path):
+        """If prompt is missing, metadata.purpose is used."""
+        task = {
+            "action": "git_status",
+            "workspace": _REPO_ROOT,
+            "metadata": {"purpose": "pre-deploy check"},
+        }
+        result = execute_task(task, artifact_base=str(tmp_path))
+        assert result.prompt == "pre-deploy check"
+
+        summary_path = Path(result.artifact_dir) / "result_summary.md"
+        content = summary_path.read_text()
+        assert "pre-deploy check" in content
+
+    def test_result_summary_prompt_na_when_missing(self, tmp_path):
+        """If both prompt and metadata.purpose are missing, show N/A."""
+        task = {
+            "action": "git_status",
+            "workspace": _REPO_ROOT,
+        }
+        result = execute_task(task, artifact_base=str(tmp_path))
+
+        summary_path = Path(result.artifact_dir) / "result_summary.md"
+        content = summary_path.read_text()
+        assert "N/A" in content
+
+    def test_result_summary_shows_command_display(self, tmp_path):
+        """result_summary.md shows the allowlisted command, not shell input."""
+        task = {
+            "action": "git_status",
+            "prompt": "Check state.",
+            "workspace": _REPO_ROOT,
+        }
+        result = execute_task(task, artifact_base=str(tmp_path))
+
+        summary_path = Path(result.artifact_dir) / "result_summary.md"
+        content = summary_path.read_text()
+        assert "git status --short" in content
+
+    def test_not_implemented_result_summary(self, tmp_path):
+        """Not-implemented actions get result_summary.md with failure_summary.md listed."""
+        task = {
+            "action": "collect_revit_journals",
+            "prompt": "Collect Revit journals.",
+            "workspace": _REPO_ROOT,
+        }
+        result = execute_task(task, artifact_base=str(tmp_path))
+
+        summary_path = Path(result.artifact_dir) / "result_summary.md"
+        assert summary_path.exists()
+        content = summary_path.read_text()
+        assert "failure_summary.md" in content
+        assert "not yet implemented" in content.lower() or "not_implemented" in content
+
+    def test_run_log_includes_new_fields(self, tmp_path):
+        """run_log.json includes prompt, resolved_action, command_executed, result_summary_path."""
+        task = {
+            "action": "git_status",
+            "prompt": "Validate before deploy.",
+            "workspace": _REPO_ROOT,
+        }
+        result = execute_task(task, artifact_base=str(tmp_path))
+
+        run_log = json.loads((Path(result.artifact_dir) / "run_log.json").read_text())
+        assert run_log["prompt"] == "Validate before deploy."
+        assert run_log["resolved_action"] == "git_status"
+        assert "git status" in run_log["command_executed"]
+        assert "result_summary.md" in run_log["result_summary_path"]
+
+    def test_task_json_preserves_prompt(self, tmp_path):
+        """task.json artifact preserves the prompt field."""
+        task = {
+            "action": "git_status",
+            "prompt": "Pre-merge check.",
+            "workspace": _REPO_ROOT,
+        }
+        result = execute_task(task, artifact_base=str(tmp_path))
+
+        task_copy = json.loads((Path(result.artifact_dir) / "task.json").read_text())
+        assert task_copy["prompt"] == "Pre-merge check."
 
 
 class TestRunbookExists:
@@ -245,3 +374,39 @@ class TestRunbookExists:
         ]
         for name in expected:
             assert (examples_dir / name).exists(), f"Missing example: {name}"
+
+
+class TestBOMHandling:
+    """UTF-8 BOM handling in task file parsing."""
+
+    def test_utf8_bom_task_file_parses_successfully(self, tmp_path):
+        """Windows PowerShell Set-Content -Encoding UTF8 adds a BOM."""
+        task_data = {
+            "action": "git_status",
+            "workspace": _REPO_ROOT,
+        }
+        task_file = tmp_path / "bom_task.json"
+        # Write with UTF-8 BOM (EF BB BF prefix)
+        content = json.dumps(task_data, indent=2)
+        task_file.write_bytes(b"\xef\xbb\xbf" + content.encode("utf-8"))
+
+        result = run_from_task_file(str(task_file), artifact_base=str(tmp_path / "artifacts"))
+        assert result.status == "success", (
+            f"BOM task file should parse successfully, got: {result.status} "
+            f"— {result.error_message}"
+        )
+
+    def test_non_bom_task_file_still_works(self, tmp_path):
+        """Regular UTF-8 (no BOM) task files continue to work."""
+        task_data = {
+            "action": "git_status",
+            "workspace": _REPO_ROOT,
+        }
+        task_file = tmp_path / "normal_task.json"
+        task_file.write_text(json.dumps(task_data, indent=2), encoding="utf-8")
+
+        result = run_from_task_file(str(task_file), artifact_base=str(tmp_path / "artifacts"))
+        assert result.status == "success", (
+            f"Non-BOM task file should parse successfully, got: {result.status} "
+            f"— {result.error_message}"
+        )

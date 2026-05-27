@@ -1,5 +1,6 @@
 {
   "action": "ruff",
+  "prompt": "Validate lint status after code changes.",
   "timeout_seconds": 120,
   "workspace": "C:\\Dev\\Axiom\\Code\\Axiom-platform",
   "metadata": {

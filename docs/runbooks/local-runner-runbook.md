@@ -49,6 +49,7 @@ python tools/local_runner/local_runner.py --task tools/local_runner/examples/git
 ```json
 {
   "action": "test_grids",
+  "prompt": "Validate grid simulation harness after changes.",
   "timeout_seconds": 300,
   "workspace": "C:\\Dev\\Axiom\\Code\\Axiom-platform",
   "metadata": {
@@ -69,6 +70,7 @@ python tools/local_runner/local_runner.py --task tools/local_runner/examples/git
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
+| `prompt` | string | `""` | Human or agent request that caused this task. Falls back to `metadata.purpose` if missing |
 | `timeout_seconds` | integer | 300 | Max execution time in seconds |
 | `metadata` | object | `{}` | Arbitrary metadata (requested_by, purpose, etc.) |
 
@@ -78,8 +80,9 @@ Each run creates:
 
 ```
 artifacts/local_runner_runs/<run_id>/
-├── task.json                  # Copy of the input task
-├── run_log.json               # Execution metadata
+├── task.json                  # Copy of the input task (includes prompt)
+├── run_log.json               # Execution metadata (includes prompt, resolved_action, command_executed)
+├── result_summary.md          # Human-readable summary (every run)
 ├── stdout.txt                 # Captured standard output
 ├── stderr.txt                 # Captured standard error
 ├── environment_summary.json   # Platform/env info
@@ -98,7 +101,10 @@ artifacts/local_runner_runs/<run_id>/
 | `exit_code` | Process exit code |
 | `timed_out` | Whether timeout was hit |
 | `status` | `success` / `failed` / `timed_out` / `blocked` / `not_implemented` |
-| `command_executed` | Action name (not arbitrary command) |
+| `prompt` | Original request text (falls back to metadata.purpose, then "N/A") |
+| `resolved_action` | The allowlisted action name |
+| `command_executed` | Actual allowlisted command(s) as human-readable string |
+| `result_summary_path` | Path to result_summary.md |
 | `stdout_path` / `stderr_path` | Paths to output files |
 | `failure_summary_path` | Path to failure_summary.md (if failed) |
 
@@ -130,6 +136,10 @@ Located in `tools/local_runner/examples/`:
 - `test_levels.task.json` — run level simulation harness
 - `ruff.task.json` — lint check
 - `deploy_revit_2027.task.json` — build and deploy to Revit 2027
+
+## Encoding Notes
+
+The task file parser uses `utf-8-sig` encoding, which transparently handles UTF-8 files with or without a Byte Order Mark (BOM). This is important on Windows where `Set-Content -Encoding UTF8` (PowerShell) prepends a BOM (`EF BB BF`) to the file. Without `utf-8-sig`, the BOM appears as the first character of the JSON and causes a parse error.
 
 ## Future Roadmap
 
