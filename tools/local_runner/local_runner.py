@@ -22,18 +22,99 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# Allowed workspace base paths
+# Trusted workspace policy
 # ---------------------------------------------------------------------------
+#
+# The Local Runner only operates inside *trusted* workspace roots. To avoid
+# hard-coding a single workstation path, trusted roots are assembled from
+# several sources (all canonicalized before comparison):
+#
+#   1. Built-in per-platform defaults (below) - safe fallback when no config.
+#   2. A JSON config file (workspace_policy.json next to this module, or the
+#      path in $AXIOM_LOCAL_RUNNER_WORKSPACE_CONFIG) - the preferred place to
+#      add future approved roots without code changes.
+#   3. The GitHub Actions checkout dir ($GITHUB_WORKSPACE) - covers the
+#      self-hosted runner's `...\actions-runner\_work\<repo>\<repo>` path.
+#   4. $AXIOM_LOCAL_RUNNER_WORKSPACE_ROOTS - os.pathsep-separated ad-hoc roots.
+#
+# The self-hosted runner's `...\actions-runner\_work\<repo>\<repo>` checkout is
+# trusted via $GITHUB_WORKSPACE during workflow runs, and via an explicit root
+# in workspace_policy.json for manual invocations on the machine. There is no
+# path-name heuristic: a directory is trusted only if it is (under) an
+# explicitly approved root, so arbitrary paths are always rejected.
 
-ALLOWED_WORKSPACE_BASES_WINDOWS = [
+# Built-in default roots (fallback). Future roots belong in workspace_policy.json.
+DEFAULT_WORKSPACE_ROOTS_WINDOWS = [
     r"C:\Dev\Axiom",
 ]
 
-ALLOWED_WORKSPACE_BASES_POSIX = [
+DEFAULT_WORKSPACE_ROOTS_POSIX = [
     str(Path.home() / "repos"),
     str(Path.home() / "Dev" / "Axiom"),
     "/home",
 ]
+
+# Back-compat aliases (external callers / tests import these names).
+ALLOWED_WORKSPACE_BASES_WINDOWS = DEFAULT_WORKSPACE_ROOTS_WINDOWS
+ALLOWED_WORKSPACE_BASES_POSIX = DEFAULT_WORKSPACE_ROOTS_POSIX
+
+WORKSPACE_POLICY_FILENAME = "workspace_policy.json"
+WORKSPACE_CONFIG_ENV = "AXIOM_LOCAL_RUNNER_WORKSPACE_CONFIG"
+WORKSPACE_ROOTS_ENV = "AXIOM_LOCAL_RUNNER_WORKSPACE_ROOTS"
+
+
+def _workspace_config_path() -> Path:
+    """Path to the workspace policy JSON (env override or module-adjacent)."""
+    override = os.environ.get(WORKSPACE_CONFIG_ENV)
+    if override:
+        return Path(override)
+    return Path(__file__).resolve().parent / WORKSPACE_POLICY_FILENAME
+
+
+def _roots_from_config() -> list[str]:
+    """Load approved roots from the JSON config file (best-effort)."""
+    path = _workspace_config_path()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if not isinstance(data, dict):
+        return []
+    platform_key = "windows" if platform.system() == "Windows" else "posix"
+    roots: list[str] = []
+    for key in (platform_key, "common"):
+        values = data.get(key)
+        if isinstance(values, list):
+            roots += [v for v in values if isinstance(v, str) and v.strip()]
+    return roots
+
+
+def get_allowed_workspace_roots() -> list[str]:
+    """Assemble the ordered, de-duplicated list of trusted workspace roots."""
+    if platform.system() == "Windows":
+        roots = list(DEFAULT_WORKSPACE_ROOTS_WINDOWS)
+    else:
+        roots = list(DEFAULT_WORKSPACE_ROOTS_POSIX)
+
+    roots += _roots_from_config()
+
+    github_workspace = os.environ.get("GITHUB_WORKSPACE")
+    if github_workspace and github_workspace.strip():
+        roots.append(github_workspace)
+
+    env_roots = os.environ.get(WORKSPACE_ROOTS_ENV)
+    if env_roots:
+        roots += [p for p in env_roots.split(os.pathsep) if p.strip()]
+
+    # Expand ~ and de-duplicate while preserving order.
+    seen: set[str] = set()
+    result: list[str] = []
+    for root in roots:
+        expanded = os.path.expanduser(root)
+        if expanded not in seen:
+            seen.add(expanded)
+            result.append(expanded)
+    return result
 
 # ---------------------------------------------------------------------------
 # Allowed actions → fixed commands
@@ -158,25 +239,33 @@ class RunResult:
 
 
 def validate_workspace(workspace: str) -> str | None:
-    """Validate workspace path is within allowed bases. Returns error message or None."""
+    """Validate the workspace is within a trusted root. Returns error or None.
+
+    Trusted roots come from :func:`get_allowed_workspace_roots` (built-in
+    defaults + config file + GitHub/env roots). GitHub Actions runner work
+    dirs are also trusted. All paths are canonicalized (and compared
+    case-insensitively on Windows) before comparison.
+    """
     workspace_path = Path(workspace).resolve()
 
-    if platform.system() == "Windows":
-        bases = ALLOWED_WORKSPACE_BASES_WINDOWS
-    else:
-        bases = ALLOWED_WORKSPACE_BASES_POSIX
+    roots = get_allowed_workspace_roots()
+    ws_norm = os.path.normcase(str(workspace_path))
 
-    for base in bases:
+    for base in roots:
         try:
             base_path = Path(base).resolve()
-            if workspace_path == base_path or base_path in workspace_path.parents:
-                return None
         except (OSError, ValueError):
             continue
+        base_norm = os.path.normcase(str(base_path))
+        if ws_norm == base_norm:
+            return None
+        if any(os.path.normcase(str(parent)) == base_norm for parent in workspace_path.parents):
+            return None
 
     return (
         f"Workspace '{workspace}' is outside allowed paths. "
-        f"Allowed: {', '.join(bases)}"
+        f"Allowed roots: {', '.join(roots)}. "
+        f"Add approved roots via {WORKSPACE_POLICY_FILENAME} or ${WORKSPACE_ROOTS_ENV}."
     )
 
 

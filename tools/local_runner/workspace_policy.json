@@ -1,0 +1,12 @@
+{
+  "_comment": "Trusted Local Runner workspace roots. Paths are canonicalized (and compared case-insensitively on Windows) before use. The GitHub Actions checkout ($GITHUB_WORKSPACE) is trusted automatically during workflow runs. For manual invocations on a self-hosted runner, add that machine's explicit runner work dir below (do NOT trust by path-name pattern). Add future approved roots here (per-platform 'windows'/'posix' or shared 'common'), or set $AXIOM_LOCAL_RUNNER_WORKSPACE_ROOTS (os.pathsep-separated). Built-in defaults in local_runner.py remain as a fallback. Do NOT add broad roots like 'C:\\' or '/'.",
+  "windows": [
+    "C:\\Dev\\Axiom",
+    "C:\\actions-runner-axiom\\actions-runner\\_work\\Axiom-platform\\Axiom-platform"
+  ],
+  "posix": [
+    "~/repos",
+    "~/Dev/Axiom"
+  ],
+  "common": []
+}

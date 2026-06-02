@@ -10,7 +10,7 @@ This is **infrastructure tooling**, not Revit product functionality. It does not
 
 - **No arbitrary shell commands.** Only named allowlisted actions are permitted.
 - **No shell strings from task.json.** The `command`, `shell`, and `cmd` fields are explicitly rejected.
-- **Workspace restricted.** On Windows: `C:\Dev\Axiom` and subdirectories. On Linux: `~/repos` and subdirectories.
+- **Workspace restricted (trusted-root policy).** The runner only operates inside explicitly trusted roots, assembled (and canonicalized) from: built-in defaults (`C:\Dev\Axiom` on Windows; `~/repos`, `~/Dev/Axiom`, `/home` on Linux); the config file `tools/local_runner/workspace_policy.json`; the GitHub Actions checkout (`$GITHUB_WORKSPACE`, set during workflow runs); and `$AXIOM_LOCAL_RUNNER_WORKSPACE_ROOTS` (os.pathsep-separated). The Axiom-01 self-hosted runner work dir (`C:\actions-runner-axiom\actions-runner\_work\Axiom-platform\Axiom-platform`) is trusted automatically during workflow runs via `$GITHUB_WORKSPACE`, and is also listed explicitly in `workspace_policy.json` for manual invocations. There is **no** path-name heuristic (e.g. matching `actions-runner/_work`) — a directory is trusted only if it is, or is under, an explicitly approved root, so a forged path like `C:\evil\actions-runner\_work\...` is rejected. Add future approved roots in the config file (or the env var) rather than in code; comparison is case-insensitive on Windows. All other paths are rejected.
 - **No file deletion** outside `artifacts/local_runner_runs/`.
 - **No secret reading.** The runner does not access secrets or credentials.
 - **No external uploads.** All output stays local in artifact directories.

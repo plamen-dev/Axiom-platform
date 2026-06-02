@@ -13,7 +13,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from local_runner.local_runner import (  # noqa: E402
     ALLOWED_ACTIONS,
     ALLOWED_WORKSPACE_BASES_WINDOWS,
+    WORKSPACE_CONFIG_ENV,
+    WORKSPACE_ROOTS_ENV,
     execute_task,
+    get_allowed_workspace_roots,
     run_from_task_file,
     validate_task,
     validate_workspace,
@@ -53,6 +56,62 @@ class TestWorkspaceValidation:
     def test_blocked_workspace_outside_all_bases(self):
         error = validate_workspace("/opt/unauthorized/workspace")
         assert error is not None
+
+    def test_actions_runner_path_not_trusted_by_pattern(self):
+        """A forged '.../actions-runner/_work/...' path is NOT trusted by name."""
+        ws = "/opt/evil/actions-runner/_work/pwned/pwned"
+        error = validate_workspace(ws)
+        assert error is not None
+        assert "outside allowed paths" in error
+
+    def test_github_workspace_env_trusted(self, tmp_path, monkeypatch):
+        """$GITHUB_WORKSPACE checkout dir (and subdirs) is trusted."""
+        monkeypatch.setenv("GITHUB_WORKSPACE", str(tmp_path))
+        assert validate_workspace(str(tmp_path)) is None
+        sub = tmp_path / "nested"
+        sub.mkdir()
+        assert validate_workspace(str(sub)) is None
+
+    def test_config_file_adds_root(self, tmp_path, monkeypatch):
+        """Approved roots can be added via the JSON config file (not code)."""
+        approved = tmp_path / "approved_ws"
+        approved.mkdir()
+        cfg = tmp_path / "workspace_policy.json"
+        cfg.write_text(
+            json.dumps({"windows": [str(approved)], "posix": [str(approved)]}),
+            encoding="utf-8",
+        )
+        monkeypatch.setenv(WORKSPACE_CONFIG_ENV, str(cfg))
+        assert validate_workspace(str(approved / "sub")) is None
+
+    def test_env_var_adds_root(self, tmp_path, monkeypatch):
+        """Approved roots can be added via the pathsep env override."""
+        approved = tmp_path / "env_ws"
+        approved.mkdir()
+        monkeypatch.setenv(WORKSPACE_ROOTS_ENV, str(approved))
+        assert validate_workspace(str(approved / "deep" / "path")) is None
+
+    def test_allowed_roots_includes_defaults(self):
+        """The assembled root list is non-empty and includes a platform default."""
+        roots = get_allowed_workspace_roots()
+        assert isinstance(roots, list) and roots
+        if platform.system() == "Windows":
+            assert any("Dev" in r and "Axiom" in r for r in roots)
+        else:
+            assert any(r == "/home" for r in roots)
+
+    def test_shipped_config_lists_self_hosted_runner_root(self):
+        """The shipped policy config declares the Axiom-01 runner work dir explicitly."""
+        cfg = (
+            Path(__file__).resolve().parents[1]
+            / "tools" / "local_runner" / "workspace_policy.json"
+        )
+        data = json.loads(cfg.read_text(encoding="utf-8"))
+        windows_roots = data.get("windows", [])
+        assert any(
+            "actions-runner" in r and r.lower().endswith("axiom-platform")
+            for r in windows_roots
+        )
 
 
 class TestTaskValidation:

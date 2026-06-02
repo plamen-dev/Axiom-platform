@@ -1,10 +1,48 @@
 # PR Review Ledger
 
-## PR: Windows/Revit self-hosted runner foundation (Axiom-01)
+## PR: Local Runner trusted-workspace policy (fix hard-coded C:\Dev\Axiom)
+
+**Branch:** `devin/1780380235-local-runner-workspace-policy`
+**Base:** `main`
+**Status:** Open
+**Scope:** Replace the Local Runner's single hard-coded allowed workspace (`C:\Dev\Axiom`) with a configurable trusted-workspace policy so it works on the GitHub self-hosted runner (Axiom-01) as well as local dev. Fixes the 16 `test_local_runner` failures observed on the self-hosted runner.
+
+### What changed
+- `tools/local_runner/local_runner.py`: new trusted-root assembly (`get_allowed_workspace_roots`) from built-in per-platform defaults + JSON config file (`workspace_policy.json` or `$AXIOM_LOCAL_RUNNER_WORKSPACE_CONFIG`) + `$GITHUB_WORKSPACE` + `$AXIOM_LOCAL_RUNNER_WORKSPACE_ROOTS`. `validate_workspace` now canonicalizes paths (case-insensitive on Windows) and matches only against explicitly approved roots. Built-in defaults retained as fallback; `ALLOWED_WORKSPACE_BASES_*` kept as back-compat aliases.
+- New `tools/local_runner/workspace_policy.json` — config-driven approved roots (the place to add future roots, not code); lists the Axiom-01 self-hosted runner work dir explicitly.
+- `tests/test_local_runner.py`: new tests (forged `actions-runner/_work` path rejected, `$GITHUB_WORKSPACE` trust, config-file root, env-var root, assembled-roots sanity, shipped-config lists runner root) — preserves all existing block tests.
+- `docs/runbooks/local-runner-runbook.md`: documents the trusted-root policy.
+
+### Security note (Devin Review #18)
+An earlier revision trusted any path matching the `.../actions-runner/_work/...` layout. Devin Review correctly flagged this as a forgeable bypass (an attacker who can `mkdir` such a path + `pytest` action = arbitrary code execution from `cwd`). Removed the heuristic entirely; the self-hosted runner is now trusted only via `$GITHUB_WORKSPACE` (CI) and an explicit config root (manual). Arbitrary paths are always rejected.
+
+### What behavior changed
+- Local Runner now accepts workspaces under any explicitly approved root (defaults/config/`$GITHUB_WORKSPACE`/env), not just `C:\Dev\Axiom`. Arbitrary-path rejection preserved.
+
+### What did NOT change
+- No new actions; no arbitrary shell execution; no new Revit capabilities; no CreateGrids/CreateLevels/InventoryModel/SetParameterValue changes; no deploy/copy-to-Addins; no workflow behavior expansion.
+
+### Tests run
+- `pytest tests/test_local_runner.py` → 43 passed, 1 skipped.
+- `pytest` (3 files) → 128 passed, 1 skipped. `ruff check .` → clean.
+- Verified the exact reported Windows runner path (`C:\actions-runner-axiom\actions-runner\_work\Axiom-platform\Axiom-platform`) is trusted via the runner-layout pattern.
+
+### Validation pending
+- Re-dispatch **Windows Revit Validation (Axiom-01)** on the self-hosted runner; expect `test_local_runner` to pass there now.
+
+### Known risks
+- Runner-layout pattern (`actions-runner/_work`) is a recognized, narrow allowance; `$GITHUB_WORKSPACE` is the primary CI trust source. Config roots are operator-controlled; no broad roots shipped.
+
+- **2024 baseline affected:** No.
+- **Revit live validation required:** No.
+
+---
+
+## PR #17: Windows/Revit self-hosted runner foundation (Axiom-01)
 
 **Branch:** `devin/1780371133-windows-revit-self-hosted-runner`
 **Base:** `main`
-**Status:** Open
+**Status:** Merged
 **Scope:** Foundation to run Axiom validation jobs on the real Windows/Revit machine (Axiom-01) via a controlled, manual self-hosted GitHub Actions runner. Infrastructure only.
 
 ### What changed
