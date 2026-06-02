@@ -1,0 +1,131 @@
+name: Windows Revit Validation (Axiom-01)
+
+# Self-hosted Windows/Revit validation runner foundation for Axiom-01.
+#
+# SAFETY / SCOPE (v0 foundation):
+#   - Manual trigger ONLY (workflow_dispatch). Never runs automatically on PRs.
+#   - No live Revit model mutation. No automatic prompt execution inside Revit.
+#   - Optional add-in BUILD only (deploy-revit-2027.ps1 -BuildOnly) — never
+#     copies DLLs into the Revit Addins folder from CI in this foundation PR.
+#   - No secrets are printed. Keep this repo PRIVATE and do not enable this
+#     workflow for untrusted forks/PRs (self-hosted runners must not run
+#     untrusted code).
+#
+# Runner: a self-hosted GitHub Actions runner on Axiom-01 with the labels
+#   [self-hosted, windows, axiom-01, revit-2027]
+# See docs/runbooks/windows-revit-self-hosted-runner.md to set it up.
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_revit_addin:
+        description: "Build the Revit 2027 add-in (BuildOnly; no deploy/copy)."
+        type: boolean
+        default: false
+      revit_version:
+        description: "Revit version for validation-run/build."
+        type: string
+        default: "2027"
+
+# Allow only one Revit validation run at a time on the machine.
+concurrency:
+  group: windows-revit-validation
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  revit-validation:
+    runs-on: [self-hosted, windows, axiom-01, revit-2027]
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Confirm runner context
+        run: |
+          Write-Host "=== Runner context ==="
+          Write-Host "Runner name : $env:RUNNER_NAME"
+          Write-Host "Runner OS   : $env:RUNNER_OS"
+          Write-Host "Machine     : $env:COMPUTERNAME"
+          Write-Host "User        : $(whoami)"
+          Write-Host "Admin shell : $((New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))"
+
+      - name: Confirm repo path
+        run: |
+          Write-Host "=== Repository path ==="
+          Write-Host "Workspace   : $env:GITHUB_WORKSPACE"
+          Write-Host "Working dir : $(Get-Location)"
+          git rev-parse --abbrev-ref HEAD
+          git log -1 --oneline
+
+      - name: Ensure Poetry
+        run: |
+          if (-not (Get-Command poetry -ErrorAction SilentlyContinue)) {
+            Write-Host "Poetry not found on PATH; installing via pip..."
+            python -m pip install --upgrade poetry
+          }
+          poetry --version
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Run Python tests
+        run: >-
+          poetry run pytest
+          tests/test_validation_loop.py
+          tests/test_local_runner.py
+          tests/test_set_parameter_value.py
+
+      - name: Ruff lint
+        run: poetry run ruff check .
+
+      - name: Build Revit 2027 add-in (BuildOnly; optional)
+        if: ${{ inputs.build_revit_addin }}
+        run: |
+          $script = "scripts/deploy-revit-$($env:REVIT_VERSION).ps1"
+          if (-not (Test-Path $script)) {
+            Write-Host "Deploy script not found: $script" -ForegroundColor Red
+            exit 1
+          }
+          Write-Host "Running safe BuildOnly (no copy to Addins folder)..."
+          & powershell -ExecutionPolicy Bypass -File $script -BuildOnly
+        env:
+          REVIT_VERSION: ${{ inputs.revit_version }}
+
+      - name: Capture built DLL timestamps (optional)
+        if: ${{ inputs.build_revit_addin }}
+        run: |
+          $outDir = "src/axiom_revit/Axiom.RevitAddin.$($env:REVIT_VERSION)/bin/x64/Release/net10.0-windows"
+          if (Test-Path $outDir) {
+            Get-ChildItem $outDir -Filter *.dll |
+              Select-Object Name, LastWriteTime |
+              Format-Table -AutoSize | Out-String | Write-Host
+          } else {
+            Write-Host "Build output dir not found: $outDir (build may have been skipped)."
+          }
+        env:
+          REVIT_VERSION: ${{ inputs.revit_version }}
+
+      - name: Validation-run (pre phase; tests, no deploy, no live Revit)
+        run: >-
+          poetry run axiom validation-run
+          --scenario set_parameter_preview_apply_wall_comments
+          --phase pre
+          --revit-version $env:REVIT_VERSION
+          --tests
+          --no-deploy
+        env:
+          REVIT_VERSION: ${{ inputs.revit_version }}
+
+      - name: Upload validation artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-run-artifacts
+          path: artifacts/validation_runs/**
+          if-no-files-found: ignore
+          retention-days: 14

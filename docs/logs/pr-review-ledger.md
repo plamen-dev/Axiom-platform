@@ -1,10 +1,48 @@
 # PR Review Ledger
 
-## PR: Axiom Validation Automation Loop v0 — semi-autonomous PR/live-validation runner
+## PR: Windows/Revit self-hosted runner foundation (Axiom-01)
+
+**Branch:** `devin/1780371133-windows-revit-self-hosted-runner`
+**Base:** `main`
+**Status:** Open
+**Scope:** Foundation to run Axiom validation jobs on the real Windows/Revit machine (Axiom-01) via a controlled, manual self-hosted GitHub Actions runner. Infrastructure only.
+
+### What changed
+- New `.github/workflows/windows-revit-validation.yml` — `workflow_dispatch`-only workflow on `runs-on: [self-hosted, windows, axiom-01, revit-2027]`: confirm runner/repo context → ensure Poetry → `poetry install` → pytest (validation_loop + local_runner + set_parameter_value) → ruff → optional Revit 2027 add-in **BuildOnly** (no copy) → optional built-DLL timestamps → `validation-run --phase pre --tests --no-deploy` → upload `artifacts/validation_runs/**`. `concurrency` serializes runs.
+- New `docs/runbooks/windows-revit-self-hosted-runner.md` — install/register/labels, service-user + Revit-licensing + admin-vs-non-admin warnings, manual trigger, success/failure interpretation, disable/remove, and security warnings (keep repo private, no untrusted PRs, never print/commit tokens).
+- New `scripts/local/setup-github-runner-notes.ps1` — checklist + prerequisite probe only; no tokens/secrets, no registration, no downloads.
+
+### What behavior changed
+- No runtime/application behavior changed. New CI/infra only (no behavior-change-ledger entry required).
+
+### What did NOT change
+- No new Revit capabilities; no Selection/Filter engine.
+- No CreateGrids/CreateLevels/InventoryModel/SetParameterValue behavior changes.
+- No live Revit model mutation, no automatic prompt execution in Revit, no auto-run on PRs, no Autodesk Assistant/MCP work.
+
+### Tests run
+- `ruff check .` → clean. No Python source changed, so the existing suite (123 passed, 1 skipped) is unaffected; workflow references those same 3 test files.
+- Workflow YAML parsed/validated; labels and `workflow_dispatch`-only trigger confirmed.
+
+### Validation pending
+- Plamen registers the self-hosted runner on Axiom-01 per the runbook and manually dispatches the workflow once to confirm it executes on the machine (tests + ruff + `pre` phase, optionally BuildOnly).
+
+### Known risks
+- Self-hosted runners execute workflow code on Axiom-01; mitigated by private repo + `workflow_dispatch`-only + explicit security warnings. Future live-Revit steps will require the interactive Revit-licensed user (documented).
+
+### Strategic fit
+- Moves validation execution onto the real Windows/Revit machine — strengthens the verification factory / validation throughput (spec §1/§11). Discovery/bounded-retry/promotion-scoring remains the later target.
+
+- **2024 baseline affected:** No.
+- **Revit live validation required:** No for merge (foundation only); runner dispatch is the post-merge validation.
+
+---
+
+## PR #16: Axiom Validation Automation Loop v0 — semi-autonomous PR/live-validation runner
 
 **Branch:** `devin/1780369276-validation-automation-loop`
 **Base:** `main`
-**Status:** Open
+**Status:** Merged
 **Scope:** Throughput tool that automates everything around the single live-Revit human step (per `Axiom_Autonomous_Verification_Loop_Spec_v1`). Not a Revit capability.
 
 ### What changed
