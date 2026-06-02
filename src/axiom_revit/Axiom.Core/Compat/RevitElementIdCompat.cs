@@ -35,5 +35,20 @@ namespace Axiom.Core.Compat
         {
             return (int)GetValue(id);
         }
+
+        /// <summary>
+        /// Constructs an ElementId from a numeric value.
+        /// Revit 2027 (.NET 10) uses the long constructor; Revit 2024
+        /// (.NET 4.8) uses the int constructor. Used to safely re-resolve
+        /// elements by ID without scattering version conditionals.
+        /// </summary>
+        public static ElementId FromLong(long value)
+        {
+#if REVIT_2027
+            return new ElementId(value);
+#else
+            return new ElementId((int)value);
+#endif
+        }
     }
 }

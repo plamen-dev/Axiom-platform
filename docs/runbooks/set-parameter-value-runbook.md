@@ -140,6 +140,112 @@ artifacts/parameter_edit_runs/<run_id>/
 - Whether model was modified
 - Model name (if available)
 
+## Revit Live Validation
+
+SetParameterValue is now available in the Revit Axiom prompt dialog. The C# bridge routes prompts matching `[Apply] Set <Parameter> to <Value> for <N> <Category>` directly to the `SetParameterValueCapability`.
+
+### Architecture
+
+```
+User Prompt → PromptDispatcher.ResolveCapability()
+           → SetParameterValueCapability.Execute()
+           → ParameterEditService.Preview() or .Apply()
+           → Evidence artifacts → interactive TaskDialog (Apply / Open evidence / Close)
+           → [Apply] PromptDispatcher.DispatchWithArgs() with previewed element IDs
+           → ParameterEditService.Apply() in a transaction → apply evidence → result dialog
+```
+
+- **Capability:** `SetParameterValueCapability` (registered in `App.cs`)
+- **Service:** `ParameterEditService` (element collection, parameter read/write, `CollectElementsByIds`)
+- **Parameters model:** `SetParameterValueParameters` (category, parameterName, value, elementCount, mode, `elementIds`)
+
+### Interactive Preview → Apply
+
+On a successful preview, the previewed elements are **selected and zoomed/focused** in Revit (`UIDocument.Selection.SetElementIds` + `UIDocument.ShowElements`) so the user can confidently review what Apply will change. The dialog notes "Previewed element(s) selected in Revit for review." Selection is read-only and best-effort — it never modifies the model and never blocks the preview.
+
+The preview result dialog is interactive. After a successful preview it offers:
+
+- **Apply changes to N element(s)** — only shown when there is at least one editable previewed element.
+- **Open evidence folder** — opens the preview run folder in Explorer (dialog re-shows afterward).
+- **Close** — dismisses without modifying the model.
+
+Apply behavior (preview-approval path):
+
+- Re-executes `SetParameterValue` in apply mode with the **exact element IDs** captured during preview (`ElementIds`), so it never recollects a different set if the model/view changed.
+- Runs inside the `Axiom SetParameterValue` transaction; rolled back on any failure.
+- If any previewed element ID no longer resolves (deleted/changed since preview), Apply is **blocked** with an explanation telling the user to re-run the preview — the model is not modified.
+- The prompt fallback `Apply Set <Parameter> to <Value> for <N> <Category>` is still supported; it recollects by category and is recorded in evidence as `initiated_from: prompt`.
+- Preview-approval applies are recorded in evidence as `initiated_from: preview_approval` with `targeted_by_ids: true` and a `preview_evidence_path` pointer.
+- Preview-approval applies also copy the preview run's `preview.json` into the apply run folder as `linked_preview.json` and write `linked_preview_metadata.json` (run-ID reconciliation + `target_ids_match`) — see [Revit Evidence Artifacts](#revit-evidence-artifacts). If `preview.json` is missing, the apply is **not** failed; the metadata records `copy_status: missing_preview_json` and a warning is added to `result_summary.md`.
+
+### Revit Deployment
+
+Deploy to `C:\Program Files\Autodesk\Revit\Addins\2027\`:
+- `Axiom.RevitAddin.dll`
+- `Axiom.Core.dll`
+- `Newtonsoft.Json.dll`
+- `Axiom.RevitAddin.addin`
+
+### Live Validation Plan
+
+1. Deploy to Revit 2027
+2. Open a disposable/sample model
+3. Run preview (no model modification):
+   ```
+   Set Comments to Axiom test 001 for 1 Walls
+   ```
+   Expected: interactive preview dialog shows old/new values with **Apply** and **Close**, evidence artifacts written, model NOT modified
+4. Click **Close** — confirm the model is not modified.
+5. Run the preview again, then click **Apply changes to 1 element(s)**.
+   Expected: exactly the previewed wall's Comments parameter updated, apply evidence written (`initiated_from: preview_approval`)
+6. Prompt fallback for apply (no dialog approval needed):
+   ```
+   Apply Set Comments to Axiom test 001 for 1 Walls
+   ```
+   Expected: exactly 1 wall's Comments parameter updated, evidence artifacts written
+7. Verify by selecting the wall or running:
+   ```
+   Run InventoryModel sample values for Walls
+   ```
+8. Check evidence artifacts at `%LOCALAPPDATA%\Axiom\parameter_edit_runs\spv_<timestamp>\`
+
+### Revit Evidence Artifacts
+
+Live Revit runs write evidence to:
+
+```
+%LOCALAPPDATA%\Axiom\parameter_edit_runs\spv_<timestamp>\
+├── request.json                  # Prompt, mode, category, parameter, value, document name, initiated_from, targeted_by_ids
+├── preview.json                  # Preview mode: element previews with old/new values
+├── changes.json                  # Apply mode: actual changes per element
+├── linked_preview.json           # Apply-from-preview only: durable copy of the preview run's preview.json
+├── linked_preview_metadata.json  # Apply-from-preview only: reconciliation metadata (see below)
+└── result_summary.md             # Human-readable summary with element table
+```
+
+For apply runs initiated from preview approval, `linked_preview_metadata.json` records:
+
+- `preview_evidence_path` — folder of the originating preview run
+- `copied_at` — UTC timestamp of the link operation
+- `source_preview_run_id` — preview run folder name (e.g. `spv_<timestamp>`)
+- `apply_run_id` — apply run folder name
+- `element_ids_previewed` — element IDs captured during preview
+- `element_ids_applied` — element IDs successfully modified during apply
+- `target_ids_match` — `true` when applied IDs exactly match previewed IDs
+- `initiated_from` — `preview_approval`
+- `copy_status` — `copied` | `missing_preview_json` | `copy_failed`
+
+`result_summary.md` for apply-from-preview runs additionally lists the **Preview evidence path**, the **Linked preview snapshot** status (`linked_preview.json` if copied), and **Target IDs match preview** (`true`/`false`).
+
+### Revit-Specific Behavior
+
+- **Active view filtering:** By default, only elements visible in the active view are collected. This prevents editing elements in other views or hidden elements.
+- **Category resolution:** Resolves the `Category` object directly from `doc.Settings.Categories` (with singular/plural normalization) and filters via `ElementCategoryFilter(category.Id)`. No `BuiltInCategory` enum cast — avoids the Int32/Int64 mismatch on Revit 2027 where `ElementId.Value` is `long`.
+- **Apply targets exact IDs:** Preview-approval apply resolves the previewed elements by ID (`ParameterEditService.CollectElementsByIds` + `RevitElementIdCompat.FromLong`) and blocks if any no longer resolve.
+- **Parameter search:** Case-insensitive name match on instance parameters. Type parameters are excluded.
+- **Transaction safety:** Preview mode runs without a transaction (read-only). Apply mode runs within a named transaction ("Axiom SetParameterValue") — rolled back on failure.
+- **Any view:** SetParameterValue can run from any view (not restricted to plan views like CreateGrids/CreateLevels).
+
 ## What Is Not Supported in v0
 
 - Non-text parameters (Length, Area, Integer, etc.)
@@ -147,7 +253,6 @@ artifacts/parameter_edit_runs/<run_id>/
 - Read-only parameters
 - Whole-model edits (category constraint required)
 - More than 5 elements per operation
-- Live Revit connection (simulation only until C# capability is implemented)
 - Undo/rollback
 - Batch operations across multiple categories
 
@@ -155,16 +260,17 @@ artifacts/parameter_edit_runs/<run_id>/
 
 - **Preview is always safe** — no model modification occurs
 - **Apply requires explicit keyword** — cannot accidentally modify
-- **Registry validation gates all operations** — unknown parameters rejected
+- **Registry validation gates all operations** — CLI validates via JSONL registry
+- **Live Revit validates at runtime** — parameter existence, read-only, storage type checked per element
 - **Hard cap prevents large-scale changes** — max 5 elements
 - **Evidence trail for every operation** — full audit artifacts
+- **Transaction rollback on failure** — apply mode rolls back if any error occurs
 
 ## Future v1+ Considerations
 
 - Numeric/measurable parameters with unit validation
 - Type parameters (with explicit opt-in)
-- Active view filtering
 - Higher element caps (with progressive validation: 10, 50, 100)
-- Live Revit C# capability integration
 - Undo support via transaction groups
 - Batch operations
+- Cross-category operations

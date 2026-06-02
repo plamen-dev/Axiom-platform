@@ -403,3 +403,38 @@ See `docs/runbooks/behavior-regression-runbook.md` for philosophy and process.
 | **related_test_case** | `test_registry_zero_definitions_reporting` |
 | **related_artifact_path** | `src/axiom_cli/main.py` |
 | **notes** | Reporting/accounting change only. No extraction behavior modified. Zero-definition categories are genuine — Revit tags, annotation symbols, and similar categories have elements but no exposed parameter definitions. |
+
+
+## BHV-023: SetParameterValue interactive preview → apply with element-ID reuse
+
+| Field | Value |
+|-------|-------|
+| **behavior_id** | BHV-023 |
+| **date** | 2026-05-06 |
+| **capability** | SetParameterValue |
+| **observed_prompt** | `Set Comments to Axiom test 001 for 1 Walls` |
+| **previous_behavior** | Preview result was a static TaskDialog with only OK/Close. To apply, the user had to re-type the prompt with the `Apply` keyword; apply then recollected elements by category, which could target a different set than was previewed. |
+| **expected_behavior** | Preview dialog is interactive (Apply / Open evidence folder / Close). Apply is only available after a successful preview, reuses the exact previewed element IDs, runs in a transaction, and blocks if any previewed element no longer resolves. |
+| **current_behavior** | Preview dialog offers command-link buttons. On successful preview the previewed elements are selected and zoomed/focused in Revit (`UIDocument.Selection.SetElementIds` + `UIDocument.ShowElements`, read-only/best-effort) with dialog note "Previewed element(s) selected in Revit for review." Apply re-executes `SetParameterValue` in apply mode with `ElementIds` = previewed editable IDs via `PromptDispatcher.DispatchWithArgs`, resolving elements with `ParameterEditService.CollectElementsByIds` + `RevitElementIdCompat.FromLong`. If any ID is missing, apply is blocked with an explanation and the model is not modified. Apply evidence records `initiated_from: preview_approval`, `targeted_by_ids: true`, and `preview_evidence_path`. The `Apply Set ...` prompt fallback remains supported (`initiated_from: prompt`). |
+| **status** | pending live validation |
+| **related_bug_id** | — |
+| **related_test_case** | C# (no Python harness) — live Revit 2027 validation |
+| **related_artifact_path** | `src/axiom_revit/Axiom.RevitAddin/PromptCommand.cs`, `src/axiom_revit/Axiom.RevitAddin/Capabilities/SetParameterValueCapability.cs`, `src/axiom_revit/Axiom.RevitAddin/Services/ParameterEditService.cs`, `src/axiom_revit/Axiom.Core/Bridge/PromptDispatcher.cs`, `src/axiom_revit/Axiom.Core/Models/SetParameterValueParameters.cs`, `src/axiom_revit/Axiom.Core/Compat/RevitElementIdCompat.cs` |
+| **notes** | Hard cap 5 still enforced (also on the ElementIds path). Preview remains read-only. Safety constraints (text instance parameters only, writable only, category-constrained, active-view default) unchanged. |
+
+## BHV-024: SetParameterValue apply-from-preview linked preview evidence snapshot
+
+| Field | Value |
+|-------|-------|
+| **behavior_id** | BHV-024 |
+| **date** | 2026-05-06 |
+| **capability** | SetParameterValue |
+| **observed_prompt** | `Set Comments to Axiom test 001 for 1 Walls` → Apply from preview dialog |
+| **previous_behavior** | Apply run folder contained `request.json`, `changes.json`, `result_summary.md`, and a `preview_evidence_path` pointer only. There was no durable copy of the preview snapshot inside the apply run, so audit required following the pointer to a separate run folder that could be deleted/moved independently. |
+| **expected_behavior** | Apply runs initiated from preview approval contain a durable linked preview snapshot and reconciliation metadata, and `result_summary.md` surfaces the preview path, snapshot status, and whether applied IDs match previewed IDs. A missing `preview.json` must not fail an apply that already modified the model. |
+| **current_behavior** | On apply-from-preview, `PromptCommand.WriteLinkedPreviewArtifacts` copies the preview run's `preview.json` into the apply run folder as `linked_preview.json` and writes `linked_preview_metadata.json` with `preview_evidence_path`, `copied_at`, `source_preview_run_id`, `apply_run_id`, `element_ids_previewed`, `element_ids_applied`, `target_ids_match`, `initiated_from: preview_approval`, and `copy_status`. `result_summary.md` adds **Preview evidence path**, **Linked preview snapshot**, and **Target IDs match preview**. If `preview.json` is missing, the apply is not failed — `copy_status: missing_preview_json` is recorded and a warning is appended to `result_summary.md`. |
+| **status** | pending live validation |
+| **related_bug_id** | — |
+| **related_test_case** | C# (no Python harness) — live Revit 2027 validation |
+| **related_artifact_path** | `src/axiom_revit/Axiom.RevitAddin/PromptCommand.cs` |
+| **notes** | No change to model behavior, element selection behavior, hard cap 5, or exact-ID reuse. No changes to CreateGrids/CreateLevels/InventoryModel. Linking is best-effort and never undoes a successful model update. |

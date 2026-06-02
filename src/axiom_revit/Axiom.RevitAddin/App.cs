@@ -79,6 +79,7 @@ namespace Axiom.RevitAddin
                 _registry.Register(new Axiom.RevitAddin.Capabilities.GridCapability());
                 _registry.Register(new Axiom.RevitAddin.Capabilities.LevelCapability());
                 _registry.Register(new Axiom.RevitAddin.Capabilities.InventoryModelCapability());
+                _registry.Register(new Axiom.RevitAddin.Capabilities.SetParameterValueCapability());
 
                 // -----------------------------
                 // Start Axiom pipe bridge

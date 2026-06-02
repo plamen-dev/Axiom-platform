@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using Axiom.Core.Bridge;
+using Axiom.Core.Compat;
 using Axiom.RevitAddin.UI;
 using Newtonsoft.Json;
 
@@ -57,13 +58,16 @@ namespace Axiom.RevitAddin
 
             var dispatcher = new PromptDispatcher(registry);
 
-            // Check if this is InventoryModel (read-only, no view restriction)
+            // Check if this is InventoryModel or SetParameterValue
             var preResolve = dispatcher.Resolve(promptText);
             bool isInventory = preResolve.Success &&
                                preResolve.CapabilityName == "InventoryModel";
+            bool isSetParameterValue = preResolve.Success &&
+                               preResolve.CapabilityName == "SetParameterValue";
 
-            // Enforce plan view only for model-modifying capabilities
-            if (!isInventory)
+            // Enforce plan view only for geometry-creating capabilities
+            // InventoryModel and SetParameterValue can run from any view
+            if (!isInventory && !isSetParameterValue)
             {
                 View view = doc.ActiveView;
                 if (!(view is ViewPlan) || view.IsTemplate)
@@ -72,7 +76,7 @@ namespace Axiom.RevitAddin
                         "Axiom",
                         "This capability requires a plan view.\n\n" +
                         "Open a Floor Plan or Ceiling Plan and try again.\n" +
-                        "(InventoryModel can run from any view.)");
+                        "(InventoryModel and SetParameterValue can run from any view.)");
                     return Result.Failed;
                 }
             }
@@ -225,6 +229,12 @@ namespace Axiom.RevitAddin
                 }
             }
 
+            // SetParameterValue: preview (read-only) or apply (transactional)
+            if (isSetParameterValue)
+            {
+                return ExecuteSetParameterValue(uiDoc, doc, dispatcher, promptText);
+            }
+
             // Model-modifying capabilities: execute within a transaction
             using (Transaction tx = new Transaction(doc, "Axiom Prompt"))
             {
@@ -268,6 +278,745 @@ namespace Axiom.RevitAddin
                     return Result.Failed;
                 }
             }
+        }
+
+        /// <summary>
+        /// Execute SetParameterValue capability.
+        /// Preview mode: read-only, no transaction.
+        /// Apply mode: transactional, modifies the model.
+        /// Both modes produce evidence artifacts.
+        /// </summary>
+        private Result ExecuteSetParameterValue(
+            UIDocument uiDoc,
+            Document doc,
+            PromptDispatcher dispatcher,
+            string promptText)
+        {
+            string lower = promptText.ToLowerInvariant().Trim();
+            bool isApply = lower.StartsWith("apply ");
+
+            if (isApply)
+            {
+                // Apply mode: requires a transaction
+                using (Transaction tx = new Transaction(doc, "Axiom SetParameterValue"))
+                {
+                    try
+                    {
+                        tx.Start();
+
+                        var result = dispatcher.Dispatch(doc, promptText);
+
+                        if (result.Success && result.CapabilityResult != null &&
+                            result.CapabilityResult.Status == "SUCCESS")
+                        {
+                            tx.Commit();
+
+                            // Add document metadata
+                            result.CapabilityResult.OutputData["document_name"] = doc.Title ?? "";
+                            try { result.CapabilityResult.OutputData["active_view"] = doc.ActiveView?.Name ?? ""; }
+                            catch { result.CapabilityResult.OutputData["active_view"] = ""; }
+                            result.CapabilityResult.OutputData["source"] = "revit_prompt_dialog";
+
+                            // Persist evidence
+                            string evidencePath = PersistSetParameterValueEvidence(
+                                result.CapabilityResult, doc.Title, "apply");
+
+                            var data = result.CapabilityResult.OutputData;
+                            int successCount = data.ContainsKey("success_count")
+                                ? Convert.ToInt32(data["success_count"]) : 0;
+                            int failedCount = data.ContainsKey("failed_count")
+                                ? Convert.ToInt32(data["failed_count"]) : 0;
+                            string paramName = data.ContainsKey("parameter_name")
+                                ? data["parameter_name"].ToString() : "";
+                            string category = data.ContainsKey("category")
+                                ? data["category"].ToString() : "";
+
+                            string warningNote = result.CapabilityResult.Warnings.Count > 0
+                                ? "\nWarnings:\n  " + string.Join("\n  ", result.CapabilityResult.Warnings)
+                                : "";
+
+                            string evidenceNote = string.IsNullOrEmpty(evidencePath)
+                                ? "" : $"\n\nEvidence: {evidencePath}";
+
+                            TaskDialog.Show(
+                                "Axiom - SetParameterValue (apply)",
+                                $"Status: SUCCESS\n" +
+                                $"Mode: apply\n" +
+                                $"Parameter: {paramName}\n" +
+                                $"Category: {category}\n" +
+                                $"Elements updated: {successCount}\n" +
+                                $"Elements failed: {failedCount}\n" +
+                                $"Duration: {result.CapabilityResult.DurationMs}ms" +
+                                warningNote + evidenceNote);
+
+                            return Result.Succeeded;
+                        }
+                        else
+                        {
+                            tx.RollBack();
+
+                            TaskDialog.Show(
+                                "Axiom - SetParameterValue Failed",
+                                $"Prompt: {promptText}\n\n{result.Message}");
+                            return Result.Failed;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        if (tx.HasStarted())
+                            tx.RollBack();
+
+                        TaskDialog.Show(
+                            "Axiom - SetParameterValue Error",
+                            $"Prompt: {promptText}\n\n" +
+                            $"Unexpected error: {ex.Message}");
+                        return Result.Failed;
+                    }
+                }
+            }
+            else
+            {
+                // Preview mode: read-only, no transaction
+                try
+                {
+                    var result = dispatcher.Dispatch(doc, promptText);
+
+                    if (result.Success && result.CapabilityResult != null)
+                    {
+                        // Add document metadata
+                        result.CapabilityResult.OutputData["document_name"] = doc.Title ?? "";
+                        try { result.CapabilityResult.OutputData["active_view"] = doc.ActiveView?.Name ?? ""; }
+                        catch { result.CapabilityResult.OutputData["active_view"] = ""; }
+                        result.CapabilityResult.OutputData["source"] = "revit_prompt_dialog";
+
+                        // Persist evidence
+                        string evidencePath = PersistSetParameterValueEvidence(
+                            result.CapabilityResult, doc.Title, "preview");
+
+                        var data = result.CapabilityResult.OutputData;
+                        int previewCount = data.ContainsKey("preview_count")
+                            ? Convert.ToInt32(data["preview_count"]) : 0;
+                        int skippedCount = data.ContainsKey("skipped_count")
+                            ? Convert.ToInt32(data["skipped_count"]) : 0;
+                        string paramName = data.ContainsKey("parameter_name")
+                            ? data["parameter_name"].ToString() : "";
+                        string category = data.ContainsKey("category")
+                            ? data["category"].ToString() : "";
+                        string value = data.ContainsKey("value")
+                            ? data["value"].ToString() : "";
+
+                        bool activeViewOnly = !data.ContainsKey("active_view_only")
+                            || Convert.ToBoolean(data["active_view_only"]);
+
+                        string skipNote = skippedCount > 0
+                            ? $"\nSkipped (read-only/non-text): {skippedCount}" : "";
+
+                        // Build element preview table and collect the IDs of the
+                        // elements that are actually editable (status "preview").
+                        // Apply will target exactly these IDs.
+                        string elementPreview = "";
+                        var previewableIds = new List<long>();
+                        if (data.ContainsKey("elements"))
+                        {
+                            var elements = data["elements"] as List<Dictionary<string, object>>;
+                            if (elements != null && elements.Count > 0)
+                            {
+                                elementPreview = "\n\nElement preview:";
+                                foreach (var elem in elements)
+                                {
+                                    string elemId = elem.ContainsKey("element_id")
+                                        ? elem["element_id"].ToString() : "?";
+                                    string oldVal = elem.ContainsKey("old_value")
+                                        ? elem["old_value"].ToString() : "";
+                                    string status = elem.ContainsKey("status")
+                                        ? elem["status"].ToString() : "";
+                                    elementPreview += $"\n  [{elemId}] \"{oldVal}\" → \"{value}\" ({status})";
+
+                                    if (status == "preview" && elem.ContainsKey("element_id"))
+                                    {
+                                        try { previewableIds.Add(Convert.ToInt64(elem["element_id"])); }
+                                        catch { }
+                                    }
+                                }
+                            }
+                        }
+
+                        string previewContent =
+                            $"Status: SUCCESS — preview only, model NOT modified\n" +
+                            $"Mode: preview\n" +
+                            $"Parameter: {paramName}\n" +
+                            $"Category: {category}\n" +
+                            $"New value: \"{value}\"\n" +
+                            $"Elements previewed: {previewCount}" +
+                            skipNote +
+                            $"\nDuration: {result.CapabilityResult.DurationMs}ms" +
+                            elementPreview;
+
+                        // Select/highlight the previewed elements in Revit so the
+                        // user can confidently review what Apply will change. Best
+                        // effort — never blocks preview.
+                        bool selected = SelectAndShowElements(uiDoc, previewableIds);
+                        if (selected)
+                            previewContent +=
+                                "\n\nPreviewed element(s) selected in Revit for review.";
+
+                        // Interactive preview dialog: offer Apply / Open evidence
+                        // folder / Close. Apply is only available here, after a
+                        // successful preview, and reuses the previewed element IDs.
+                        return ShowPreviewDialogAndMaybeApply(
+                            doc, dispatcher, promptText, evidencePath, previewContent,
+                            previewableIds, category, paramName, value, activeViewOnly);
+                    }
+                    else
+                    {
+                        TaskDialog.Show(
+                            "Axiom - SetParameterValue Failed",
+                            $"Prompt: {promptText}\n\n{result.Message}");
+                        return Result.Failed;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    TaskDialog.Show(
+                        "Axiom - SetParameterValue Error",
+                        $"Prompt: {promptText}\n\n" +
+                        $"Unexpected error: {ex.Message}");
+                    return Result.Failed;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Show the interactive preview result dialog with Apply / Open
+        /// evidence folder / Close. Apply is only reachable from here (after a
+        /// successful preview) and edits exactly the previewed element IDs.
+        /// Returns when the user closes/cancels or after Apply completes.
+        /// </summary>
+        private Result ShowPreviewDialogAndMaybeApply(
+            Document doc,
+            PromptDispatcher dispatcher,
+            string promptText,
+            string previewEvidencePath,
+            string previewContent,
+            List<long> previewableIds,
+            string category,
+            string parameterName,
+            string value,
+            bool activeViewOnly)
+        {
+            bool canApply = previewableIds.Count > 0;
+
+            while (true)
+            {
+                var dlg = new TaskDialog("Axiom - SetParameterValue (preview)")
+                {
+                    MainInstruction = "Preview complete — model NOT modified",
+                    MainContent = previewContent,
+                    AllowCancellation = true,
+                    CommonButtons = TaskDialogCommonButtons.Close,
+                    DefaultButton = TaskDialogResult.Close
+                };
+
+                if (canApply)
+                {
+                    dlg.AddCommandLink(
+                        TaskDialogCommandLinkId.CommandLink1,
+                        $"Apply changes to {previewableIds.Count} element(s)",
+                        $"Write \"{value}\" to {parameterName} on the previewed {category} " +
+                        "in a single transaction.");
+                }
+                else
+                {
+                    dlg.FooterText =
+                        "Apply unavailable: no editable previewed elements " +
+                        "(all skipped as read-only/non-text).";
+                }
+
+                if (!string.IsNullOrEmpty(previewEvidencePath))
+                {
+                    dlg.AddCommandLink(
+                        TaskDialogCommandLinkId.CommandLink2,
+                        "Open evidence folder",
+                        previewEvidencePath);
+                }
+
+                TaskDialogResult res = dlg.Show();
+
+                if (res == TaskDialogResult.CommandLink1 && canApply)
+                {
+                    return ApplyFromPreview(
+                        doc, dispatcher, promptText, previewEvidencePath,
+                        previewableIds, category, parameterName, value, activeViewOnly);
+                }
+
+                if (res == TaskDialogResult.CommandLink2 ||
+                    (res == TaskDialogResult.CommandLink1 && !canApply))
+                {
+                    OpenEvidenceFolder(previewEvidencePath);
+                    // Re-show the dialog so the user can still apply or close.
+                    continue;
+                }
+
+                // Close / Cancel — model not modified.
+                return Result.Succeeded;
+            }
+        }
+
+        /// <summary>
+        /// Apply the previewed edit: re-execute SetParameterValue in apply mode
+        /// against the exact previewed element IDs, inside a transaction. If any
+        /// previewed element no longer resolves, the capability blocks the apply
+        /// and this method surfaces the explanation. Evidence records that the
+        /// apply was initiated from preview approval.
+        /// </summary>
+        private Result ApplyFromPreview(
+            Document doc,
+            PromptDispatcher dispatcher,
+            string promptText,
+            string previewEvidencePath,
+            List<long> previewableIds,
+            string category,
+            string parameterName,
+            string value,
+            bool activeViewOnly)
+        {
+            var applyArgs = new Axiom.Core.Models.SetParameterValueParameters
+            {
+                Category = category,
+                ParameterName = parameterName,
+                Value = value,
+                ElementCount = previewableIds.Count,
+                Mode = "apply",
+                ActiveViewOnly = activeViewOnly,
+                RawPrompt = promptText,
+                ElementIds = previewableIds
+            };
+            string argsJson = JsonConvert.SerializeObject(applyArgs);
+
+            using (Transaction tx = new Transaction(doc, "Axiom SetParameterValue"))
+            {
+                try
+                {
+                    tx.Start();
+
+                    var result = dispatcher.DispatchWithArgs(doc, "SetParameterValue", argsJson);
+
+                    if (result.Success && result.CapabilityResult != null &&
+                        result.CapabilityResult.Status == "SUCCESS")
+                    {
+                        tx.Commit();
+
+                        var data = result.CapabilityResult.OutputData;
+                        data["document_name"] = doc.Title ?? "";
+                        try { data["active_view"] = doc.ActiveView?.Name ?? ""; }
+                        catch { data["active_view"] = ""; }
+                        data["source"] = "revit_prompt_dialog";
+                        data["initiated_from"] = "preview_approval";
+                        data["preview_evidence_path"] = previewEvidencePath ?? "";
+                        data["element_ids_previewed"] = previewableIds;
+
+                        string evidencePath = PersistSetParameterValueEvidence(
+                            result.CapabilityResult, doc.Title, "apply");
+
+                        int successCount = data.ContainsKey("success_count")
+                            ? Convert.ToInt32(data["success_count"]) : 0;
+                        int failedCount = data.ContainsKey("failed_count")
+                            ? Convert.ToInt32(data["failed_count"]) : 0;
+
+                        // Build old→new table from the apply results.
+                        string changeDetail = "";
+                        if (data.ContainsKey("elements"))
+                        {
+                            var elements = data["elements"] as List<Dictionary<string, object>>;
+                            if (elements != null)
+                            {
+                                changeDetail = "\n\nChanges:";
+                                foreach (var elem in elements)
+                                {
+                                    string elemId = elem.ContainsKey("element_id")
+                                        ? elem["element_id"].ToString() : "?";
+                                    string oldVal = elem.ContainsKey("old_value")
+                                        ? elem["old_value"].ToString() : "";
+                                    string newVal = elem.ContainsKey("new_value")
+                                        ? elem["new_value"].ToString() : "";
+                                    string status = elem.ContainsKey("status")
+                                        ? elem["status"].ToString() : "";
+                                    changeDetail += $"\n  [{elemId}] \"{oldVal}\" → \"{newVal}\" ({status})";
+                                }
+                            }
+                        }
+
+                        string warningNote = result.CapabilityResult.Warnings.Count > 0
+                            ? "\nWarnings:\n  " + string.Join("\n  ", result.CapabilityResult.Warnings)
+                            : "";
+                        string evidenceNote = string.IsNullOrEmpty(evidencePath)
+                            ? "" : $"\n\nEvidence: {evidencePath}";
+
+                        TaskDialog.Show(
+                            "Axiom - SetParameterValue (apply)",
+                            $"Status: SUCCESS — applied from preview approval\n" +
+                            $"Parameter: {parameterName}\n" +
+                            $"Category: {category}\n" +
+                            $"New value: \"{value}\"\n" +
+                            $"Elements modified: {successCount}\n" +
+                            $"Elements failed: {failedCount}\n" +
+                            $"Duration: {result.CapabilityResult.DurationMs}ms" +
+                            changeDetail + warningNote + evidenceNote);
+
+                        return Result.Succeeded;
+                    }
+                    else
+                    {
+                        tx.RollBack();
+
+                        string msg = result.CapabilityResult != null &&
+                            result.CapabilityResult.Errors.Count > 0
+                            ? string.Join("\n", result.CapabilityResult.Errors)
+                            : result.Message;
+
+                        TaskDialog.Show(
+                            "Axiom - SetParameterValue Apply Blocked",
+                            $"Apply did not modify the model.\n\n{msg}");
+                        return Result.Failed;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (tx.HasStarted())
+                        tx.RollBack();
+
+                    TaskDialog.Show(
+                        "Axiom - SetParameterValue Error",
+                        $"Apply failed: {ex.Message}");
+                    return Result.Failed;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Select and zoom/focus the previewed elements in Revit so the user
+        /// can confidently review what Apply will change. Best-effort and
+        /// read-only — selection/showing never modifies the model and never
+        /// blocks the preview if it fails. Returns true if a selection was set.
+        /// </summary>
+        private static bool SelectAndShowElements(UIDocument uiDoc, List<long> elementIds)
+        {
+            if (uiDoc == null || elementIds == null || elementIds.Count == 0)
+                return false;
+
+            try
+            {
+                var ids = new List<ElementId>();
+                foreach (long idValue in elementIds)
+                    ids.Add(RevitElementIdCompat.FromLong(idValue));
+
+                uiDoc.Selection.SetElementIds(ids);
+
+                // Zoom/focus the selected elements so they are visible.
+                try { uiDoc.ShowElements(ids); }
+                catch (Exception ex) { Debug.WriteLine($"ShowElements failed: {ex.Message}"); }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"SelectAndShowElements failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Open the evidence folder in Windows Explorer. Best-effort.
+        /// </summary>
+        private static void OpenEvidenceFolder(string path)
+        {
+            if (string.IsNullOrEmpty(path) || !Directory.Exists(path))
+                return;
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = path,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"OpenEvidenceFolder failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Persist SetParameterValue evidence artifacts to
+        /// %LOCALAPPDATA%\Axiom\parameter_edit_runs\spv_YYYYMMDD_HHmmss\
+        /// </summary>
+        private static string PersistSetParameterValueEvidence(
+            Axiom.Core.Capabilities.CapabilityResult capResult,
+            string docTitle,
+            string mode)
+        {
+            try
+            {
+                string localAppData = Environment.GetFolderPath(
+                    Environment.SpecialFolder.LocalApplicationData);
+                string baseDir = Path.Combine(localAppData, "Axiom", "parameter_edit_runs");
+
+                string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                string runDir = Path.Combine(baseDir, $"spv_{timestamp}");
+                Directory.CreateDirectory(runDir);
+
+                var data = capResult.OutputData;
+
+                // request.json
+                var request = new Dictionary<string, object>
+                {
+                    { "raw_prompt", data.ContainsKey("raw_prompt") ? data["raw_prompt"] : "" },
+                    { "mode", mode },
+                    { "category", data.ContainsKey("category") ? data["category"] : "" },
+                    { "parameter_name", data.ContainsKey("parameter_name") ? data["parameter_name"] : "" },
+                    { "value", data.ContainsKey("value") ? data["value"] : "" },
+                    { "element_count", data.ContainsKey("requested_count") ? data["requested_count"] : 0 },
+                    { "active_view_only", data.ContainsKey("active_view_only") ? data["active_view_only"] : true },
+                    { "document_name", data.ContainsKey("document_name") ? data["document_name"] : docTitle ?? "" },
+                    { "initiated_from", data.ContainsKey("initiated_from") ? data["initiated_from"] : (mode == "apply" ? "prompt" : "preview") },
+                    { "targeted_by_ids", data.ContainsKey("targeted_by_ids") ? data["targeted_by_ids"] : false },
+                    { "preview_evidence_path", data.ContainsKey("preview_evidence_path") ? data["preview_evidence_path"] : "" },
+                    { "timestamp", DateTime.UtcNow.ToString("o") }
+                };
+                File.WriteAllText(
+                    Path.Combine(runDir, "request.json"),
+                    JsonConvert.SerializeObject(request, Formatting.Indented));
+
+                // preview.json or changes.json
+                string resultFile = mode == "apply" ? "changes.json" : "preview.json";
+                File.WriteAllText(
+                    Path.Combine(runDir, resultFile),
+                    JsonConvert.SerializeObject(data, Formatting.Indented));
+
+                // Linked preview snapshot (apply-from-preview only).
+                string initiatedFrom = data.ContainsKey("initiated_from")
+                    ? data["initiated_from"].ToString()
+                    : (mode == "apply" ? "prompt" : "preview");
+                bool isLinkedApply = mode == "apply" && initiatedFrom == "preview_approval";
+                bool linkedPreviewCopied = false;
+                bool linkedTargetIdsMatch = false;
+                string linkedCopyStatus = "";
+                if (isLinkedApply)
+                {
+                    linkedCopyStatus = WriteLinkedPreviewArtifacts(
+                        runDir, data, out linkedTargetIdsMatch, out linkedPreviewCopied);
+                    if (linkedCopyStatus == "missing_preview_json")
+                    {
+                        string pp = data.ContainsKey("preview_evidence_path")
+                            ? data["preview_evidence_path"].ToString() : "";
+                        capResult.Warnings.Add(
+                            $"Linked preview snapshot missing: preview.json not found at \"{pp}\". " +
+                            "Apply already succeeded; linked_preview_metadata.json records copy_status: missing_preview_json.");
+                    }
+                }
+
+                // result_summary.md
+                string paramName = data.ContainsKey("parameter_name")
+                    ? data["parameter_name"].ToString() : "";
+                string category = data.ContainsKey("category")
+                    ? data["category"].ToString() : "";
+                string value = data.ContainsKey("value")
+                    ? data["value"].ToString() : "";
+                bool modelModified = data.ContainsKey("model_modified")
+                    && (bool)data["model_modified"];
+
+                var md = new System.Text.StringBuilder();
+                md.AppendLine("# SetParameterValue Result Summary");
+                md.AppendLine();
+                md.AppendLine($"- **Raw prompt:** {(data.ContainsKey("raw_prompt") ? data["raw_prompt"] : "")}");
+                md.AppendLine($"- **Mode:** {mode}");
+                md.AppendLine($"- **Initiated from:** {(data.ContainsKey("initiated_from") ? data["initiated_from"] : (mode == "apply" ? "prompt" : "preview"))}");
+                md.AppendLine($"- **Targeted by element IDs:** {(data.ContainsKey("targeted_by_ids") ? data["targeted_by_ids"] : false)}");
+                if (isLinkedApply)
+                {
+                    md.AppendLine($"- **Preview evidence path:** {(data.ContainsKey("preview_evidence_path") ? data["preview_evidence_path"] : "")}");
+                    md.AppendLine($"- **Linked preview snapshot:** {(linkedPreviewCopied ? "linked_preview.json" : $"not copied ({linkedCopyStatus})")}");
+                    md.AppendLine($"- **Target IDs match preview:** {linkedTargetIdsMatch.ToString().ToLowerInvariant()}");
+                }
+                md.AppendLine($"- **Category:** {category}");
+                md.AppendLine($"- **Parameter:** {paramName}");
+                md.AppendLine($"- **Value:** \"{value}\"");
+                md.AppendLine($"- **Status:** {capResult.Status}");
+                md.AppendLine($"- **Model modified:** {modelModified}");
+                md.AppendLine($"- **Document:** {docTitle ?? ""}");
+                md.AppendLine($"- **Active view:** {(data.ContainsKey("active_view") ? data["active_view"] : "")}");
+                md.AppendLine($"- **Duration:** {capResult.DurationMs}ms");
+                md.AppendLine($"- **Timestamp:** {DateTime.UtcNow:O}");
+                md.AppendLine();
+
+                // Element details
+                if (data.ContainsKey("elements"))
+                {
+                    md.AppendLine("## Elements");
+                    md.AppendLine();
+                    md.AppendLine("| Element ID | Old Value | New Value | Status | Error |");
+                    md.AppendLine("|-----------|-----------|-----------|--------|-------|");
+
+                    var elements = data["elements"] as List<Dictionary<string, object>>;
+                    if (elements != null)
+                    {
+                        foreach (var elem in elements)
+                        {
+                            string elemId = elem.ContainsKey("element_id")
+                                ? elem["element_id"].ToString() : "";
+                            string oldVal = elem.ContainsKey("old_value")
+                                ? elem["old_value"].ToString() : "";
+                            string newVal = elem.ContainsKey("new_value")
+                                ? elem["new_value"].ToString() : "";
+                            string status = elem.ContainsKey("status")
+                                ? elem["status"].ToString() : "";
+                            string error = elem.ContainsKey("error")
+                                ? elem["error"].ToString() : "";
+                            md.AppendLine($"| {elemId} | {oldVal} | {newVal} | {status} | {error} |");
+                        }
+                    }
+                    md.AppendLine();
+                }
+
+                // Counts
+                md.AppendLine("## Summary");
+                md.AppendLine();
+                md.AppendLine($"- Preview count: {(data.ContainsKey("preview_count") ? data["preview_count"] : 0)}");
+                md.AppendLine($"- Success count: {(data.ContainsKey("success_count") ? data["success_count"] : 0)}");
+                md.AppendLine($"- Skipped count: {(data.ContainsKey("skipped_count") ? data["skipped_count"] : 0)}");
+                md.AppendLine($"- Failed count: {(data.ContainsKey("failed_count") ? data["failed_count"] : 0)}");
+
+                if (capResult.Warnings.Count > 0)
+                {
+                    md.AppendLine();
+                    md.AppendLine("## Warnings");
+                    foreach (var w in capResult.Warnings)
+                        md.AppendLine($"- {w}");
+                }
+
+                if (capResult.Errors.Count > 0)
+                {
+                    md.AppendLine();
+                    md.AppendLine("## Errors");
+                    foreach (var e in capResult.Errors)
+                        md.AppendLine($"- {e}");
+                }
+
+                File.WriteAllText(
+                    Path.Combine(runDir, "result_summary.md"),
+                    md.ToString());
+
+                return runDir;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"PersistSetParameterValueEvidence failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// For apply runs initiated from preview approval, copy the preview run's
+        /// preview.json into the apply run folder as linked_preview.json and write
+        /// linked_preview_metadata.json with reconciliation fields. Never throws for
+        /// a missing preview.json — records copy_status: missing_preview_json instead,
+        /// so a successful model update is not undone by an evidence-linking failure.
+        /// Returns the copy status ("copied" | "missing_preview_json").
+        /// </summary>
+        private static string WriteLinkedPreviewArtifacts(
+            string applyRunDir,
+            Dictionary<string, object> data,
+            out bool targetIdsMatch,
+            out bool linkedPreviewCopied)
+        {
+            targetIdsMatch = false;
+            linkedPreviewCopied = false;
+
+            string previewPath = data.ContainsKey("preview_evidence_path")
+                ? (data["preview_evidence_path"]?.ToString() ?? "") : "";
+
+            var previewedIds = ToLongList(
+                data.ContainsKey("element_ids_previewed") ? data["element_ids_previewed"] : null);
+
+            var appliedIds = new List<long>();
+            if (data.ContainsKey("elements") &&
+                data["elements"] is List<Dictionary<string, object>> elements)
+            {
+                foreach (var elem in elements)
+                {
+                    bool ok = elem.ContainsKey("status") &&
+                        string.Equals(elem["status"]?.ToString(), "success",
+                            StringComparison.OrdinalIgnoreCase);
+                    if (ok && elem.ContainsKey("element_id"))
+                    {
+                        try { appliedIds.Add(Convert.ToInt64(elem["element_id"])); }
+                        catch { /* skip unparseable id */ }
+                    }
+                }
+            }
+
+            targetIdsMatch = previewedIds.Count > 0 &&
+                new HashSet<long>(previewedIds).SetEquals(appliedIds);
+
+            string copyStatus;
+            string srcPreviewJson = string.IsNullOrEmpty(previewPath)
+                ? null : Path.Combine(previewPath, "preview.json");
+            if (srcPreviewJson != null && File.Exists(srcPreviewJson))
+            {
+                try
+                {
+                    File.Copy(srcPreviewJson,
+                        Path.Combine(applyRunDir, "linked_preview.json"), true);
+                    copyStatus = "copied";
+                    linkedPreviewCopied = true;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"linked_preview.json copy failed: {ex.Message}");
+                    copyStatus = "copy_failed";
+                }
+            }
+            else
+            {
+                copyStatus = "missing_preview_json";
+            }
+
+            var metadata = new Dictionary<string, object>
+            {
+                { "preview_evidence_path", previewPath },
+                { "copied_at", DateTime.UtcNow.ToString("o") },
+                { "source_preview_run_id", string.IsNullOrEmpty(previewPath)
+                    ? "" : Path.GetFileName(previewPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) },
+                { "apply_run_id", Path.GetFileName(applyRunDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) },
+                { "element_ids_previewed", previewedIds },
+                { "element_ids_applied", appliedIds },
+                { "target_ids_match", targetIdsMatch },
+                { "initiated_from", "preview_approval" },
+                { "copy_status", copyStatus },
+            };
+            File.WriteAllText(
+                Path.Combine(applyRunDir, "linked_preview_metadata.json"),
+                JsonConvert.SerializeObject(metadata, Formatting.Indented));
+
+            return copyStatus;
+        }
+
+        /// <summary>
+        /// Coerce a heterogeneous value (List&lt;long&gt;, List&lt;object&gt;, etc.)
+        /// into a List&lt;long&gt;, skipping any element that cannot be parsed.
+        /// </summary>
+        private static List<long> ToLongList(object value)
+        {
+            var result = new List<long>();
+            if (value is System.Collections.IEnumerable seq && !(value is string))
+            {
+                foreach (var item in seq)
+                {
+                    try { result.Add(Convert.ToInt64(item)); }
+                    catch { /* skip unparseable id */ }
+                }
+            }
+            return result;
         }
 
         /// <summary>

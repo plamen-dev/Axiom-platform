@@ -56,7 +56,8 @@ namespace Axiom.Core.Bridge
                     "  - Grid creation (e.g. \"Create 10 vertical gridlines, " +
                     "50 ft long, spaced 10 ft apart\")\n" +
                     "  - Level creation (e.g. \"Create 5 levels spaced 12 ft apart\")\n" +
-                    "  - Model inventory (e.g. \"Run InventoryModel\")\n\n" +
+                    "  - Model inventory (e.g. \"Run InventoryModel\")\n" +
+                    "  - Parameter edit (e.g. \"Set Comments to Axiom test for 3 Walls\")\n\n" +
                     "Unsupported prompts will be available in future updates.");
             }
 
@@ -116,7 +117,8 @@ namespace Axiom.Core.Bridge
                     "  - Grid creation (e.g. \"Create 10 vertical gridlines, " +
                     "50 ft long, spaced 10 ft apart\")\n" +
                     "  - Level creation (e.g. \"Create 5 levels spaced 12 ft apart\")\n" +
-                    "  - Model inventory (e.g. \"Run InventoryModel\")\n\n" +
+                    "  - Model inventory (e.g. \"Run InventoryModel\")\n" +
+                    "  - Parameter edit (e.g. \"Set Comments to Axiom test for 3 Walls\")\n\n" +
                     "Unsupported prompts will be available in future updates.");
             }
 
@@ -345,6 +347,43 @@ namespace Axiom.Core.Bridge
         }
 
         /// <summary>
+        /// Execute a named capability with pre-built args JSON, bypassing
+        /// prompt parsing. Used by the interactive SetParameterValue apply
+        /// flow to re-execute the exact resolved request (same parameter,
+        /// value, and element IDs) approved during preview — the user never
+        /// has to retype the prompt. The caller owns transaction management.
+        /// </summary>
+        public PromptDispatchResult DispatchWithArgs(
+            Autodesk.Revit.DB.Document doc,
+            string capabilityName,
+            string argsJson)
+        {
+            IAxiomCapability capability;
+            if (!_registry.TryGet(capabilityName, out capability))
+            {
+                return PromptDispatchResult.Fail(
+                    $"Capability not registered: {capabilityName}");
+            }
+
+            try
+            {
+                var result = capability.Execute(doc, argsJson, false);
+                return new PromptDispatchResult
+                {
+                    Success = result.Status == "SUCCESS",
+                    CapabilityName = capabilityName,
+                    CapabilityResult = result,
+                    Message = result.Status
+                };
+            }
+            catch (Exception ex)
+            {
+                return PromptDispatchResult.Fail(
+                    $"{capabilityName} execution error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Dispatch a structured category parameter schema request directly,
         /// bypassing NLP prompt parsing. Used by the plan execution queue
         /// to avoid fragile category name matching through the resolver.
@@ -406,6 +445,18 @@ namespace Axiom.Core.Bridge
 
         private string ResolveCapability(string lower)
         {
+            // SetParameterValue: "set <param> to <value> for <N> <category>"
+            // Must check before inventory to avoid false match on "set" + category
+            if (lower.StartsWith("set ") || lower.StartsWith("apply set "))
+            {
+                // Must contain "to" and "for" with a count pattern
+                if (System.Text.RegularExpressions.Regex.IsMatch(
+                    lower, @"\bto\b.+\bfor\s+\w+\s+\w"))
+                {
+                    return "SetParameterValue";
+                }
+            }
+
             // Inventory keywords (checked first — read-only, unambiguous)
             string[] inventoryKeywords = {
                 "run inventorymodel", "inventory model", "inventorymodel",
@@ -724,6 +775,9 @@ namespace Axiom.Core.Bridge
         {
             if (capabilityName == "CreateLevels")
                 return BuildLevelArgsJson(lower, promptText);
+
+            if (capabilityName == "SetParameterValue")
+                return BuildSetParameterValueArgsJson(lower, promptText);
 
             if (capabilityName != "CreateGrids")
                 return "{}";
@@ -1293,6 +1347,79 @@ namespace Axiom.Core.Bridge
             }
 
             return Tuple.Create(names.ToArray(), elevations.ToArray());
+        }
+
+        // Word-to-number mapping for small counts
+        private static readonly Dictionary<string, int> WordNumbers
+            = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "one", 1 }, { "two", 2 }, { "three", 3 }, { "four", 4 }, { "five", 5 },
+            { "six", 6 }, { "seven", 7 }, { "eight", 8 }, { "nine", 9 }, { "ten", 10 },
+        };
+
+        /// <summary>
+        /// Parse a SetParameterValue prompt and build the args JSON.
+        /// Supports: [Apply] Set Parameter to Value for N Category
+        /// Both quoted and unquoted values.
+        /// </summary>
+        private string BuildSetParameterValueArgsJson(string lower, string promptText)
+        {
+            string text = promptText.Trim();
+            string mode = "preview";
+
+            // Detect apply mode
+            if (Regex.IsMatch(text, @"(?i)^apply\b"))
+            {
+                mode = "apply";
+                text = Regex.Replace(text, @"(?i)^apply\s+", "");
+            }
+
+            // Strip leading "set"
+            text = Regex.Replace(text, @"(?i)^set\s+", "");
+
+            // Find trailing "for <N> <Category>"
+            var trailing = Regex.Match(text, @"\bfor\s+(\w+)\s+(.+)$", RegexOptions.IgnoreCase);
+            if (!trailing.Success)
+                return "{}";
+
+            string countStr = trailing.Groups[1].Value;
+            string category = trailing.Groups[2].Value.Trim();
+
+            // Everything before "for ..." is "<Parameter> to <Value>"
+            string beforeFor = text.Substring(0, trailing.Index).Trim();
+
+            // Split at " to " to get parameter and value
+            var toMatch = Regex.Match(beforeFor, @"\bto\s+", RegexOptions.IgnoreCase);
+            if (!toMatch.Success)
+                return "{}";
+
+            string parameterName = beforeFor.Substring(0, toMatch.Index).Trim();
+            string rawValue = beforeFor.Substring(toMatch.Index + toMatch.Length).Trim();
+
+            // Strip surrounding quotes if present
+            if (rawValue.Length >= 2 && rawValue[0] == '"' && rawValue[rawValue.Length - 1] == '"')
+                rawValue = rawValue.Substring(1, rawValue.Length - 2);
+
+            // Parse count
+            int count;
+            if (!int.TryParse(countStr, out count))
+            {
+                if (!WordNumbers.TryGetValue(countStr, out count))
+                    count = 1;
+            }
+
+            var args = new Models.SetParameterValueParameters
+            {
+                Category = category,
+                ParameterName = parameterName,
+                Value = rawValue,
+                ElementCount = count,
+                Mode = mode,
+                ActiveViewOnly = true,
+                RawPrompt = promptText
+            };
+
+            return JsonConvert.SerializeObject(args);
         }
     }
 
