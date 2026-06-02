@@ -3196,5 +3196,104 @@ def _apply_ledger_entries(snapshot: dict, proposed: str):
         console.print("[yellow]No ledger files updated.[/yellow]")
 
 
+@cli.command("validation-run")
+@click.option("--scenario", "scenario", default="set_parameter_preview_apply_wall_comments",
+              help="Validation scenario id (or alias, e.g. set_parameter_preview_apply).")
+@click.option("--branch", "branch", default=None,
+              help="Target git branch to record (and pull when --pull is set).")
+@click.option("--revit-version", "revit_version", default="2027",
+              help="Revit version for deploy/evidence (default: 2027).")
+@click.option("--phase", "phase", default="all",
+              type=click.Choice(["pre", "scan", "all"]),
+              help="pre = automate before live Revit; scan = evaluate evidence "
+                   "after live Revit; all = both.")
+@click.option("--pull/--no-pull", "do_pull", default=False,
+              help="Fast-forward pull the target branch (requires --branch).")
+@click.option("--tests/--no-tests", "do_tests", default=True,
+              help="Run the allowlisted Python tests + ruff in pre/all phases.")
+@click.option("--deploy/--no-deploy", "do_deploy", default=False,
+              help="Build/deploy via the existing deploy script (Windows only).")
+@click.option("--max-attempts", "max_attempts", default=None, type=int,
+              help="Bounded retry budget for the evidence scan (default: 5). "
+                   "Increase to confirm larger testing concepts.")
+@click.option("--attempt-wait-seconds", "attempt_wait_seconds", default=2.0, type=float,
+              help="Seconds to wait between evidence-scan attempts.")
+@click.option("--evidence-root", "evidence_roots", multiple=True,
+              type=click.Path(),
+              help="Evidence directory containing run folders. Repeatable. "
+                   "Defaults to all user profiles' Axiom evidence folders.")
+@click.option("--run-id", "run_id", default=None,
+              help="Reuse/resume an existing run id (for the scan phase).")
+@click.option("--output-dir", "output_dir", default="artifacts/validation_runs",
+              type=click.Path(), help="Base directory for validation run artifacts.")
+@click.option("--repo-root", "repo_root", default=".", type=click.Path(),
+              help="Repository root for git/test/deploy commands.")
+def validation_run(scenario, branch, revit_version, phase, do_pull, do_tests,
+                   do_deploy, max_attempts, attempt_wait_seconds, evidence_roots,
+                   run_id, output_dir, repo_root):
+    """Axiom Validation Automation Loop v0 - automate everything around the
+    single live-Revit human step and classify the result.
+
+    \b
+    Examples:
+      # Pre phase: tests + (optional deploy) + print manual Revit steps
+      axiom validation-run --scenario set_parameter_preview_apply --branch main --phase pre
+      # Scan phase: after performing the live Revit step, evaluate evidence
+      axiom validation-run --scenario set_parameter_preview_apply --phase scan
+      # Larger retry budget for bigger testing concepts
+      axiom validation-run --phase scan --max-attempts 20
+    """
+    from axiom_core.validation_loop import (
+        DEFAULT_MAX_ATTEMPTS,
+        resolve_scenario,
+        run_validation,
+    )
+
+    if resolve_scenario(scenario) is None:
+        console.print(f"[red]Unknown scenario: {scenario}[/red]")
+        raise SystemExit(1)
+
+    attempts = max_attempts if max_attempts is not None else DEFAULT_MAX_ATTEMPTS
+
+    console.print("\n[bold blue]Axiom Validation Automation Loop v0[/bold blue]\n")
+    console.print(f"[dim]Scenario: {scenario} | Phase: {phase} | "
+                  f"Revit: {revit_version} | Max attempts: {attempts}[/dim]")
+
+    result = run_validation(
+        scenario_name=scenario,
+        branch=branch,
+        revit_version=revit_version,
+        phase=phase,
+        do_pull=do_pull,
+        do_tests=do_tests,
+        do_deploy=do_deploy,
+        evidence_dirs=list(evidence_roots) if evidence_roots else None,
+        repo_root=repo_root,
+        output_dir=output_dir,
+        run_id=run_id,
+        max_attempts=attempts,
+        attempt_wait_seconds=attempt_wait_seconds,
+    )
+
+    console.print()
+    color = "green" if result.classification == "pass" else "yellow"
+    console.print(f"[bold {color}]Classification: {result.classification}[/bold {color}]")
+    console.print(f"[dim]{result.reason}[/dim]")
+    console.print(f"\n[dim]Run ID: {result.run_id}[/dim]")
+    console.print(f"[dim]Artifacts: {result.artifact_dir}[/dim]")
+    if result.human_action_required:
+        console.print(f"[yellow]Human action required: "
+                      f"{result.artifact_dir}/human_action_required.md[/yellow]")
+    if phase == "pre":
+        console.print(f"[dim]Next: perform the manual Revit steps, then run "
+                      f"--phase scan --run-id {result.run_id}[/dim]")
+
+    # Signal failure via exit code so wrappers / CI can react. A pending live
+    # Revit step is the expected handoff in the pre phase, not a failure.
+    ok_classes = {"pass", "revit_manual_step_pending"}
+    if result.classification not in ok_classes:
+        raise SystemExit(1)
+
+
 if __name__ == "__main__":
     cli()

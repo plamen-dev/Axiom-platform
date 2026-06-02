@@ -1,5 +1,49 @@
 # PR Review Ledger
 
+## PR: Axiom Validation Automation Loop v0 — semi-autonomous PR/live-validation runner
+
+**Branch:** `devin/1780369276-validation-automation-loop`
+**Base:** `main`
+**Status:** Open
+**Scope:** Throughput tool that automates everything around the single live-Revit human step (per `Axiom_Autonomous_Verification_Loop_Spec_v1`). Not a Revit capability.
+
+### What changed
+- New `src/axiom_core/validation_loop.py` — pure-Python orchestrator: context/git recording, optional branch pull, allowlisted Python tests + ruff, optional deploy + deployed-DLL timestamp capture, manual-step rendering, cross-profile evidence scan, 12 v0 evidence conditions, ordered pass/fail classifier, and full artifact-bundle writer.
+- New `validation-run` CLI command in `src/axiom_cli/main.py` with `--phase pre|scan|all`, `--max-attempts` (configurable bounded retry, default 5), `--evidence-root`, `--deploy/--no-deploy`, etc.
+- New `scripts/local/run-validation-loop.ps1` — Windows wrapper; runs git/tests/scan non-elevated and only deploy elevated (`-ElevateDeploy`) or reports `needs_admin`.
+- Local Runner: new `test_validation_loop` allowlisted action (fixed argv `poetry run pytest tests/test_validation_loop.py`) + example task.json.
+- New `tests/test_validation_loop.py` (29 tests) + 2 Local Runner allowlist tests.
+- New `docs/runbooks/validation-loop-runbook.md`.
+
+### What behavior changed
+- New harness behavior only (BHV-025). A single command now produces `artifacts/validation_runs/<run_id>/` and a deterministic classification; previously these steps were manual.
+
+### What did NOT change
+- No new Revit workflow features; no Selection/Filter engine.
+- No changes to CreateGrids/CreateLevels/InventoryModel.
+- No changes to SetParameterValue behavior — its evidence schema is consumed read-only (no validation-metadata change was required).
+
+### Tests run
+- `pytest tests/test_validation_loop.py` → 29 passed.
+- `pytest tests/test_local_runner.py` → passing (incl. new allowlist tests).
+- `pytest tests/test_set_parameter_value.py` → passing.
+- Combined: 119 passed, 1 skipped. `ruff check .` clean.
+- CLI smoke: `validation-run --phase scan` against mocked evidence → `pass`, full bundle written to `artifacts/validation_runs/<run_id>/`. Local Runner `test_validation_loop` → result_summary reports "29 passed."
+
+### Validation pending
+- Live Windows run by Plamen: `--phase pre` (tests + manual steps + optional deploy) then `--phase scan` after the live Revit step, confirming cross-profile evidence scan and `pass` classification on a real apply run.
+
+### Known risks
+- `pre`-phase deploy path and DLL-timestamp capture are Windows-only and not exercisable on the Linux dev VM; covered by fixed-argv unit assertions only.
+
+### Strategic fit
+- Improves the verification factory / evidence quality and validation throughput (spec §1/§11). Bounded-retry/promotion-scoring discovery machinery (spec §9) is the next target and intentionally out of scope.
+
+- **2024 baseline affected:** No.
+- **Revit live validation required:** No for merge (Python harness); yes to exercise the loop end-to-end on Windows.
+
+---
+
 ## PR #5: Revit 2027 Compatibility — Discipline Extraction, Safety Guards, Chunked Inventory
 
 **Branch:** `revit-2027-compatibility`

@@ -119,6 +119,12 @@ def _get_allowed_actions() -> dict[str, dict]:
             ],
             "description": "Run SetParameterValue v0 tests.",
         },
+        "test_validation_loop": {
+            "commands": [
+                ["poetry", "run", "pytest", "tests/test_validation_loop.py"],
+            ],
+            "description": "Run Validation Automation Loop v0 tests.",
+        },
     }
 
 

@@ -438,3 +438,20 @@ See `docs/runbooks/behavior-regression-runbook.md` for philosophy and process.
 | **related_test_case** | C# (no Python harness) — live Revit 2027 validation |
 | **related_artifact_path** | `src/axiom_revit/Axiom.RevitAddin/PromptCommand.cs` |
 | **notes** | No change to model behavior, element selection behavior, hard cap 5, or exact-ID reuse. No changes to CreateGrids/CreateLevels/InventoryModel. Linking is best-effort and never undoes a successful model update. |
+
+## BHV-025: Validation Automation Loop v0 — semi-autonomous PR/live-validation runner
+
+| Field | Value |
+|-------|-------|
+| **behavior_id** | BHV-025 |
+| **date** | 2026-05-06 |
+| **capability** | ValidationLoop (new harness; not a Revit capability) |
+| **observed_prompt** | `poetry run axiom validation-run --scenario set_parameter_preview_apply --phase pre` / `--phase scan` |
+| **previous_behavior** | Around the single live-Revit human step, every other step (record context/git, pull, run tests + ruff, deploy, capture DLL timestamps, print manual steps, scan evidence across user profiles, validate conditions, classify pass/fail, write a result summary) was performed manually and reported by hand in chat. There was no structured validation-run artifact bundle. |
+| **expected_behavior** | A single command automates everything before and after the live Revit step and emits a structured `artifacts/validation_runs/<run_id>/` bundle with a deterministic pass/fail classification, leaving only the live Revit interaction to the human. |
+| **current_behavior** | `axiom validation-run` (and `scripts/local/run-validation-loop.ps1`) runs phases `pre` (context/git/optional pull/tests+ruff/optional deploy/DLL timestamps/manual steps), `scan` (cross-profile evidence scan → 12 v0 conditions → classification), or `all`. Evidence is searched across all user profiles' `…\AppData\Local\Axiom\parameter_edit_runs`. Classification uses ordered precedence: tests_failed → needs_admin → deploy_failed → revit_manual_step_pending → evidence_missing → evidence_mismatch → pass. The bounded retry budget (`--max-attempts`, default `DEFAULT_MAX_ATTEMPTS=5`) is configurable and recorded in `request.json`/`pass_fail.json` (`max_attempts`, `attempts_made`); it drives re-scanning while the add-in writes evidence asynchronously, and is overridable to confirm larger testing concepts. All subprocesses use fixed argv lists (never a shell string); branch/scenario inputs are validated against conservative patterns. |
+| **status** | implemented (Python harness; ruff + pytest green) |
+| **related_bug_id** | — |
+| **related_test_case** | `tests/test_validation_loop.py` (29 tests), `tests/test_local_runner.py::TestActionAllowlist::test_validation_loop_*` |
+| **related_artifact_path** | `src/axiom_core/validation_loop.py`, `src/axiom_cli/main.py` (validation-run command), `scripts/local/run-validation-loop.ps1`, `tools/local_runner/local_runner.py`, `tools/local_runner/examples/test_validation_loop.task.json`, `docs/runbooks/validation-loop-runbook.md` |
+| **notes** | No new Revit capability and no change to SetParameterValue/CreateGrids/CreateLevels/InventoryModel behavior. Live Revit remains the one human step. This is the throughput tool; the bounded-retry/promotion-scoring discovery machinery (spec §9) is the next target and explicitly out of scope here. SetParameterValue evidence schema was consumed read-only (no metadata changes were required). |

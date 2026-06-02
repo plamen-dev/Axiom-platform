@@ -1,0 +1,38 @@
+name: Python CI
+
+# Lightweight Python-only CI to prevent basic test/lint regressions.
+# Intentionally excludes C#/Revit build, deploy-revit-2027.ps1, the Autodesk
+# Revit SDK, live validation, secrets, and artifact upload.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Run tests
+        run: >-
+          poetry run pytest
+          tests/test_validation_loop.py
+          tests/test_local_runner.py
+          tests/test_set_parameter_value.py
+
+      - name: Ruff lint
+        run: poetry run ruff check .

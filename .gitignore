@@ -68,6 +68,8 @@ artifacts/object_registry_candidates/
 artifacts/parameter_registry_candidates/
 artifacts/parameter_edit_runs/
 artifacts/scratch/
+# Validation Automation Loop runs (generated run outputs only; keep curated reports)
+artifacts/validation_runs/vrun_*/
 
 # Visual Studio local state
 .vs/

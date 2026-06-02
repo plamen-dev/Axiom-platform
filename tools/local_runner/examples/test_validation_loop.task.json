@@ -1,0 +1,10 @@
+{
+  "action": "test_validation_loop",
+  "prompt": "Validate the Axiom Validation Automation Loop v0: evidence scanner, pass/fail classifier, admin/non-admin context recording, bounded-retry budget, and result_summary generation.",
+  "timeout_seconds": 180,
+  "workspace": "C:\\Dev\\Axiom\\Code\\Axiom-platform",
+  "metadata": {
+    "requested_by": "agent",
+    "purpose": "validate the semi-autonomous PR/live-validation runner"
+  }
+}

@@ -146,6 +146,15 @@ class TestAllowedActions:
         cmd = defn["commands"][0]
         assert cmd == ["poetry", "run", "pytest", "tests/test_set_parameter_value.py"]
 
+    def test_validation_loop_is_allowlisted(self):
+        assert "test_validation_loop" in ALLOWED_ACTIONS
+
+    def test_validation_loop_maps_to_correct_test_file(self):
+        defn = ALLOWED_ACTIONS["test_validation_loop"]
+        assert len(defn["commands"]) == 1
+        cmd = defn["commands"][0]
+        assert cmd == ["poetry", "run", "pytest", "tests/test_validation_loop.py"]
+
 
 class TestTaskExecution:
     """End-to-end execution tests."""
