@@ -455,3 +455,20 @@ See `docs/runbooks/behavior-regression-runbook.md` for philosophy and process.
 | **related_test_case** | `tests/test_validation_loop.py` (29 tests), `tests/test_local_runner.py::TestActionAllowlist::test_validation_loop_*` |
 | **related_artifact_path** | `src/axiom_core/validation_loop.py`, `src/axiom_cli/main.py` (validation-run command), `scripts/local/run-validation-loop.ps1`, `tools/local_runner/local_runner.py`, `tools/local_runner/examples/test_validation_loop.task.json`, `docs/runbooks/validation-loop-runbook.md` |
 | **notes** | No new Revit capability and no change to SetParameterValue/CreateGrids/CreateLevels/InventoryModel behavior. Live Revit remains the one human step. This is the throughput tool; the bounded-retry/promotion-scoring discovery machinery (spec §9) is the next target and explicitly out of scope here. SetParameterValue evidence schema was consumed read-only (no metadata changes were required). |
+
+## BHV-026: Axiom Automation Bridge v0 - external driver + durable evidence
+
+| Field | Value |
+|-------|-------|
+| **behavior_id** | BHV-026 |
+| **date** | 2026-05-06 |
+| **capability** | AutomationBridge (new driver/harness; not a Revit capability) |
+| **observed_prompt** | `poetry run axiom bridge-execute --capability InventoryModel` (live) / `--simulate` (mock) |
+| **previous_behavior** | No software path existed for an external process (CI / Validation Loop) to send an execution request to a running Revit add-in and capture durable evidence. The named-pipe bridge (PR #2: `AxiomPipeServer` + `PipeClient`) existed but had no non-interactive driver, no evidence capture, and no pass/fail classification for an outside-Revit caller. |
+| **expected_behavior** | A single non-interactive command sends one capability `execute_tool` request over the existing named pipe to the running add-in, the add-in executes it via ExternalEvent, and the caller writes durable evidence proving request sent -> received -> executed -> result -> classified, with no human interaction after dispatch. |
+| **current_behavior** | `axiom bridge-execute` (driver `axiom_core.automation_bridge.execute_capability_via_bridge`) reuses `PipeClient` verbatim, defaults `InventoryModel` to safe summary mode (`SummaryOnly=true`, `ScanMode=summary`; no full scan, no model mutation), and writes `artifacts/validation_runs/<run_id>/bridge/{bridge_request.json,bridge_response.json,bridge_result_summary.md,pass_fail.json}`. Classification: `pass` / `capability_failed` / `bridge_unavailable` / `bridge_error`, with evidence written for every outcome. Exit codes: 0 pass, 1 fail/unavailable/error, 2 bad `--args-json`. `windows-revit-validation.yml` gains opt-in `run_bridge` / `bridge_simulate` / `bridge_capability` dispatch inputs to drive it on Axiom-01 after the add-in is loaded. |
+| **status** | validated - live Revit acceptance passed on Axiom-01 (Revit 2027). Full chain proven: GitHub Actions -> Axiom-01 self-hosted runner -> validation workflow -> Automation Bridge -> named pipe -> running Revit 2027 -> InventoryModel capability -> evidence collection -> artifact upload, with no human interaction after dispatch. (Python harness: full pytest 546 passed/1 skipped + ruff green.) |
+| **related_bug_id** | — |
+| **related_test_case** | `tests/test_automation_bridge.py` (classifier + driver + CLI vs mock PipeClient) |
+| **related_artifact_path** | `src/axiom_core/automation_bridge.py`, `src/axiom_cli/main.py` (bridge-execute), `.github/workflows/windows-revit-validation.yml`, `docs/architecture/revit-automation-bridge-v0.md` |
+| **notes** | No new Revit capability; no change to CreateGrids/CreateLevels/InventoryModel/SetParameterValue behavior. No new transport (Option A only; no Job Queue / Local HTTP). No UI automation. Establishes the Axiom-outside <-> Axiom-inside communication boundary for the verification factory. |

@@ -26,6 +26,18 @@ on:
         description: "Revit version for validation-run/build."
         type: string
         default: "2027"
+      run_bridge:
+        description: "Run the Automation Bridge (send one capability to a RUNNING Revit add-in)."
+        type: boolean
+        default: false
+      bridge_simulate:
+        description: "Bridge simulate mode (mock; no live Revit needed). Use to prove the driver/evidence flow."
+        type: boolean
+        default: false
+      bridge_capability:
+        description: "Capability for the bridge to execute (read-only default)."
+        type: string
+        default: "InventoryModel"
 
 # Allow only one Revit validation run at a time on the machine.
 concurrency:
@@ -120,6 +132,25 @@ jobs:
           --no-deploy
         env:
           REVIT_VERSION: ${{ inputs.revit_version }}
+
+      # Axiom Automation Bridge v0 (PR #19): send ONE capability execution
+      # request to a RUNNING Revit add-in over the named pipe, with no human
+      # interaction, and capture durable evidence. Opt-in only:
+      #   - run_bridge=true + bridge_simulate=false : requires Revit running with
+      #     the Axiom add-in loaded (AxiomPipeServer listening). Read-only
+      #     InventoryModel summary by default; no model mutation.
+      #   - run_bridge=true + bridge_simulate=true  : mock path, no Revit needed.
+      - name: Automation Bridge - execute one capability (optional)
+        if: ${{ inputs.run_bridge }}
+        run: |
+          $isSimulate = $env:BRIDGE_SIMULATE -eq 'true'
+          $bridgeArgs = @('bridge-execute', '--capability', $env:BRIDGE_CAPABILITY)
+          if ($isSimulate) { $bridgeArgs += '--simulate' }
+          Write-Host "Bridge mode: $(if ($isSimulate) { 'simulate' } else { 'live (requires running Revit add-in)' })"
+          poetry run axiom @bridgeArgs
+        env:
+          BRIDGE_CAPABILITY: ${{ inputs.bridge_capability }}
+          BRIDGE_SIMULATE: ${{ inputs.bridge_simulate }}
 
       - name: Upload validation artifacts
         if: always()

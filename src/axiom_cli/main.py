@@ -1,5 +1,6 @@
 """Axiom CLI - Command-line interface for the Axiom platform."""
 
+import json
 from typing import Optional
 from uuid import UUID
 
@@ -3292,6 +3293,73 @@ def validation_run(scenario, branch, revit_version, phase, do_pull, do_tests,
     # Revit step is the expected handoff in the pre phase, not a failure.
     ok_classes = {"pass", "revit_manual_step_pending"}
     if result.classification not in ok_classes:
+        raise SystemExit(1)
+
+
+@cli.command("bridge-execute")
+@click.option("--capability", "capability", default="InventoryModel",
+              help="Registered capability to execute (default: InventoryModel).")
+@click.option("--args-json", "args_json", default=None,
+              help="JSON object of capability args. Default for InventoryModel is "
+                   "safe summary mode ({\"SummaryOnly\": true}).")
+@click.option("--simulate", is_flag=True,
+              help="Use the mock path (no Revit needed); request is still recorded.")
+@click.option("--transaction-name", "transaction_name", default=None,
+              help="Optional Revit transaction name.")
+@click.option("--run-id", "run_id", default=None,
+              help="Run id for the evidence bundle (default: brun_<timestamp>).")
+@click.option("--output-dir", "output_dir", default="artifacts/validation_runs",
+              type=click.Path(), help="Base directory for bridge run artifacts.")
+def bridge_execute(capability, args_json, simulate, transaction_name, run_id, output_dir):
+    """Axiom Automation Bridge v0 - send ONE capability execution request to a
+    running Revit add-in over the existing named-pipe bridge, with no human
+    interaction, and write durable evidence (request/response/summary/pass-fail).
+
+    \b
+    Examples:
+      # Read-only InventoryModel summary against a running Revit add-in
+      axiom bridge-execute --capability InventoryModel
+      # Mock path (no Revit) - proves the driver/evidence flow off-Windows
+      axiom bridge-execute --capability InventoryModel --simulate
+    """
+    from axiom_core.automation_bridge import execute_capability_via_bridge
+
+    if args_json:
+        try:
+            args = json.loads(args_json)
+        except json.JSONDecodeError as exc:
+            console.print(f"[red]Invalid --args-json: {exc}[/red]")
+            raise SystemExit(2)
+        if not isinstance(args, dict):
+            console.print("[red]--args-json must be a JSON object.[/red]")
+            raise SystemExit(2)
+    elif capability == "InventoryModel":
+        # Safe default: summary mode only (no full scan).
+        args = {"SummaryOnly": True, "ScanMode": "summary"}
+    else:
+        args = {}
+
+    console.print("\n[bold blue]Axiom Automation Bridge v0[/bold blue]\n")
+    console.print(f"[dim]Capability: {capability} | Mode: "
+                  f"{'simulate' if simulate else 'live'}[/dim]")
+
+    result = execute_capability_via_bridge(
+        capability=capability,
+        args=args,
+        run_id=run_id,
+        simulate=simulate,
+        transaction_name=transaction_name,
+        output_dir=output_dir,
+    )
+
+    console.print()
+    color = "green" if result.passed else "yellow"
+    console.print(f"[bold {color}]Classification: {result.classification}[/bold {color}]")
+    console.print(f"[dim]{result.reason}[/dim]")
+    console.print(f"\n[dim]Run ID: {result.run_id}[/dim]")
+    console.print(f"[dim]Artifacts: {result.artifact_dir}[/dim]")
+
+    if result.classification not in ("pass",):
         raise SystemExit(1)
 
 
