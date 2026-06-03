@@ -226,3 +226,81 @@ class InventoryParameterRow(Base):
     is_read_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_instance_param: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     parameter_group: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+
+
+# ---------------------------------------------------------------------------
+# Discovery Harness v1 registries (PR #20)
+#
+# These tables persist *interpreted* facts derived from existing InventoryModel
+# exports. DiscoveryHarness never extracts/scans; it reads InventoryModel output
+# and upserts the rows below using the same SQLite/SQLAlchemy patterns as PR #1.
+# ---------------------------------------------------------------------------
+
+
+class ProductObjectRow(Base):
+    """A discovered product object category (ProductObjectRegistry)."""
+
+    __tablename__ = "product_objects"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    adapter: Mapped[str] = mapped_column(String(50), nullable=False, default="revit", index=True)
+    category_name: Mapped[str] = mapped_column(String(255), nullable=False, default="", index=True)
+    built_in_category: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    category_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    element_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    type_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_run_id: Mapped[str] = mapped_column(String(100), nullable=False, default="")
+    discovered_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
+
+
+class ProductPropertyRow(Base):
+    """A discovered product property/parameter (ProductPropertyRegistry).
+
+    Keyed by (adapter, category, parameter_name, instance_parameter) so that a
+    parameter observed as both an instance and a type parameter is recorded as
+    two correctly-labeled rows.
+    """
+
+    __tablename__ = "product_properties"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    adapter: Mapped[str] = mapped_column(String(50), nullable=False, default="revit", index=True)
+    category: Mapped[str] = mapped_column(String(255), nullable=False, default="", index=True)
+    parameter_name: Mapped[str] = mapped_column(String(500), nullable=False, default="", index=True)
+    storage_type: Mapped[str] = mapped_column(String(50), nullable=False, default="")
+    read_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    instance_parameter: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    built_in_parameter_id: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    # ---- value contract metadata (where available from InventoryModel export) ----
+    spec_type_id: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    unit_type_id: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    display_unit: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    format_options_json: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    has_value: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    sample_values_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    expected_input_format: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    safely_settable_by_axiom: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    last_run_id: Mapped[str] = mapped_column(String(100), nullable=False, default="")
+    discovered_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
+
+
+class CandidateCapabilityRow(Base):
+    """A generated (never executed) candidate capability definition."""
+
+    __tablename__ = "candidate_capabilities"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    candidate_id: Mapped[str] = mapped_column(String(255), nullable=False, default="", index=True)
+    capability: Mapped[str] = mapped_column(String(100), nullable=False, default="")
+    adapter: Mapped[str] = mapped_column(String(50), nullable=False, default="revit")
+    category: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    parameter_name: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    storage_type: Mapped[str] = mapped_column(String(50), nullable=False, default="")
+    instance_parameter: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    spec_type_id: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    unit_type_id: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    expected_input_format: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    safely_settable_by_axiom: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="candidate")
+    source_run_id: Mapped[str] = mapped_column(String(100), nullable=False, default="")
+    generated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)

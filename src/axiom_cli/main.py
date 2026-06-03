@@ -3363,5 +3363,108 @@ def bridge_execute(capability, args_json, simulate, transaction_name, run_id, ou
         raise SystemExit(1)
 
 
+@cli.command("discovery-run")
+@click.option("--adapter", "adapter", default="revit",
+              help="Product adapter (only 'revit' supported in v1).")
+@click.option("--simulate", is_flag=True,
+              help="Interpret the built-in deterministic export (no Revit needed).")
+@click.option("--inventory-export-path", "inventory_export_path", default=None,
+              type=click.Path(), help="Path to an InventoryModel export to interpret "
+                                       "(required for a live run). Recommended: an "
+                                       "InventoryModel run FOLDER (auto-detects "
+                                       "elements.jsonl/elements.parquet + parameters.parquet "
+                                       "+ run_metadata.json). Also accepts a single handoff "
+                                       ".json (object with an 'elements' list) or an "
+                                       "element-level .jsonl. NOTE: elements.jsonl ALONE has "
+                                       "no parameters - pass the run folder (with "
+                                       "parameters.parquet) for parameter/candidate "
+                                       "discovery. parameters.jsonl / parameter_schema.jsonl "
+                                       "are NOT element exports.")
+@click.option("--run-id", "run_id", default=None,
+              help="Run id for the discovery bundle (default: drun_<timestamp>).")
+@click.option("--output-dir", "output_dir", default="artifacts/discovery_runs",
+              type=click.Path(), help="Base directory for discovery run artifacts.")
+@click.option("--db-path", "db_path", default=None,
+              type=click.Path(), help="Optional SQLite DB path to persist registries "
+                                       "(reuses PR #1 schema). Omit to skip persistence.")
+def discovery_run(adapter, simulate, inventory_export_path, run_id, output_dir, db_path):
+    """Discovery Harness v1 - interpret an InventoryModel export into the
+    ProductObject/ProductProperty registries, discovery evidence, candidate
+    capability definitions, and a human-reviewable report bundle.
+
+    Read-only discovery only: no model mutation, no candidate execution.
+
+    \b
+    Examples:
+      # Built-in deterministic export (off-Windows / CI)
+      axiom discovery-run --adapter revit --simulate
+      # Live interpretation of an InventoryModel export
+      axiom discovery-run --adapter revit --inventory-export-path export.json
+    """
+    from axiom_core.discovery import run_discovery
+
+    if adapter != "revit":
+        console.print(f"[red]Unsupported adapter '{adapter}' (only 'revit' in v1).[/red]")
+        raise SystemExit(2)
+    if not simulate and not inventory_export_path:
+        console.print("[red]Live discovery requires --inventory-export-path "
+                      "(or use --simulate).[/red]")
+        raise SystemExit(2)
+
+    session_factory = None
+    if db_path:
+        from axiom_core.database import (
+            create_db_engine,
+            init_db,
+            make_session_factory,
+        )
+
+        engine = create_db_engine(db_path)
+        init_db(engine)
+        session_factory = make_session_factory(engine)
+
+    console.print("\n[bold blue]Axiom Discovery Harness v1[/bold blue]\n")
+    console.print(f"[dim]Adapter: {adapter} | Mode: "
+                  f"{'simulate' if simulate else 'live'}[/dim]")
+
+    try:
+        result = run_discovery(
+            run_id=run_id,
+            simulate=simulate,
+            inventory_export_path=inventory_export_path,
+            output_dir=output_dir,
+            session_factory=session_factory,
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise SystemExit(2)
+
+    m = result.metrics
+    table = Table(title="Discovery Metrics")
+    table.add_column("Metric")
+    table.add_column("Count", justify="right")
+    for key, val in m.items():
+        table.add_row(key.replace("_", " ").title(), str(val))
+    console.print()
+    console.print(table)
+    rows_total = result.parameter_rows_total
+    rows_joined = result.parameter_rows_joined
+    rows_note = ""
+    if rows_total is not None:
+        rows_note = f" | Parameter rows joined/total: {rows_joined}/{rows_total}"
+    console.print(f"\n[dim]Object source: {result.object_source or '(unknown)'} | "
+                  f"Parameter source: {result.parameter_source or 'MISSING'}"
+                  f"{rows_note}[/dim]")
+    console.print(
+        f"[dim]Discovery complete: {'yes' if result.discovery_complete else 'NO'}[/dim]"
+    )
+    for warning in result.warnings:
+        console.print(f"[yellow]Warning: {warning}[/yellow]")
+    console.print(f"\n[dim]Run ID: {result.run_id}[/dim]")
+    console.print(f"[dim]Artifacts: {result.output_dir}[/dim]")
+    if result.persisted:
+        console.print(f"[dim]Persisted: {result.persisted}[/dim]")
+
+
 if __name__ == "__main__":
     cli()
