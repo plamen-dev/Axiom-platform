@@ -4166,5 +4166,105 @@ def capability_state(name, as_json, refresh, db_path, capability_runs_dir,
     console.print(table)
 
 
+# ---------------------------------------------------------------------------
+# Failure classification
+# ---------------------------------------------------------------------------
+
+_CATEGORY_COLOUR: dict[str, str] = {
+    "passed": "green",
+    "denied": "yellow",
+    "refused": "cyan",
+    "blocked": "red",
+    "unsupported": "yellow",
+    "execution_failed": "red",
+    "transport_failed": "red",
+    "prerequisite_missing": "red",
+    "evidence_missing": "red",
+    "validation_failed": "red",
+    "timeout": "red",
+    "parse_error": "red",
+    "policy_violation": "magenta",
+    "unknown_error": "red",
+}
+
+
+@cli.command("classify-failure")
+@click.option("--evidence-path", "evidence_path", required=True,
+              type=click.Path(exists=True),
+              help="Path to evidence bundle directory "
+                   "(e.g. artifacts/capability_runs/<run_id>)")
+@click.option("--json", "as_json", is_flag=True, default=False,
+              help="Output classification as JSON")
+def classify_failure(evidence_path, as_json):
+    """Classify an evidence bundle outcome into a durable failure category,
+    severity level, and retry decision.
+
+    Reads pass_fail.json from the given evidence directory and writes
+    failure_classification.json + failure_classification.md into the same
+    directory. Never overwrites pass_fail.json.
+
+    Works on both capability-run and validation-run evidence bundles.
+    """
+    import json as _json
+    from pathlib import Path
+
+    from axiom_core.runner.failure_classification import (
+        FailureClassificationEngine,
+        write_classification,
+    )
+
+    engine = FailureClassificationEngine()
+    summary = engine.classify(Path(evidence_path))
+
+    json_path, md_path = write_classification(summary)
+
+    if as_json:
+        console.print_json(_json.dumps(summary.to_dict(), default=str))
+        return
+
+    cat = summary.category.value
+    colour = _CATEGORY_COLOUR.get(cat, "white")
+    console.print(f"\n[bold blue]Failure Classification[/bold blue]  "
+                  f"[{colour}]{cat}[/{colour}]  "
+                  f"[dim]({summary.severity.value})[/dim]\n")
+    table = Table(show_header=False, box=None)
+    table.add_column("k", style="cyan")
+    table.add_column("v")
+    table.add_row("Evidence path", summary.evidence_path)
+    table.add_row("Bundle type", summary.bundle_type)
+    table.add_row("Capability", summary.capability_name or "(unknown)")
+    table.add_row("Outcome", summary.outcome)
+    table.add_row("Category", f"[{colour}]{cat}[/{colour}]")
+    table.add_row("Severity", summary.severity.value)
+    table.add_row("Retry eligibility", summary.retry_eligibility.value)
+    rd = summary.retry_decision
+    table.add_row("Retry allowed", str(rd.retry_allowed))
+    table.add_row("Retry recommended", str(rd.retry_recommended))
+    table.add_row("Retry reason", rd.retry_reason)
+    table.add_row("Max retries", str(rd.max_retries))
+    table.add_row("Retry delay (sec)", str(rd.retry_delay_seconds))
+    table.add_row("Requires human", str(rd.retry_requires_human))
+    table.add_row("Requires env change", str(rd.retry_requires_environment_change))
+    if summary.error_detail:
+        table.add_row("Error detail", summary.error_detail)
+    console.print(table)
+
+    if summary.checks:
+        console.print()
+        ct = Table(title=f"Checks ({sum(1 for c in summary.checks if c.get('passed'))}/"
+                         f"{len(summary.checks)} passed)")
+        ct.add_column("Check")
+        ct.add_column("Result")
+        ct.add_column("Detail")
+        for c in summary.checks:
+            r = "[green]PASS[/green]" if c.get("passed") else "[red]FAIL[/red]"
+            ct.add_row(c.get("name", ""), r, c.get("detail", ""))
+        console.print(ct)
+
+    console.print("\n[green]Classification written:[/green]")
+    console.print(f"  {json_path}")
+    console.print(f"  {md_path}")
+
+
 if __name__ == "__main__":
     cli()

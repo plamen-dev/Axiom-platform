@@ -1116,6 +1116,34 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="classify-failure",
+        command="axiom classify-failure --evidence-path <path>",
+        description=(
+            "Failure Classification Engine: classify an evidence bundle "
+            "outcome into a durable failure category, severity level, and "
+            "retry decision. Works on capability-run and validation-run "
+            "bundles. Writes failure_classification.json + .md without "
+            "overwriting pass_fail.json."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("failure_classification.json",
+                           "Machine-readable category/severity/retry decision."),
+            EvidenceOutput("failure_classification.md",
+                           "Human-readable classification summary."),
+        ) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Classification/governance only: classify and recommend. "
+              "No automatic retry execution, promotion, scheduling, or "
+              "learning. Does not modify original evidence bundles.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object

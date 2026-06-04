@@ -45,8 +45,8 @@ SEED_COMMANDS = {
 
 # Every built-in axiom CLI command must be cataloged (extended scope).
 EXPECTED_AXIOM_COMMANDS = {
-    "bridge-execute", "capability-run", "capability-state", "demo",
-    "discovery-run", "evidence-run",
+    "bridge-execute", "capability-run", "capability-state", "classify-failure",
+    "demo", "discovery-run", "evidence-run",
     "evidence-update", "execute",
     "inventory-combine", "inventory-export", "inventory-import",
     "inventory-import-batch", "inventory-model", "inventory-plan",
