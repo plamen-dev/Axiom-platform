@@ -70,6 +70,8 @@ artifacts/parameter_edit_runs/
 artifacts/scratch/
 # Validation Automation Loop runs (generated run outputs only; keep curated reports)
 artifacts/validation_runs/vrun_*/
+# Validation Evidence Runner bundles (generated run outputs; keep curated evidence)
+artifacts/validation_evidence/
 
 # Visual Studio local state
 .vs/

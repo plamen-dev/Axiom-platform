@@ -1034,6 +1034,32 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="evidence-run",
+        command="axiom evidence-run --validation <name>",
+        description=(
+            "Validation Evidence Runner: run a safe/read-only validation and write "
+            "a durable evidence bundle. Consumes the validation registry and gates "
+            "the command it drives against this command registry."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("artifacts/validation_evidence/<validation>/<evr_id>/",
+                           "Evidence bundle directory."),
+            EvidenceOutput("artifacts/validation_evidence/<validation>/<evr_id>/pass_fail.json",
+                           "Machine-readable pass/fail verdict."),
+        ) + EV_CONSOLE,
+        timeout_seconds=600,
+        failure_modes=(FM_NONZERO, FM_TIMEOUT),
+        notes="Read-only evidence generation only. Unknown validations are denied "
+              "by default; mutation/high-risk validations are refused (no mutation "
+              "allowance). No scheduling, promotion, learning, or model mutation.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object

@@ -12,6 +12,14 @@ scheduling, promotion engine, learning loop, or workflow generation.
 
 from __future__ import annotations
 
+from axiom_core.validation.evidence_runner import (
+    EXIT_CODES,
+    CheckResult,
+    EvidenceOutcome,
+    EvidenceRunner,
+    SupportedValidation,
+    ValidationRunResult,
+)
 from axiom_core.validation.persistence import (
     load_procedure_names,
     persist_default_registry,
@@ -65,4 +73,11 @@ __all__ = [
     "load_procedure_names",
     "persist_default_registry",
     "upsert_procedures",
+    # evidence runner (PR #25)
+    "EvidenceRunner",
+    "EvidenceOutcome",
+    "ValidationRunResult",
+    "CheckResult",
+    "SupportedValidation",
+    "EXIT_CODES",
 ]

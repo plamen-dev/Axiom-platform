@@ -122,7 +122,7 @@ Each command lists the specific `FailureMode`s it can exhibit, each carrying a
 `retryable` flag (e.g. a `timeout` or `pipe_unavailable` is retryable; a
 `test_failure` or `build_error` is not).
 
-## 4. Cataloged commands (full — 32)
+## 4. Cataloged commands (full — 33)
 
 Covers **every built-in `axiom` CLI command** plus the toolchain commands
 `pytest`, `ruff`, and `dotnet-build`. Full evidence outputs, failure modes, and
@@ -134,6 +134,7 @@ notes are in the catalog and via `axiom runner-commands --name <name>`.
 | `demo` | read_only | safe | poetry_env | 600s |
 | `discovery-run` | read_only | safe | poetry_env, inventory_export_available, db_path_available | 600s |
 | `dotnet-build` | build | guarded | dotnet_sdk | 1200s |
+| `evidence-run` | read_only | safe | poetry_env | 600s |
 | `evidence-update` | read_only | guarded | poetry_env | 120s |
 | `execute` | mutation | high_risk | poetry_env, revit_running, model_open | 600s |
 | `inventory-combine` | read_only | safe | poetry_env, inventory_export_available | 600s |

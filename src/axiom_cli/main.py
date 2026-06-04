@@ -3773,5 +3773,75 @@ def validation_registry(name, capability_type, as_json, persist, db_path):
                   f"Inspect one with: axiom validation-registry --name <capability>[/dim]")
 
 
+@cli.command("evidence-run")
+@click.option("--validation", "validation_name", required=True,
+              help="Validation to run (unknown validations are denied by default).")
+@click.option("--inventory-export-path", "inventory_export_path", default=None,
+              type=click.Path(),
+              help="InventoryModel export for DiscoveryHarness (omit to use the "
+                   "built-in deterministic export).")
+@click.option("--output-dir", "output_dir", default=None, type=click.Path(),
+              help="Base directory for evidence bundles "
+                   "(default: artifacts/validation_evidence).")
+def evidence_run(validation_name, inventory_export_path, output_dir):
+    """Validation Evidence Runner — produce a durable evidence bundle for a
+    read-only validation.
+
+    Consumes the Capability Validation Registry (PR #24), gates the command it
+    drives against the Runner Command Registry (PR #22), runs only safe/
+    read-only procedures, and writes an evidence bundle every time
+    (validation_request.json, validation_result.json, validation_summary.md,
+    command_outputs/, pass_fail.json).
+
+    Unknown validations are denied by default; mutation/high-risk validations
+    are refused (mutation allowance is not implemented). No scheduling,
+    promotion, learning, or model mutation.
+
+    \b
+    Examples:
+      axiom evidence-run --validation CommandRegistry
+      axiom evidence-run --validation ValidationRegistry
+      axiom evidence-run --validation DiscoveryHarness
+      axiom evidence-run --validation DiscoveryHarness --inventory-export-path export.json
+    """
+    from axiom_core.validation.evidence_runner import (
+        DEFAULT_OUTPUT_BASE,
+        EvidenceOutcome,
+        EvidenceRunner,
+    )
+
+    runner = EvidenceRunner(output_base=output_dir or DEFAULT_OUTPUT_BASE)
+    result = runner.run(validation_name, inventory_export_path=inventory_export_path)
+
+    colour = {
+        EvidenceOutcome.PASSED: "green",
+        EvidenceOutcome.FAILED: "red",
+        EvidenceOutcome.DENIED: "red",
+        EvidenceOutcome.REFUSED: "yellow",
+        EvidenceOutcome.UNSUPPORTED: "yellow",
+        EvidenceOutcome.BLOCKED: "yellow",
+    }[result.outcome]
+
+    console.print("\n[bold blue]Axiom Validation Evidence Runner[/bold blue]\n")
+    console.print(f"Validation: [bold]{result.validation_name}[/bold]")
+    console.print(f"Outcome: [{colour}]{result.outcome.value.upper()}[/{colour}]  "
+                  f"({result.checks_passed}/{len(result.checks)} checks passed)")
+    console.print(f"[dim]{result.reason}[/dim]")
+
+    if result.checks:
+        table = Table(title="Checks")
+        table.add_column("Check")
+        table.add_column("Result", justify="center")
+        table.add_column("Detail")
+        for c in result.checks:
+            mark = "[green]PASS[/green]" if c.passed else "[red]FAIL[/red]"
+            table.add_row(c.name, mark, c.detail)
+        console.print(table)
+
+    console.print(f"\n[dim]Evidence bundle: {result.bundle_dir}[/dim]")
+    console.print(f"[dim]Verdict: pass_fail.json | exit code {result.exit_code}[/dim]")
+    raise SystemExit(result.exit_code)
+
+
 if __name__ == "__main__":
     cli()
