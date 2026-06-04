@@ -1060,6 +1060,35 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="capability-run",
+        command="axiom capability-run --capability <name>",
+        description=(
+            "Capability Execution Runner: execute an explicitly allowed safe/"
+            "read-only capability through the Automation Bridge and write a "
+            "durable evidence bundle. Gates the command it drives against this "
+            "command registry and maps the capability to its validation contract."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("artifacts/capability_runs/<capability>/<run_id>/",
+                           "Evidence bundle directory."),
+            EvidenceOutput("artifacts/capability_runs/<capability>/<run_id>/pass_fail.json",
+                           "Machine-readable pass/fail verdict."),
+        ) + EV_CONSOLE,
+        timeout_seconds=900,
+        failure_modes=(FM_NONZERO, FM_TIMEOUT),
+        notes="Governed execution of safe/read-only capabilities only. Unknown "
+              "capabilities are denied by default; mutation/high-risk capabilities "
+              "(and unbounded InventoryModel scans) are refused (no mutation "
+              "allowance). No SetParameterValue execution, scheduling, retry, "
+              "promotion, learning, or model mutation.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object

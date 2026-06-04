@@ -3843,5 +3843,89 @@ def evidence_run(validation_name, inventory_export_path, output_dir):
     raise SystemExit(result.exit_code)
 
 
+@cli.command("capability-run")
+@click.option("--capability", "capability_name", required=True,
+              help="Capability to execute (unknown capabilities are denied by default).")
+@click.option("--args-json", "args_json", default=None,
+              help="JSON object of capability arguments (e.g. '{\"Category\": \"Walls\"}').")
+@click.option("--run-id", "run_id", default=None,
+              help="Explicit run id for the evidence bundle (default: generated).")
+@click.option("--output-dir", "output_dir", default=None, type=click.Path(),
+              help="Base directory for evidence bundles "
+                   "(default: artifacts/capability_runs).")
+@click.option("--simulate", is_flag=True, default=False,
+              help="Use the bridge mock path (no live Revit needed).")
+def capability_run(capability_name, args_json, run_id, output_dir, simulate):
+    """Capability Execution Runner — execute a governed safe/read-only capability
+    and produce a durable evidence bundle.
+
+    Gates the capability against the Runner Command Registry (PR #22), maps it to
+    its Capability Validation Registry (PR #24) contract, executes only
+    explicitly allowed safe/read-only capabilities through the Automation Bridge
+    (PR #19), and writes an evidence bundle every time (capability_request.json,
+    capability_result.json, capability_summary.md, command_outputs/,
+    pass_fail.json).
+
+    Unknown capabilities are denied by default; mutation/high-risk capabilities
+    (and unbounded InventoryModel scans) are refused (mutation allowance is not
+    implemented). No SetParameterValue execution, scheduling, retry, promotion,
+    learning, or model mutation.
+
+    \b
+    Examples:
+      axiom capability-run --capability InventoryModel --simulate
+      axiom capability-run --capability InventoryModel --args-json '{"Category": "Walls"}' --simulate
+    """
+    from axiom_core.runner.capability_runner import (
+        DEFAULT_OUTPUT_BASE,
+        CapabilityOutcome,
+        CapabilityRunner,
+    )
+
+    try:
+        args = json.loads(args_json) if args_json else {}
+    except json.JSONDecodeError as exc:
+        console.print(f"[red]Invalid --args-json: {exc}[/red]")
+        raise SystemExit(2) from exc
+    if not isinstance(args, dict):
+        console.print("[red]--args-json must be a JSON object.[/red]")
+        raise SystemExit(2)
+
+    runner = CapabilityRunner(output_base=output_dir or DEFAULT_OUTPUT_BASE)
+    result = runner.run(
+        capability_name, args=args, simulate=simulate, run_id=run_id,
+    )
+
+    colour = {
+        CapabilityOutcome.PASSED: "green",
+        CapabilityOutcome.FAILED: "red",
+        CapabilityOutcome.DENIED: "red",
+        CapabilityOutcome.REFUSED: "yellow",
+        CapabilityOutcome.UNSUPPORTED: "yellow",
+        CapabilityOutcome.BLOCKED: "yellow",
+    }[result.outcome]
+
+    console.print("\n[bold blue]Axiom Capability Execution Runner[/bold blue]\n")
+    console.print(f"Capability: [bold]{result.capability_name}[/bold]  "
+                  f"[dim]({'simulate' if result.simulate else 'live'})[/dim]")
+    console.print(f"Outcome: [{colour}]{result.outcome.value.upper()}[/{colour}]  "
+                  f"({result.checks_passed}/{len(result.checks)} checks passed)")
+    console.print(f"[dim]{result.reason}[/dim]")
+
+    if result.checks:
+        table = Table(title="Checks")
+        table.add_column("Check")
+        table.add_column("Result", justify="center")
+        table.add_column("Detail")
+        for c in result.checks:
+            mark = "[green]PASS[/green]" if c.passed else "[red]FAIL[/red]"
+            table.add_row(c.name, mark, c.detail)
+        console.print(table)
+
+    console.print(f"\n[dim]Evidence bundle: {result.bundle_dir}[/dim]")
+    console.print(f"[dim]Verdict: pass_fail.json | exit code {result.exit_code}[/dim]")
+    raise SystemExit(result.exit_code)
+
+
 if __name__ == "__main__":
     cli()

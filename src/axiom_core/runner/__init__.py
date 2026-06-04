@@ -8,6 +8,11 @@ expectations, timeouts, and failure classification. It is pure metadata
 
 from __future__ import annotations
 
+from axiom_core.runner.capability_runner import (
+    CapabilityOutcome,
+    CapabilityRunner,
+    CapabilityRunResult,
+)
 from axiom_core.runner.command_registry import (
     DEFAULT_REGISTRY,
     AllowedCommand,
@@ -31,6 +36,9 @@ from axiom_core.runner.command_registry import (
 )
 
 __all__ = [
+    "CapabilityOutcome",
+    "CapabilityRunner",
+    "CapabilityRunResult",
     "DEFAULT_REGISTRY",
     "AllowedCommand",
     "CommandClass",

@@ -1,5 +1,104 @@
 # PR Review Ledger
 
+## PR #26: Capability Execution Runner v1
+
+**Status:** Open
+**Scope:** Governed execution of explicitly allowed safe/read-only capabilities.
+The first step from validation evidence (PR #25) to governed capability
+execution.
+
+### What changed
+- New `src/axiom_core/runner/capability_runner.py` (`CapabilityRunner`,
+  `CapabilityOutcome`, `CapabilityRunResult`, `CheckResult`,
+  `SupportedCapability`, `inventory_scan_refusal`). It resolves a capability
+  against an explicit supported set, gates the driven command against the
+  Command Registry (PR #22), maps the capability to its Validation Registry
+  (PR #24) contract, executes via the Automation Bridge (PR #19), and writes a
+  durable evidence bundle every time.
+- New CLI `axiom capability-run --capability <name> [--args-json --run-id
+  --output-dir --simulate]`; cataloged as a `read_only`/`safe` entry in the
+  command registry (coverage test + expected-set updated).
+- Initial supported capability: `InventoryModel`, summary/bounded read-only
+  only. Unbounded/full scans are refused (crashed Revit 2027).
+- Docs: `docs/architecture/capability-execution-runner.md`.
+
+### Safety hardening (post-review)
+Adversarial review (requested on the PR) found two arg-bypass gaps in
+`inventory_scan_refusal`, now closed before merge:
+- **`mode`/`scan`/`scanmode`/`scan_type` carrying a full value** (e.g.
+  `{"ScanMode":"full"}`) previously PASSED — it ran summary mode but forwarded
+  the raw `full` arg to the bridge (a live-Revit risk). Now refused regardless
+  of `SummaryOnly`, so a `full` value can never reach the bridge.
+- **Oversized/non-numeric numeric limits** (e.g.
+  `{"SummaryOnly":false,"max":999999}`, `{"limit":10000000}`, `{"limit":"all"}`)
+  previously PASSED as if "bounded" — effectively unbounded. A numeric limit
+  now bounds a scan only when it is a positive integer `<= 10000`
+  (`_INVENTORY_MAX_BOUND`); otherwise it is refused outright.
+- Bounded scans remain allowed (`category`, modest `max`/`limit`). Added
+  regression tests (`test_scan_mode_full_bypass_refused`,
+  `test_oversized_limit_bypass_refused`, helper coverage).
+
+### Post-review hardening (round 2 — Devin Review triage)
+Three further findings were investigated; all three were real and fixed before
+merge (remaining informational findings were judged not to expose governance,
+execution, mutation, or evidence-integrity risk):
+- **Evidence-integrity — `validation_contract` serialization.** `_validation_contract`
+  emitted raw `EvidenceItem` dataclasses, which `json.dumps(default=str)` rendered
+  as opaque `EvidenceItem(...)` repr strings in `capability_result.json` (machine-
+  unreadable — the opposite of the bundle's purpose). Now uses
+  `EvidenceItem.to_dict()` so `required_artifacts`/`required_checkpoints` are
+  structured `{kind,name,description,required}`. Test:
+  `test_validation_contract_evidence_is_structured`.
+- **Governance/safety — categorical key was a bound by key-presence alone.**
+  `_has_valid_bound` treated any categorical key as a valid bound regardless of
+  value, so `{"SummaryOnly":false,"category":""}` (also `null`/`[]`/whitespace/
+  `false`/`"all"`/`"full"`) PASSED and reached the bridge as an effectively
+  unbounded scan. Added `_valid_categorical`: a categorical value bounds a scan
+  only when it names a real, narrowing subset (non-empty, non-bool, not a full-
+  scan alias). Such shapes are now refused (exit 3); real categories/lists still
+  pass. Tests: `test_inventory_scan_refusal_empty_categorical_not_a_bound`,
+  `test_empty_categorical_bypass_refused`.
+- **Evidence-integrity — exception path skipped bundle writing.** An unhandled
+  exception in `_resolve_and_run` (e.g. the bridge executor raising) propagated
+  out of `run()` before `_write_bundle`, leaving no evidence bundle for a genuine
+  execution crash. `run()` now catches it, classifies the run `failed` (exit 1)
+  with an `execution_error` check, and falls through so the durable bundle is
+  always written. Test: `test_unhandled_exception_still_writes_evidence`.
+
+### What behavior changed
+- Axiom can now execute a governed safe/read-only capability (InventoryModel
+  summary/bounded) end-to-end and emit a machine-readable evidence bundle, via
+  the bridge (simulate or live). Previously execution evidence came only from
+  the read-only validation runner (PR #25) or hand-recorded walkthroughs.
+
+### What did NOT change
+- No `SetParameterValue` execution; no mutation allowance; no autonomous
+  scheduling/loops; no discovered-candidate execution; no retry/promotion/
+  scoring/learning/workflow-generation; no MCP/external integration. Revit 2024
+  baseline unaffected. No new transport — reuses the existing Automation Bridge.
+
+### Outcome contract (exit codes)
+`passed` 0 · `failed` 1 · `denied` 2 (unknown) · `refused` 3 (mutation/high-risk
+or unbounded InventoryModel scan) · `unsupported` 4 · `blocked` 5 (unmet
+prerequisites).
+
+### Tests run
+- `pytest tests/test_capability_runner.py tests/test_command_registry.py` →
+  passed (incl. adversarial arg-bypass + round-2 review regressions). Full suite
+  checkpoint: 696 passed / 1 skipped, ruff clean.
+
+### Validation pending
+- Live InventoryModel execution on AXIOM-01 (real Revit) is optional and not
+  required for this PR; simulate covers off-Windows. No live Revit validation
+  required for merge (governed read-only execution; bridge mock path proven).
+
+### Verification factory impact
+- Strengthens governed execution + evidence quality (the verification factory):
+  Axiom now executes a trusted read-only primitive itself and produces durable
+  evidence, the layer before retry/failure classification and promotion scoring.
+
+---
+
 ## PR: Local Runner trusted-workspace policy (fix hard-coded C:\Dev\Axiom)
 
 **Branch:** `devin/1780380235-local-runner-workspace-policy`

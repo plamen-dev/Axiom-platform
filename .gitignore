@@ -72,6 +72,8 @@ artifacts/scratch/
 artifacts/validation_runs/vrun_*/
 # Validation Evidence Runner bundles (generated run outputs; keep curated evidence)
 artifacts/validation_evidence/
+# Capability Execution Runner bundles (generated run outputs; keep curated evidence)
+artifacts/capability_runs/
 
 # Visual Studio local state
 .vs/
