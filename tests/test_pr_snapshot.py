@@ -344,6 +344,131 @@ class TestPrSnapshot:
         md = (Path(out_dir) / "review_snapshot.md").read_text(encoding="utf-8")
         assert "UNVERIFIED" in md
 
+    def test_snapshot_ambiguous_summary_preserved_raw(self, runner, tmp_path):
+        """Summary with unrecognized headings / preamble is preserved raw
+        rather than mis-bucketed into a wrong section."""
+        summary = tmp_path / "summary.md"
+        summary.write_text(
+            "Some intro text before any heading.\n\n"
+            "## Wibble Wobble\n\n"
+            "Content under a heading the parser does not recognize.\n",
+            encoding="utf-8",
+        )
+        out_dir = str(tmp_path / "pr_0009")
+        result = runner.invoke(cli, [
+            "pr-snapshot",
+            "--pr", "9",
+            "--title", "Ambiguous summary",
+            "--branch", "test",
+            "--status", "open",
+            "--summary-file", str(summary),
+            "--out", out_dir,
+        ])
+        assert result.exit_code == 0, result.output
+
+        snapshot = json.loads(
+            (Path(out_dir) / "review_snapshot.json").read_text(encoding="utf-8")
+        )
+        # Raw markdown preserved verbatim, nothing dropped.
+        assert "Some intro text before any heading." in snapshot["raw_summary"]
+        assert "Wibble Wobble" in snapshot["raw_summary"]
+        # The unrecognized content was not guessed into a known section.
+        assert "Wibble Wobble" not in snapshot.get("root_cause", "")
+        assert "Wibble Wobble" not in snapshot.get("changes", "")
+
+        md = (Path(out_dir) / "review_snapshot.md").read_text(encoding="utf-8")
+        assert "Raw Summary" in md
+
+    def test_snapshot_structured_summary_has_no_raw(
+        self, runner, tmp_path, sample_summary_file
+    ):
+        """A cleanly structured summary (all recognized headings, no preamble)
+        leaves raw_summary empty — raw is only kept when parsing is ambiguous."""
+        out_dir = str(tmp_path / "pr_0009")
+        result = runner.invoke(cli, [
+            "pr-snapshot",
+            "--pr", "9",
+            "--title", "Clean summary",
+            "--branch", "test",
+            "--status", "merged",
+            "--summary-file", str(sample_summary_file),
+            "--out", out_dir,
+        ])
+        assert result.exit_code == 0
+
+        snapshot = json.loads(
+            (Path(out_dir) / "review_snapshot.json").read_text(encoding="utf-8")
+        )
+        assert snapshot["raw_summary"] == ""
+
+    def test_snapshot_ambiguous_validation_preserved_raw(self, runner, tmp_path):
+        """Validation input carrying markdown structure (which is stored
+        verbatim, never parsed into sub-sections) is preserved under
+        raw_validation; plain validation text leaves it empty."""
+        structured_validation = tmp_path / "validation.md"
+        structured_validation.write_text(
+            "## Results\n\n278 exports, 0 duplicates.\n", encoding="utf-8"
+        )
+        out_dir = str(tmp_path / "pr_0009")
+        result = runner.invoke(cli, [
+            "pr-snapshot",
+            "--pr", "9",
+            "--title", "Validation with structure",
+            "--branch", "test",
+            "--status", "merged",
+            "--validation-file", str(structured_validation),
+            "--out", out_dir,
+        ])
+        assert result.exit_code == 0
+
+        snapshot = json.loads(
+            (Path(out_dir) / "review_snapshot.json").read_text(encoding="utf-8")
+        )
+        assert "278 exports" in snapshot["raw_validation"]
+        assert "## Results" in snapshot["raw_validation"]
+
+    def test_snapshot_plain_validation_has_no_raw(
+        self, runner, tmp_path, sample_validation_file
+    ):
+        """Plain (heading-free) validation output is unambiguous, so
+        raw_validation stays empty."""
+        out_dir = str(tmp_path / "pr_0009")
+        result = runner.invoke(cli, [
+            "pr-snapshot",
+            "--pr", "9",
+            "--title", "Plain validation",
+            "--branch", "test",
+            "--status", "merged",
+            "--validation-file", str(sample_validation_file),
+            "--out", out_dir,
+        ])
+        assert result.exit_code == 0
+
+        snapshot = json.loads(
+            (Path(out_dir) / "review_snapshot.json").read_text(encoding="utf-8")
+        )
+        assert snapshot["raw_validation"] == ""
+
+    def test_snapshot_omits_changed_files_and_commits_when_absent(
+        self, runner, tmp_path
+    ):
+        """changed_files.txt and commits.txt must NOT be written when no
+        corresponding input is provided."""
+        out_dir = str(tmp_path / "pr_0009")
+        result = runner.invoke(cli, [
+            "pr-snapshot",
+            "--pr", "9",
+            "--title", "No optional inputs",
+            "--branch", "test",
+            "--status", "merged",
+            "--out", out_dir,
+        ])
+        assert result.exit_code == 0
+
+        assert (Path(out_dir) / "review_snapshot.json").exists()
+        assert not (Path(out_dir) / "changed_files.txt").exists()
+        assert not (Path(out_dir) / "commits.txt").exists()
+
 
 class TestEvidenceUpdate:
     """Tests for axiom evidence-update command."""
@@ -530,3 +655,46 @@ class TestEvidenceUpdate:
         )
         assert "**Verification:**" in proposed
         assert "github_pr_api" in proposed
+
+    def test_apply_is_opt_in_default_does_not_modify_ledgers(
+        self, runner, tmp_path, sample_summary_file
+    ):
+        """Without --apply, evidence-update must NOT modify any ledger file."""
+        snapshot_dir = self._create_snapshot(runner, tmp_path, sample_summary_file)
+
+        ledger = tmp_path / "pr-review-ledger.md"
+        original = "# PR Review Ledger\n\nExisting content.\n"
+        ledger.write_text(original, encoding="utf-8")
+
+        result = runner.invoke(cli, [
+            "evidence-update",
+            "--from-pr-snapshot", snapshot_dir,
+        ])
+        assert result.exit_code == 0
+        # Ledger untouched; proposal only written to the snapshot dir.
+        assert ledger.read_text(encoding="utf-8") == original
+        assert (Path(snapshot_dir) / "proposed_ledger_entries.md").exists()
+
+    def test_apply_flag_appends_to_existing_ledgers(
+        self, runner, tmp_path, sample_summary_file, monkeypatch
+    ):
+        """With --apply, entries are appended to ledger files that exist."""
+        snapshot_dir = self._create_snapshot(runner, tmp_path, sample_summary_file)
+
+        # _apply_ledger_entries writes to relative docs/logs/*.md paths.
+        monkeypatch.chdir(tmp_path)
+        ledger = tmp_path / "docs" / "logs" / "pr-review-ledger.md"
+        ledger.parent.mkdir(parents=True, exist_ok=True)
+        original = "# PR Review Ledger\n"
+        ledger.write_text(original, encoding="utf-8")
+
+        result = runner.invoke(cli, [
+            "evidence-update",
+            "--from-pr-snapshot", snapshot_dir,
+            "--apply",
+        ])
+        assert result.exit_code == 0
+        updated = ledger.read_text(encoding="utf-8")
+        assert updated.startswith(original)
+        assert len(updated) > len(original)
+        assert "PR #9" in updated

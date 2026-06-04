@@ -77,7 +77,10 @@ artifacts/pr_reviews/pr_0009/
 ```
 
 **Snapshot fields:**
-pr_number, title, branch, status, merge_status, verification_method, status_source, summary, review_checklist, notes, root_cause, changes, what_did_not_change, validation_commands, validation_results, safety_notes, known_limitations, follow_up_tasks, artifact_paths, source_url, created_at.
+pr_number, title, branch, status, merge_status, verification_method, status_source, summary, raw_summary, raw_validation, review_checklist, notes, root_cause, changes, what_did_not_change, validation_commands, validation_results, safety_notes, known_limitations, follow_up_tasks, artifact_paths, source_url, created_at.
+
+**Ambiguous markdown preservation:**
+When the summary contains content the section parser cannot confidently place — text before the first heading, or headings whose titles aren't recognized — the original markdown is preserved verbatim under `raw_summary` instead of being guessed into the wrong section. Likewise, a validation file that carries its own markdown headings (validation input is stored verbatim, never split into sub-sections) is preserved under `raw_validation`. Cleanly structured summaries and plain validation text leave both fields empty.
 
 ### axiom evidence-update
 

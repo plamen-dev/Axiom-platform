@@ -2789,6 +2789,10 @@ def pr_snapshot(pr_number, title, branch, pr_status, merge_status,
     # Parse structured sections from summary text
     sections = _parse_pr_summary_sections(summary_text)
 
+    # Preserve raw markdown when parsing is ambiguous, rather than guessing.
+    raw_summary = summary_text if _summary_parse_remainder(summary_text) else ""
+    raw_validation = validation_text if _validation_is_ambiguous(validation_text) else ""
+
     snapshot = {
         "pr_number": pr_number,
         "title": title,
@@ -2796,6 +2800,8 @@ def pr_snapshot(pr_number, title, branch, pr_status, merge_status,
         "status": pr_status,
         "merge_status": merge_status or pr_status,
         "summary": sections.get("summary", summary_text),
+        "raw_summary": raw_summary,
+        "raw_validation": raw_validation,
         "review_checklist": sections.get("review_checklist", ""),
         "notes": sections.get("notes", ""),
         "root_cause": sections.get("root_cause", ""),
@@ -2880,6 +2886,40 @@ def _qualified_status(snapshot: dict) -> str:
     return f"{status.capitalize()} (unverified)"
 
 
+# Order matters: more specific aliases first to avoid false matches.
+# E.g. "safety notes" must match safety_notes before "notes" matches notes.
+_PR_HEADING_MAP = [
+    ("review_checklist", ["review", "checklist", "testing checklist"]),
+    ("root_cause", ["root cause"]),
+    ("what_did_not_change", ["what did not change", "did not change", "unchanged"]),
+    ("validation_commands", ["validation commands", "to validate"]),
+    ("validation_results", ["validation results", "live validation",
+                             "test results"]),
+    ("safety_notes", ["safety notes", "safety status", "safety"]),
+    ("known_limitations", ["known limitations", "limitations", "known gaps",
+                            "known issues"]),
+    ("follow_up_tasks", ["follow up", "follow-up", "next steps", "todo"]),
+    ("artifact_paths", ["artifact locations", "artifact paths", "artifacts",
+                         "artifact"]),
+    ("changes", ["changes", "changed files", "what changed"]),
+    ("summary", ["summary"]),
+    ("notes", ["notes"]),
+]
+
+
+def _match_pr_heading_key(heading_text: str) -> str | None:
+    """Map a markdown heading line to a known snapshot section key, or None."""
+    import re
+
+    text = re.sub(r"^#{2,3}\s+", "", heading_text.strip()).strip().lower()
+    text = re.sub(r"[:\-—]+$", "", text).strip()
+    for key, aliases in _PR_HEADING_MAP:
+        for alias in aliases:
+            if alias in text:
+                return key
+    return None
+
+
 def _parse_pr_summary_sections(text: str) -> dict[str, str]:
     """Parse a PR summary/description into named sections.
 
@@ -2894,26 +2934,6 @@ def _parse_pr_summary_sections(text: str) -> dict[str, str]:
     if not text.strip():
         return sections
 
-    # Order matters: more specific aliases first to avoid false matches.
-    # E.g. "safety notes" must match safety_notes before "notes" matches notes.
-    heading_map = [
-        ("review_checklist", ["review", "checklist", "testing checklist"]),
-        ("root_cause", ["root cause"]),
-        ("what_did_not_change", ["what did not change", "did not change", "unchanged"]),
-        ("validation_commands", ["validation commands", "to validate"]),
-        ("validation_results", ["validation results", "live validation",
-                                 "test results"]),
-        ("safety_notes", ["safety notes", "safety status", "safety"]),
-        ("known_limitations", ["known limitations", "limitations", "known gaps",
-                                "known issues"]),
-        ("follow_up_tasks", ["follow up", "follow-up", "next steps", "todo"]),
-        ("artifact_paths", ["artifact locations", "artifact paths", "artifacts",
-                             "artifact"]),
-        ("changes", ["changes", "changed files", "what changed"]),
-        ("summary", ["summary"]),
-        ("notes", ["notes"]),
-    ]
-
     # Split by markdown headings (## or ###)
     parts = re.split(r"^(#{2,3}\s+.+)$", text, flags=re.MULTILINE)
 
@@ -2921,22 +2941,60 @@ def _parse_pr_summary_sections(text: str) -> dict[str, str]:
     for part in parts:
         heading_match = re.match(r"^#{2,3}\s+(.+)$", part.strip())
         if heading_match:
-            heading_text = heading_match.group(1).strip().lower()
-            # Remove trailing punctuation
-            heading_text = re.sub(r"[:\-—]+$", "", heading_text).strip()
-            current_key = None
-            for key, aliases in heading_map:
-                for alias in aliases:
-                    if alias in heading_text:
-                        current_key = key
-                        break
-                if current_key:
-                    break
+            current_key = _match_pr_heading_key(heading_match.group(0))
         elif current_key:
             existing = sections.get(current_key, "")
             sections[current_key] = (existing + part).strip()
 
     return sections
+
+
+def _summary_parse_remainder(text: str) -> str:
+    """Return summary markdown that structured parsing does NOT capture.
+
+    This is content the section parser would silently drop or dump into a
+    catch-all: text before the first heading (preamble) and any heading whose
+    title does not map to a known section. A non-empty remainder means the
+    parse is ambiguous, so the caller should preserve the raw markdown rather
+    than guess. Text with no headings at all is unambiguous (it becomes the
+    summary verbatim) and yields no remainder.
+    """
+    import re
+
+    if not text.strip():
+        return ""
+
+    parts = re.split(r"^(#{2,3}\s+.+)$", text, flags=re.MULTILINE)
+    if not re.search(r"^#{2,3}\s+.+$", text, flags=re.MULTILINE):
+        return ""
+
+    remainder: list[str] = []
+    preamble = parts[0].strip()
+    if preamble:
+        remainder.append(preamble)
+
+    idx = 1
+    while idx < len(parts):
+        heading = parts[idx].strip()
+        body = parts[idx + 1] if idx + 1 < len(parts) else ""
+        if _match_pr_heading_key(heading) is None:
+            remainder.append((heading + "\n" + body).strip())
+        idx += 2
+
+    return "\n\n".join(chunk for chunk in remainder if chunk).strip()
+
+
+def _validation_is_ambiguous(text: str) -> bool:
+    """True when validation markdown carries structure the snapshot does not
+    parse. Validation input is stored verbatim (never split into sub-sections),
+    so any markdown heading is unaccounted-for structure and the raw markdown
+    should be preserved explicitly rather than implying it was parsed.
+    """
+    import re
+
+    if not text.strip():
+        return False
+    return bool(re.search(r"^#{2,3}\s+.+$", text, flags=re.MULTILINE))
 
 
 def _render_snapshot_markdown(snapshot: dict) -> str:
@@ -2968,6 +3026,8 @@ def _render_snapshot_markdown(snapshot: dict) -> str:
         ("known_limitations", "Known Limitations"),
         ("follow_up_tasks", "Follow-Up Tasks"),
         ("artifact_paths", "Artifact Paths"),
+        ("raw_summary", "Raw Summary (preserved — ambiguous parse)"),
+        ("raw_validation", "Raw Validation (preserved — ambiguous parse)"),
     ]
 
     for key, label in section_labels:
