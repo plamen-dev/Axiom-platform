@@ -74,6 +74,8 @@ artifacts/validation_runs/vrun_*/
 artifacts/validation_evidence/
 # Capability Execution Runner bundles (generated run outputs; keep curated evidence)
 artifacts/capability_runs/
+# Promotion Eligibility Engine checks (generated decision records; keep curated evidence)
+artifacts/promotion_checks/
 
 # Visual Studio local state
 .vs/

@@ -1,5 +1,68 @@
 # PR Review Ledger
 
+## PR #30: Promotion Eligibility Engine v1
+
+**Status:** Open
+**Scope:** Deterministic promotion-eligibility decisions — eligibility/governance
+infrastructure only. Decides and recommends; promotes nothing and mutates no
+state/registry.
+
+### What changed
+- New `src/axiom_core/runner/promotion_eligibility.py`:
+  `PromotionEligibilityEngine`, `PromotionCriteria`, `PromotionDecision`,
+  `PromotionStatus`, `PromotionEvidenceSummary`, `PromotionBlocker`, plus
+  `write_promotion_decisions()` / `promotion_run_id()`.
+- New CLI `axiom promotion-check --capability <name> | --all [--json] [--out]
+  [--no-write]`. Unknown capability exits non-zero. Optional evidence record
+  `promotion_decision.json` + `.md` under `artifacts/promotion_checks/<run_id>/`.
+- Cataloged `promotion-check` in the Runner Command Registry as `read_only` /
+  `safe`; added to the expected-commands test set.
+- Docs: `docs/architecture/promotion-eligibility-engine.md`.
+
+### What behavior changed
+- A new read-only decision surface exists. The engine consumes the Capability
+  State Registry (#27), Validation Registry (#24), Command Registry (#22), and
+  failure-classification artifacts (#29) to return one of: `eligible`,
+  `not_eligible`, `needs_more_evidence`, `failed_recently`, `blocked`,
+  `policy_refused`, `unknown`. Read-only-safe capability needs ≥1 passing run +
+  evidence bundle + no unresolved/critical failure; mutation/high-risk →
+  `policy_refused` in v1.
+
+### What did NOT change
+- No automatic promotion, no registry/state mutation by default, no autonomous
+  discovery/retry/scheduling/learning loop, no workflow generation, no
+  `SetParameterValue` execution, no external integrations/MCP. Revit,
+  InventoryModel, CreateGrids/CreateLevels behavior untouched.
+
+### Tests run
+- `tests/test_promotion_eligibility.py` (new, 35 tests): eligible /
+  needs_more_evidence (missing + insufficient) / failed_recently / blocked
+  (blocked + unsupported + policy-violation + critical) / policy_refused
+  (mutation + refused) / unknown / JSON valid (single + --all) / Markdown written
+  / no-mutation (no db, bundle untouched) / --all / classification consumed /
+  missing+unreadable classification conservative / determinism / catalog.
+- Full suite: 806 passed, 1 skipped. `ruff check` clean.
+
+### Validation still pending
+- None required for this PR. No live Revit validation needed (read-only
+  governance over existing artifacts/registries).
+
+### Known risks
+- Low. Pure-read engine; the only writes are an optional evidence report under
+  `artifacts/promotion_checks/`. v1 criteria are intentionally simple (≥1 passing
+  run) and may be tightened by a later confidence-scoring pass.
+
+### Revit live validation required
+- No.
+
+### 2024 baseline affected
+- No.
+
+### Verification-factory impact
+- Adds the promotion-decision layer that future controlled autonomous loops
+  consume to distinguish trusted vs. needs-more-evidence vs. blocked
+  capabilities. Strengthens promotion scoring / trusted-pattern groundwork.
+
 ## PR #27: Capability State Registry v1
 
 **Status:** Open

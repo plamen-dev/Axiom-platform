@@ -1144,6 +1144,35 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="promotion-check",
+        command="axiom promotion-check --capability <name> | --all",
+        description=(
+            "Promotion Eligibility Engine: decide whether a capability is "
+            "eligible to be promoted toward trusted status by summarizing the "
+            "Capability State Registry, Validation Registry, Command Registry, "
+            "and failure-classification artifacts. Writes optional "
+            "promotion_decision.json + .md under artifacts/promotion_checks."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("promotion_decision.json",
+                           "Machine-readable promotion eligibility decision(s)."),
+            EvidenceOutput("promotion_decision.md",
+                           "Human-readable promotion eligibility summary."),
+        ) + EV_CONSOLE,
+        timeout_seconds=120,
+        failure_modes=(FM_NONZERO,),
+        notes="Eligibility/governance only: decide and recommend. No automatic "
+              "promotion, registry/state mutation, retry, scheduling, or "
+              "learning. Mutation/high-risk capabilities are not eligible in "
+              "v1. Unknown capability lookup exits non-zero.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object

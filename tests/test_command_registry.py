@@ -51,7 +51,8 @@ EXPECTED_AXIOM_COMMANDS = {
     "inventory-combine", "inventory-export", "inventory-import",
     "inventory-import-batch", "inventory-model", "inventory-plan",
     "inventory-plan-status", "inventory-summary", "jobs", "local-runner",
-    "parameter-registry-build", "plan", "plans", "pr-snapshot", "prompt",
+    "parameter-registry-build", "plan", "plans", "pr-snapshot", "promotion-check",
+    "prompt",
     "runner-commands", "set-parameter-value", "stats", "submit", "test-grids",
     "test-levels", "tools", "validation-registry", "validation-run",
 }

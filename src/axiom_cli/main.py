@@ -4266,5 +4266,193 @@ def classify_failure(evidence_path, as_json):
     console.print(f"  {md_path}")
 
 
+# ---------------------------------------------------------------------------
+# Promotion eligibility
+# ---------------------------------------------------------------------------
+
+_PROMOTION_COLOUR: dict[str, str] = {
+    "eligible": "green",
+    "not_eligible": "yellow",
+    "needs_more_evidence": "yellow",
+    "failed_recently": "red",
+    "blocked": "red",
+    "policy_refused": "magenta",
+    "unknown": "red",
+}
+
+
+@cli.command("promotion-check")
+@click.option("--capability", "capability", default=None,
+              help="Capability to check (unknown capabilities exit non-zero).")
+@click.option("--all", "check_all", is_flag=True, default=False,
+              help="Check every known capability.")
+@click.option("--json", "as_json", is_flag=True, default=False,
+              help="Emit machine-readable JSON instead of a table.")
+@click.option("--no-write", "no_write", is_flag=True, default=False,
+              help="Do not write the promotion_decision.json/.md evidence "
+                   "record (default writes under artifacts/promotion_checks).")
+@click.option("--out", "out_dir", default=None, type=click.Path(),
+              help="Evidence output directory "
+                   "(default: artifacts/promotion_checks/<run_id>).")
+@click.option("--db-path", "db_path", default=None,
+              help="SQLite db path for persisted state (default: ~/.axiom/axiom.db).")
+@click.option("--capability-runs-dir", "capability_runs_dir", default=None,
+              type=click.Path(),
+              help="Base dir of Capability Runner evidence bundles "
+                   "(default: artifacts/capability_runs).")
+@click.option("--validation-evidence-dir", "validation_evidence_dir", default=None,
+              type=click.Path(),
+              help="Base dir of Validation Evidence Runner bundles "
+                   "(default: artifacts/validation_evidence).")
+def promotion_check(capability, check_all, as_json, no_write, out_dir, db_path,
+                    capability_runs_dir, validation_evidence_dir):
+    """Promotion Eligibility Engine — decide whether a capability is eligible to
+    be promoted toward trusted status.
+
+    Read-only governance: summarizes the Capability State Registry, Validation
+    Registry, Command Registry, and Failure Classification artifacts into a
+    deterministic promotion decision (eligible / needs_more_evidence /
+    failed_recently / blocked / policy_refused / unknown). It promotes nothing,
+    mutates no state or registry, executes nothing, retries nothing, and
+    schedules nothing. Mutation/high-risk capabilities are not eligible in v1.
+
+    An optional promotion_decision.json + .md evidence record is written under
+    artifacts/promotion_checks/<run_id>/ (a report, not a state change).
+
+    \b
+    Examples:
+      axiom promotion-check --capability InventoryModel
+      axiom promotion-check --capability SetParameterValue
+      axiom promotion-check --all
+      axiom promotion-check --all --json
+    """
+    import json as _json
+    from pathlib import Path as _Path
+
+    from axiom_core.database import (
+        create_db_engine,
+        get_database_url,
+        make_session_factory,
+    )
+    from axiom_core.runner.capability_state import (
+        DEFAULT_CAPABILITY_RUNS_BASE,
+        DEFAULT_VALIDATION_EVIDENCE_BASE,
+        CapabilityStateRegistry,
+    )
+    from axiom_core.runner.promotion_eligibility import (
+        DEFAULT_PROMOTION_CHECKS_BASE,
+        PromotionEligibilityEngine,
+        promotion_run_id,
+        write_promotion_decisions,
+    )
+
+    if bool(capability) == bool(check_all):
+        console.print("[red]Specify exactly one of --capability <name> or "
+                      "--all.[/red]")
+        raise SystemExit(2)
+
+    runs_base = capability_runs_dir or DEFAULT_CAPABILITY_RUNS_BASE
+    evidence_base = validation_evidence_dir or DEFAULT_VALIDATION_EVIDENCE_BASE
+
+    # Read-only: attach to the db only if it already exists (so persisted state
+    # + discovery candidates load) — never create one. promotion-check mutates
+    # nothing.
+    session_factory = None
+    url = get_database_url(db_path)
+    existing = url.replace("sqlite:///", "", 1)
+    if existing and _Path(existing).is_file():
+        session_factory = make_session_factory(create_db_engine(db_path))
+
+    registry = CapabilityStateRegistry(
+        capability_runs_base=runs_base,
+        validation_evidence_base=evidence_base,
+        session_factory=session_factory,
+    )
+    engine = PromotionEligibilityEngine(state_registry=registry)
+
+    if check_all:
+        decisions = engine.evaluate_all()
+        scope = "all"
+    else:
+        decisions = [engine.evaluate(capability)]
+        scope = capability
+
+    json_path = md_path = None
+    if not no_write:
+        target = out_dir or str(
+            _Path(DEFAULT_PROMOTION_CHECKS_BASE) / promotion_run_id(scope))
+        json_path, md_path = write_promotion_decisions(decisions, out_dir=target)
+
+    if as_json:
+        if check_all:
+            console.print_json(_json.dumps(
+                {"decisions": [d.to_dict() for d in decisions]}, default=str))
+        else:
+            console.print_json(_json.dumps(decisions[0].to_dict(), default=str))
+    elif check_all:
+        console.print("\n[bold blue]Promotion Eligibility[/bold blue]  "
+                      f"[dim]({len(decisions)} capabilities)[/dim]\n")
+        table = Table()
+        table.add_column("Capability")
+        table.add_column("Status")
+        table.add_column("Eligible", justify="center")
+        table.add_column("Passing runs", justify="center")
+        table.add_column("Reason")
+        for d in decisions:
+            colour = _PROMOTION_COLOUR.get(d.status.value, "white")
+            table.add_row(
+                d.capability_name,
+                f"[{colour}]{d.status.value}[/{colour}]",
+                "[green]yes[/green]" if d.eligible else "—",
+                str(d.evidence.successful_runs),
+                d.reason,
+            )
+        console.print(table)
+    else:
+        d = decisions[0]
+        colour = _PROMOTION_COLOUR.get(d.status.value, "white")
+        console.print(f"\n[bold blue]Promotion Eligibility[/bold blue]  "
+                      f"[{colour}]{d.status.value}[/{colour}]  "
+                      f"[dim]({'eligible' if d.eligible else 'not eligible'})"
+                      f"[/dim]\n")
+        meta = Table(show_header=False, box=None)
+        meta.add_column("k", style="cyan")
+        meta.add_column("v")
+        ev = d.evidence
+        meta.add_row("Capability", d.capability_name)
+        meta.add_row("Status", f"[{colour}]{d.status.value}[/{colour}]")
+        meta.add_row("Reason", d.reason)
+        meta.add_row("Current status", ev.current_status)
+        meta.add_row("Type / safety",
+                     f"{ev.capability_type or '—'} / {ev.safety_level or '—'}")
+        meta.add_row("Mutation / high-risk",
+                     f"{ev.is_mutation} / {ev.is_high_risk}")
+        meta.add_row("Validation defined", str(ev.validation_defined))
+        meta.add_row("Passing runs (exec+val)",
+                     f"{ev.successful_runs} ({ev.pass_count}+{ev.validation_pass_count})")
+        meta.add_row("Evidence path", ev.last_evidence_path or "—")
+        meta.add_row("Failure classification",
+                     (f"{ev.latest_failure_category} ({ev.latest_failure_severity})"
+                      if ev.failure_classification_present else "—"))
+        console.print(meta)
+        if d.blockers:
+            console.print()
+            bt = Table(title="Blockers")
+            bt.add_column("Code", style="red")
+            bt.add_column("Detail")
+            for b in d.blockers:
+                bt.add_row(b.code, b.detail)
+            console.print(bt)
+
+    if json_path is not None:
+        console.print("\n[green]Promotion decision written:[/green]")
+        console.print(f"  {json_path}")
+        console.print(f"  {md_path}")
+
+    # Unknown capability lookup exits non-zero.
+    if not check_all and decisions[0].status.value == "unknown":
+        raise SystemExit(2)
+
+
 if __name__ == "__main__":
     cli()
