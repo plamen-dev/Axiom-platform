@@ -1,5 +1,112 @@
 # PR Review Ledger
 
+## PR #27: Capability State Registry v1
+
+**Status:** Open
+**Scope:** Durable, queryable capability lifecycle state — state/governance
+infrastructure only. Summarizes existing sources (does not execute anything).
+
+### What changed
+- New `src/axiom_core/runner/capability_state.py`: `CapabilityStateRegistry`,
+  `CapabilityState`, `CapabilityStatus`, `CapabilityHistory` (+
+  `CapabilityHistoryEvent`), `CapabilitySnapshot`. The registry summarizes the
+  Command Registry (PR #22), Validation Registry (PR #24), Capability Runner
+  bundles (PR #26, `artifacts/capability_runs/`), Validation Evidence bundles
+  (PR #25, `artifacts/validation_evidence/`), and — when a SQLite session is
+  supplied — DiscoveryHarness candidate capabilities (PR #20), into one durable
+  per-capability state record.
+- New SQLite tables `capability_states` + `capability_state_events`
+  (`CapabilityStateRow` / `CapabilityStateEventRow` in `models.py`), reusing the
+  existing `Base`/`get_session` stack (no new database technology).
+- New CLI `axiom capability-state [--name --json --refresh --db-path
+  --capability-runs-dir --validation-evidence-dir]`; read-only unless
+  `--refresh` rebuilds/persists state. Unknown capability lookup exits non-zero.
+  Cataloged as a `read_only`/`safe` command (coverage test + expected set
+  updated: 33 axiom commands).
+- Docs: `docs/architecture/capability-state-registry.md`.
+
+### What behavior changed
+- Axiom can now answer "which capabilities exist / are executable / have
+  validation definitions / passed / failed / are blocked/refused/unsupported /
+  have evidence / are promotion candidates" from one durable state layer instead
+  of re-deriving it from raw artifacts each time.
+- Statuses are deterministic: newest execution outcome > newest validation
+  outcome > definitional status (`executable` > `validation_defined` >
+  `discovered` > `defined`). `promotion_candidate` is a **non-binding** derived
+  flag for a future promotion engine — it triggers no action.
+
+### Post-review fixes (Devin Review)
+- **refresh() artifact-scan consistency (real):** `refresh()` scanned the
+  artifact tree twice — once inside `build_snapshot()` and once for `_persist()`
+  — so the persisted state summary and event history could derive from two
+  different disk scans if a bundle landed in between. `build_snapshot()` now
+  accepts an optional pre-computed `histories` dict; `refresh()` scans once and
+  shares that single immutable dataset for snapshot generation, persistence, and
+  event-row generation. Regression tests: `test_refresh_scans_artifacts_once`,
+  `test_state_and_event_rows_share_dataset`,
+  `test_refresh_consistent_when_artifacts_change_between_scans`.
+- **promotion_candidate accuracy (real):** the flag used execution-only
+  `pass_count`/`fail_count`, making the `validation_passed` branch unreachable
+  for capabilities with a passing validation but no execution evidence. Now
+  requires currently-passing + ≥1 pass across the execution **or** validation
+  dimension + 0 failures in either dimension. Regression tests:
+  `test_promotion_candidate_for_validation_only_pass`,
+  `test_promotion_candidate_false_with_validation_failure`.
+- Remaining Devin Review findings were evaluated and are
+  cosmetic/theoretical (no impact on state correctness, determinism, persistence
+  integrity, or promotion accuracy), so per instruction they were left as-is.
+
+### What did NOT change
+- No capability execution, retry, failure-classification engine, promotion
+  engine, scoring, autonomous loop, scheduling, learning, workflow generation,
+  mutation/SetParameterValue, or MCP/external integration. Read paths never
+  write; only `--refresh` writes (idempotent upsert; history rebuilt).
+
+### Tests run
+- `tests/test_capability_state_registry.py` (26 tests): list, inspect, unknown,
+  refresh+persist, idempotent refresh, single-scan consistency (state vs event
+  rows; artifact change mid-scan), first_seen preservation, evidence-count
+  summarization, latest-run/evidence preservation, execution-over-validation
+  precedence, promotion flag (execution + validation-only + failure cases),
+  determinism, JSON output, discovery-candidate source, SQLite persistence, and
+  CLI (list/inspect/json/unknown-exit/refresh/read-only-does-not-create-db).
+- `tests/test_command_registry.py` (catalog coverage) updated and passing.
+- Full pytest + ruff at checkpoint (see Test Results below).
+
+### Validation still pending
+- None for this PR. No live Revit needed (pure state summarization over
+  existing artifacts/registries).
+
+### Known risks
+- Discovery candidates are consumed from the SQLite `candidate_capabilities`
+  table only when a db is supplied; scanning raw `artifacts/discovery_runs/`
+  CSVs is documented as a future source (kept out of scope deliberately).
+- Read-only `--name`/list against the default db loads persisted rows if the
+  table exists; if it does not (older db), it transparently falls back to an
+  in-memory build (never creates the db).
+
+### Revit live validation required
+- No.
+
+### 2024 baseline affected
+- No.
+
+### Verification-factory impact
+- Adds the durable lifecycle-state memory layer that future retry, failure
+  classification, promotion scoring, and controlled discovery loops will consume
+  instead of repeatedly inferring status from raw evidence — a state/governance
+  enabler for the factory, not a workflow.
+
+### Test Results
+
+| Suite | Count | Status |
+|-------|-------|--------|
+| pytest (full checkpoint) | 722 passed / 1 skipped | All passing |
+| test_capability_state_registry.py | 26 | All passing |
+| ruff lint (`src` + `tests`) | 0 errors | Clean |
+
+---
+
 ## PR #26: Capability Execution Runner v1
 
 **Status:** Open

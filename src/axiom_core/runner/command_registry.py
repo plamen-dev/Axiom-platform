@@ -1089,6 +1089,33 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="capability-state",
+        command="axiom capability-state",
+        description=(
+            "Capability State Registry: list/inspect durable capability lifecycle "
+            "state summarized from the command/validation registries and recent "
+            "evidence bundles. Read-only unless --refresh rebuilds state from "
+            "those sources into SQLite."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            "capability state table / JSON (console)",
+            EvidenceOutput("capability_states (SQLite table)",
+                           "Persisted per-capability lifecycle state (with --refresh)."),
+        ) + EV_CONSOLE,
+        timeout_seconds=120,
+        failure_modes=(FM_NONZERO,),
+        notes="State/governance memory only: summarizes existing registries and "
+              "evidence artifacts. Executes nothing; no retry, promotion, "
+              "scheduling, or learning. Unknown capability lookup exits non-zero. "
+              "promotion_candidate is a non-binding derived flag.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object

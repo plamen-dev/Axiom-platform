@@ -339,3 +339,59 @@ class ValidationProcedureRow(Base):
     promotion_eligibility_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
     notes: Mapped[str] = mapped_column(Text, nullable=False, default="")
     registered_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
+
+
+class CapabilityStateRow(Base):
+    """Durable lifecycle state for one capability (PR #27).
+
+    The Capability State Registry summarizes existing governance registries and
+    recent evidence artifacts into a single durable per-capability state record:
+    identity, current lifecycle status, evidence counts, latest run/evidence
+    pointers, and a non-binding promotion-candidate flag. This is state/
+    governance memory only — persisting a row never executes, retries, promotes,
+    or schedules anything.
+
+    Keyed (uniquely upserted) by ``capability_name``.
+    """
+
+    __tablename__ = "capability_states"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    capability_name: Mapped[str] = mapped_column(String(255), nullable=False, default="", index=True)
+    adapter: Mapped[str] = mapped_column(String(50), nullable=False, default="revit", index=True)
+    capability_type: Mapped[str] = mapped_column(String(50), nullable=False, default="")
+    current_status: Mapped[str] = mapped_column(String(50), nullable=False, default="defined", index=True)
+    source_registry: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
+    last_validation_run_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    last_execution_run_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    last_evidence_path: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    pass_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    fail_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    refused_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    blocked_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    unsupported_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_error_summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    promotion_candidate: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    metadata_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+
+
+class CapabilityStateEventRow(Base):
+    """One observed lifecycle event for a capability (PR #27).
+
+    An append-derived history row summarizing a single evidence artifact (one
+    execution or validation run). Rebuilt deterministically from artifacts on
+    each ``--refresh``; storing a row executes nothing.
+    """
+
+    __tablename__ = "capability_state_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    capability_name: Mapped[str] = mapped_column(String(255), nullable=False, default="", index=True)
+    kind: Mapped[str] = mapped_column(String(20), nullable=False, default="", index=True)
+    outcome: Mapped[str] = mapped_column(String(50), nullable=False, default="")
+    run_id: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    evidence_path: Mapped[str] = mapped_column(String(1000), nullable=False, default="")
+    at: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    detail: Mapped[str] = mapped_column(Text, nullable=False, default="")

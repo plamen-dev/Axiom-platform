@@ -13,6 +13,14 @@ from axiom_core.runner.capability_runner import (
     CapabilityRunner,
     CapabilityRunResult,
 )
+from axiom_core.runner.capability_state import (
+    CapabilityHistory,
+    CapabilityHistoryEvent,
+    CapabilitySnapshot,
+    CapabilityState,
+    CapabilityStateRegistry,
+    CapabilityStatus,
+)
 from axiom_core.runner.command_registry import (
     DEFAULT_REGISTRY,
     AllowedCommand,
@@ -39,6 +47,12 @@ __all__ = [
     "CapabilityOutcome",
     "CapabilityRunner",
     "CapabilityRunResult",
+    "CapabilityHistory",
+    "CapabilityHistoryEvent",
+    "CapabilitySnapshot",
+    "CapabilityState",
+    "CapabilityStateRegistry",
+    "CapabilityStatus",
     "DEFAULT_REGISTRY",
     "AllowedCommand",
     "CommandClass",

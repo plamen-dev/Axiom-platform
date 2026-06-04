@@ -3927,5 +3927,184 @@ def capability_run(capability_name, args_json, run_id, output_dir, simulate):
     raise SystemExit(result.exit_code)
 
 
+_STATE_COLOUR = {
+    "execution_passed": "green",
+    "validation_passed": "green",
+    "executable": "cyan",
+    "validation_defined": "cyan",
+    "defined": "white",
+    "discovered": "blue",
+    "execution_failed": "red",
+    "validation_failed": "red",
+    "denied": "red",
+    "blocked": "yellow",
+    "refused": "yellow",
+    "unsupported": "yellow",
+    "deprecated": "dim",
+}
+
+
+@cli.command("capability-state")
+@click.option("--name", "name", default=None,
+              help="Inspect one capability's lifecycle state "
+                   "(unknown capabilities exit non-zero).")
+@click.option("--json", "as_json", is_flag=True, default=False,
+              help="Emit machine-readable JSON instead of tables.")
+@click.option("--refresh", "refresh", is_flag=True, default=False,
+              help="Rebuild/persist state from registries + evidence artifacts "
+                   "into SQLite (otherwise the command is read-only).")
+@click.option("--db-path", "db_path", default=None,
+              help="SQLite db path for persisted state (default: ~/.axiom/axiom.db).")
+@click.option("--capability-runs-dir", "capability_runs_dir", default=None,
+              type=click.Path(),
+              help="Base dir of Capability Runner evidence bundles "
+                   "(default: artifacts/capability_runs).")
+@click.option("--validation-evidence-dir", "validation_evidence_dir", default=None,
+              type=click.Path(),
+              help="Base dir of Validation Evidence Runner bundles "
+                   "(default: artifacts/validation_evidence).")
+def capability_state(name, as_json, refresh, db_path, capability_runs_dir,
+                     validation_evidence_dir):
+    """Capability State Registry — durable lifecycle state for capabilities.
+
+    Summarizes existing governance registries (Command Registry / Validation
+    Registry), Capability Runner + Validation Evidence bundles, and (when a db
+    is present) DiscoveryHarness candidates into one durable per-capability state
+    record. State/governance memory only: it executes nothing, retries nothing,
+    promotes nothing, and schedules nothing. ``promotion_candidate`` is a
+    non-binding derived flag for a future promotion engine.
+
+    Read-only by default; pass ``--refresh`` to rebuild and persist state into
+    SQLite. Unknown capability lookup exits non-zero.
+
+    \b
+    Examples:
+      axiom capability-state                       # list all capability states
+      axiom capability-state --name InventoryModel # inspect one capability
+      axiom capability-state --json                # machine-readable snapshot
+      axiom capability-state --refresh             # rebuild + persist into SQLite
+    """
+    import json as _json
+    from pathlib import Path as _Path
+
+    from axiom_core.database import (
+        create_db_engine,
+        get_database_url,
+        init_db,
+        make_session_factory,
+    )
+    from axiom_core.runner.capability_state import (
+        DEFAULT_CAPABILITY_RUNS_BASE,
+        DEFAULT_VALIDATION_EVIDENCE_BASE,
+        CapabilityStateRegistry,
+    )
+
+    runs_base = capability_runs_dir or DEFAULT_CAPABILITY_RUNS_BASE
+    evidence_base = validation_evidence_dir or DEFAULT_VALIDATION_EVIDENCE_BASE
+
+    session_factory = None
+    if refresh:
+        engine = create_db_engine(db_path)
+        init_db(engine)
+        session_factory = make_session_factory(engine)
+    else:
+        # Read-only: only attach to the db if it already exists (so persisted
+        # state + discovery candidates can load) — never create one.
+        url = get_database_url(db_path)
+        existing = url.replace("sqlite:///", "", 1)
+        if existing and _Path(existing).is_file():
+            session_factory = make_session_factory(create_db_engine(db_path))
+
+    registry = CapabilityStateRegistry(
+        capability_runs_base=runs_base,
+        validation_evidence_base=evidence_base,
+        session_factory=session_factory,
+    )
+
+    if refresh:
+        snapshot = registry.refresh()
+        source = "refreshed"
+    else:
+        persisted = registry.load_snapshot() if session_factory else None
+        if persisted is not None:
+            snapshot = persisted
+            source = "persisted"
+        else:
+            snapshot = registry.build_snapshot()
+            source = "in-memory"
+
+    # Inspect a single capability.
+    if name:
+        state = snapshot.get(name)
+        if state is None:
+            if as_json:
+                console.print_json(_json.dumps({
+                    "capability_name": name,
+                    "known": False,
+                    "reason": "unknown capability — no lifecycle state",
+                    "known_capabilities": snapshot.names(),
+                }))
+            else:
+                console.print(
+                    f"[red]Capability '{name}' has no lifecycle state "
+                    f"(unknown to the Capability State Registry).[/red]")
+                if snapshot.names():
+                    console.print(f"[dim]Known: {', '.join(snapshot.names())}[/dim]")
+            raise SystemExit(2)
+
+        if as_json:
+            console.print_json(_json.dumps(state.to_dict()))
+            return
+
+        console.print(f"\n[bold blue]{state.capability_name}[/bold blue]  "
+                      f"[{_STATE_COLOUR.get(state.current_status.value, 'white')}]"
+                      f"{state.current_status.value}[/]")
+        meta = Table(show_header=False, box=None)
+        meta.add_column("k", style="cyan")
+        meta.add_column("v")
+        meta.add_row("Adapter / type", f"{state.adapter} / {state.capability_type or '—'}")
+        meta.add_row("Source", state.source_registry)
+        meta.add_row("First seen / last seen",
+                     f"{state.first_seen_at} / {state.last_seen_at}")
+        meta.add_row("Last validation run", state.last_validation_run_id or "—")
+        meta.add_row("Last execution run", state.last_execution_run_id or "—")
+        meta.add_row("Last evidence path", state.last_evidence_path or "—")
+        meta.add_row("Counts (pass/fail/refused/blocked/unsupported)",
+                     f"{state.pass_count}/{state.fail_count}/{state.refused_count}/"
+                     f"{state.blocked_count}/{state.unsupported_count}")
+        meta.add_row("Promotion candidate",
+                     "yes" if state.promotion_candidate else "no")
+        meta.add_row("Last error", state.last_error_summary or "—")
+        console.print(meta)
+        return
+
+    # List all capability states.
+    if as_json:
+        console.print_json(_json.dumps(snapshot.to_dict()))
+        return
+
+    console.print("\n[bold blue]Axiom Capability State Registry[/bold blue]  "
+                  f"[dim]({len(snapshot.states)} capabilities — {source})[/dim]\n")
+    table = Table()
+    table.add_column("Capability")
+    table.add_column("Status")
+    table.add_column("Type")
+    table.add_column("P/F/R/B/U", justify="center")
+    table.add_column("Promo", justify="center")
+    table.add_column("Last evidence")
+    for state in snapshot.states:
+        colour = _STATE_COLOUR.get(state.current_status.value, "white")
+        table.add_row(
+            state.capability_name,
+            f"[{colour}]{state.current_status.value}[/{colour}]",
+            state.capability_type or "—",
+            f"{state.pass_count}/{state.fail_count}/{state.refused_count}/"
+            f"{state.blocked_count}/{state.unsupported_count}",
+            "[green]yes[/green]" if state.promotion_candidate else "—",
+            (state.last_evidence_path or "—"),
+        )
+    console.print(table)
+
+
 if __name__ == "__main__":
     cli()
