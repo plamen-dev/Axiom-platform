@@ -276,20 +276,35 @@ def _normalize_element(rec: dict) -> dict:
 def _param_row_to_export(row: dict) -> dict:
     """Map a parameters.parquet row to the parameter dict the interpreter reads.
 
-    parameters.parquet carries no unit/spec metadata, so a Double parameter
-    correctly remains NOT safely_settable_by_axiom (value contract preserved).
+    The enriched parameter export (PR #21) carries the value contract
+    (spec_type_id / unit_type_id / display_unit / format_options), so a Double
+    parameter with unit metadata becomes safely_settable_by_axiom. A legacy
+    export without those columns still loads and a bare Double correctly stays
+    NOT safely settable, preserving the value contract.
     """
+    def first(*keys):
+        for k in keys:
+            v = row.get(k)
+            if v is not None and v != "":
+                return v
+        return ""
+
     return {
-        "Name": row.get("param_name") or row.get("Name") or "",
-        "StorageType": row.get("storage_type") or row.get("StorageType") or "",
+        "Name": first("param_name", "Name"),
+        "StorageType": first("storage_type", "StorageType"),
         "IsReadOnly": bool(row.get("is_read_only", row.get("IsReadOnly", False))),
-        "BuiltInParameterId": (
-            row.get("built_in_parameter_id") or row.get("BuiltInParameterId") or ""
-        ),
+        "BuiltInParameterId": first("built_in_parameter_id", "BuiltInParameterId"),
         "ValueString": row.get("value_string", row.get("ValueString")),
         "ValueDouble": row.get("value_number", row.get("ValueDouble")),
         "ValueInt": row.get("value_integer", row.get("ValueInt")),
-        "ParameterGroup": row.get("parameter_group") or row.get("ParameterGroup") or "",
+        "ValueElementId": row.get("value_element_id", row.get("ValueElementId")),
+        "ParameterGroup": first("parameter_group", "ParameterGroup"),
+        # ── value contract (enriched export) ──
+        "SpecTypeId": first("spec_type_id", "SpecTypeId", "DataTypeId"),
+        "ForgeTypeId": first("forge_type_id", "ForgeTypeId"),
+        "UnitTypeId": first("unit_type_id", "UnitTypeId"),
+        "DisplayUnit": first("display_unit", "DisplayUnit", "UnitLabel"),
+        "FormatOptions": first("format_options", "FormatOptions"),
     }
 
 

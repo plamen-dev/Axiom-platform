@@ -1,0 +1,7 @@
+adapter,category,parameter_name,parameter_kind,storage_type,read_only,spec_type_id,unit_type_id,display_unit,has_value,sample_values,expected_input_format,safely_settable_by_axiom,built_in_parameter_id
+revit,Doors,Mark,instance,String,False,,,,True,D-01,text,True,ALL_MODEL_MARK
+revit,Walls,Comments,instance,String,False,,,,True,Exterior,text,True,ALL_MODEL_INSTANCE_COMMENTS
+revit,Walls,Fire Rating,type,String,False,,,,True,2HR,text,True,FIRE_RATING
+revit,Walls,Mystery Number,instance,Double,False,,,,True,,double (unit unknown),False,SOME_DOUBLE
+revit,Walls,Phase Created,instance,ElementId,False,,,,True,New Construction,element_id (integer),True,PHASE_CREATED
+revit,Walls,Unconnected Height,instance,Double,False,autodesk.spec.aec:length-2.0.0,autodesk.unit.unit:millimeters-1.0.1,millimeters,True,3000 mm,double (millimeters),True,WALL_USER_HEIGHT_PARAM

@@ -442,10 +442,53 @@ namespace Axiom.RevitAddin.Services
                     IsReadOnly = param.IsReadOnly,
                 };
 
+                var def = param.Definition;
+
                 // Built-in parameter id
-                if (param.Definition is InternalDefinition intDef)
+                if (def is InternalDefinition intDef)
                 {
                     pe.BuiltInParameterId = intDef.BuiltInParameter.ToString();
+                }
+
+                // Value contract metadata from the Definition. Cheap (no per-value
+                // reads); gives DiscoveryHarness the spec/unit needed to decide
+                // whether a Double parameter is safely settable.
+                if (def != null)
+                {
+                    try
+                    {
+                        var dataType = def.GetDataType();
+                        if (dataType != null)
+                        {
+                            pe.SpecTypeId = dataType.TypeId ?? "";
+                            try
+                            {
+                                if (UnitUtils.IsMeasurableSpec(dataType))
+                                {
+                                    var validUnits = UnitUtils.GetValidUnits(dataType);
+                                    if (validUnits != null && validUnits.Count > 0)
+                                    {
+                                        pe.UnitTypeId = validUnits[0].TypeId ?? "";
+                                        try { pe.DisplayUnit = LabelUtils.GetLabelForUnit(validUnits[0]) ?? ""; }
+                                        catch { pe.DisplayUnit = ""; }
+                                    }
+                                }
+                            }
+                            catch { /* unit resolution not critical */ }
+                        }
+                    }
+                    catch { /* data type resolution not critical */ }
+
+                    try
+                    {
+                        var groupType = def.GetGroupTypeId();
+                        if (groupType != null)
+                        {
+                            try { pe.ParameterGroup = LabelUtils.GetLabelForGroup(groupType) ?? ""; }
+                            catch { pe.ParameterGroup = groupType.TypeId ?? ""; }
+                        }
+                    }
+                    catch { /* group type resolution not critical */ }
                 }
 
                 // Value extraction
@@ -467,6 +510,7 @@ namespace Axiom.RevitAddin.Services
                         pe.ValueString = param.AsValueString()
                             ?? (eid != null ? RevitElementIdCompat.GetValue(eid).ToString() : "");
                         pe.ValueInt = eid != null ? RevitElementIdCompat.GetIntValue(eid) : (int?)null;
+                        pe.ValueElementId = eid != null ? RevitElementIdCompat.GetIntValue(eid) : (int?)null;
                         break;
                     default:
                         pe.ValueString = param.AsValueString() ?? "";
@@ -761,8 +805,19 @@ namespace Axiom.RevitAddin.Services
         public string ValueString { get; set; }
         public double? ValueDouble { get; set; }
         public int? ValueInt { get; set; }
+        public int? ValueElementId { get; set; }
         public string BuiltInParameterId { get; set; }
         public bool IsReadOnly { get; set; }
+
+        // Value contract metadata (derived from the parameter Definition, not
+        // from reading every value — cheap, so safe to emit per element). These
+        // let DiscoveryHarness populate the value contract and decide whether a
+        // Double parameter is safely settable. See
+        // docs/architecture/inventorymodel-parameter-discovery-contract.md.
+        public string SpecTypeId { get; set; }
+        public string UnitTypeId { get; set; }
+        public string DisplayUnit { get; set; }
+        public string ParameterGroup { get; set; }
     }
 
     /// <summary>Output from schema discovery mode.</summary>

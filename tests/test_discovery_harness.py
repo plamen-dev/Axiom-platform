@@ -1,5 +1,6 @@
 """End-to-end tests for DiscoveryHarness v1 + the discovery-run CLI."""
 
+import csv
 import json
 
 import pytest
@@ -490,6 +491,86 @@ def test_attach_parameters_tolerates_str_int_id_mismatch():
     total, joined = _attach_parameters(elements, rows)
     assert (total, joined) == (1, 1)
     assert elements[0]["Parameters"][0]["Name"] == "Comments"
+
+
+# --- PR #21: enriched parameter export reaches complete discovery -------------
+
+_ENRICHED_ELEMENTS = [
+    {
+        "ElementId": 4001, "Category": "Walls", "BuiltInCategory": "OST_Walls",
+        "CategoryId": -2000011, "IsType": False, "Parameters": [
+            {"Name": "Comments", "StorageType": "String", "IsReadOnly": False,
+             "BuiltInParameterId": "ALL_MODEL_INSTANCE_COMMENTS",
+             "ValueString": "Exterior"},
+            # writable Double WITH unit metadata -> safely settable
+            {"Name": "Unconnected Height", "StorageType": "Double",
+             "IsReadOnly": False, "BuiltInParameterId": "WALL_USER_HEIGHT_PARAM",
+             "ValueDouble": 3.0, "ValueString": "3000 mm",
+             "SpecTypeId": "autodesk.spec.aec:length-2.0.0",
+             "UnitTypeId": "autodesk.unit.unit:millimeters-1.0.1",
+             "DisplayUnit": "millimeters"},
+            # writable Double WITHOUT unit metadata -> NOT safely settable
+            {"Name": "Mystery Number", "StorageType": "Double",
+             "IsReadOnly": False, "BuiltInParameterId": "SOME_DOUBLE",
+             "ValueDouble": 1.0},
+        ],
+    },
+    {
+        "ElementId": 4002, "Category": "Walls", "BuiltInCategory": "OST_Walls",
+        "CategoryId": -2000011, "IsType": True, "Parameters": [
+            {"Name": "Fire Rating", "StorageType": "String", "IsReadOnly": False,
+             "BuiltInParameterId": "FIRE_RATING", "ValueString": "2HR"},
+        ],
+    },
+]
+
+
+def _make_enriched_run_folder(folder):
+    """Build a run folder whose parameters.parquet carries the value contract."""
+    from axiom_core.inventory import storage
+    folder.mkdir(parents=True, exist_ok=True)
+    storage.write_parameters_parquet(
+        _ENRICHED_ELEMENTS, folder / "parameters.parquet", run_id="inv_enr")
+    els_no_params = [{k: v for k, v in e.items() if k != "Parameters"}
+                     for e in _ENRICHED_ELEMENTS]
+    storage.write_jsonl(els_no_params, folder / "elements.jsonl")
+    return folder
+
+
+def test_run_folder_enriched_export_reaches_complete_discovery(tmp_path):
+    """Enriched parameters.parquet -> parameters + candidates + complete=YES."""
+    folder = _make_enriched_run_folder(tmp_path / "inv_enr")
+    result = run_discovery(
+        run_id="enr_e2e",
+        inventory_export_path=str(folder),
+        output_dir=str(tmp_path / "out"),
+    )
+    m = result.metrics
+    assert m["categories_discovered"] > 0
+    assert m["parameters_discovered"] > 0
+    assert m["candidate_capabilities_generated"] > 0
+    assert result.discovery_complete is True
+    assert result.parameter_rows_joined == result.parameter_rows_total > 0
+    # Value contract: the unit-bearing Double is safely settable; the bare one
+    # is not, so at least one but not all parameters are safely settable.
+    assert m["safely_settable_parameters"] >= 1
+
+
+def test_run_folder_enriched_double_unit_contract(tmp_path):
+    """A writable Double is safely settable only with unit metadata."""
+    folder = _make_enriched_run_folder(tmp_path / "inv_enr2")
+    run_discovery(
+        run_id="enr_e2e2",
+        inventory_export_path=str(folder),
+        output_dir=str(tmp_path / "out2"),
+    )
+    rows = list(csv.DictReader(
+        (tmp_path / "out2" / "enr_e2e2" / "parameters.csv").read_text().splitlines()
+    ))
+    by_name = {r["parameter_name"]: r for r in rows}
+    assert by_name["Unconnected Height"]["safely_settable_by_axiom"] == "True"
+    assert by_name["Mystery Number"]["safely_settable_by_axiom"] == "False"
+    assert by_name["Unconnected Height"]["unit_type_id"]
 
 
 def test_run_discovery_path_wins_mode_is_live_even_if_simulate_set(tmp_path):

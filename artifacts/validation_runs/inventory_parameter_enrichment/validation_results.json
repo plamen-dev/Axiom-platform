@@ -1,0 +1,56 @@
+{
+  "evidence": "InventoryModel parameter discovery enrichment (PR #21)",
+  "inventory_export": {
+    "elements": 3,
+    "parameter_rows_exported": 6,
+    "parameter_schema_columns": [
+      "run_id",
+      "element_id",
+      "category",
+      "built_in_category",
+      "param_name",
+      "built_in_parameter_id",
+      "is_instance_param",
+      "is_type_param",
+      "storage_type",
+      "is_read_only",
+      "value_string",
+      "value_number",
+      "value_integer",
+      "value_element_id",
+      "spec_type_id",
+      "forge_type_id",
+      "unit_type_id",
+      "display_unit",
+      "format_options",
+      "parameter_group",
+      "parameter_source",
+      "discovered_at"
+    ],
+    "files_written": [
+      "elements.jsonl",
+      "elements.parquet",
+      "parameters.csv",
+      "parameters.jsonl",
+      "parameters.parquet"
+    ]
+  },
+  "discovery_run": {
+    "object_source": "elements.jsonl",
+    "parameter_source": "parameters.parquet",
+    "parameter_rows_total": 6,
+    "parameter_rows_joined": 6,
+    "discovery_complete": true,
+    "metrics": {
+      "categories_discovered": 2,
+      "parameters_discovered": 6,
+      "writable_parameters": 6,
+      "read_only_parameters": 0,
+      "instance_parameters": 5,
+      "type_parameters": 1,
+      "safely_settable_parameters": 5,
+      "candidate_capabilities_generated": 6
+    },
+    "warnings": []
+  }
+}

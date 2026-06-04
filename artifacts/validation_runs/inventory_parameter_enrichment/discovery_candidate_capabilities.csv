@@ -1,0 +1,7 @@
+candidate_id,capability,adapter,category,parameter_name,parameter_kind,storage_type,spec_type_id,unit_type_id,expected_input_format,safely_settable_by_axiom,status
+cand_revit_doors_mark_instance_setparametervalue,SetParameterValue,revit,Doors,Mark,instance,String,,,text,True,candidate
+cand_revit_walls_comments_instance_setparametervalue,SetParameterValue,revit,Walls,Comments,instance,String,,,text,True,candidate
+cand_revit_walls_fire_rating_type_setparametervalue,SetParameterValue,revit,Walls,Fire Rating,type,String,,,text,True,candidate
+cand_revit_walls_mystery_number_instance_setparametervalue,SetParameterValue,revit,Walls,Mystery Number,instance,Double,,,double (unit unknown),False,candidate
+cand_revit_walls_phase_created_instance_setparametervalue,SetParameterValue,revit,Walls,Phase Created,instance,ElementId,,,element_id (integer),True,candidate
+cand_revit_walls_unconnected_height_instance_setparametervalue,SetParameterValue,revit,Walls,Unconnected Height,instance,Double,autodesk.spec.aec:length-2.0.0,autodesk.unit.unit:millimeters-1.0.1,double (millimeters),True,candidate

@@ -6,13 +6,19 @@ Writes inventory results to three formats:
   3. Parquet — durable structured datasets (elements.parquet, parameters.parquet)
 """
 
+import csv
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 from sqlalchemy.orm import sessionmaker
+
+# Provenance tag written onto every exported parameter row so downstream
+# consumers (DiscoveryHarness) can record where a parameter came from.
+PARAMETER_SOURCE = "revit_inventory_model"
 
 # ── Parquet schemas ──────────────────────────────────────────────────
 
@@ -22,6 +28,7 @@ ELEMENT_PARQUET_SCHEMA = pa.schema([
     ("element_id", pa.int64()),
     ("unique_id", pa.string()),
     ("category", pa.string()),
+    ("built_in_category", pa.string()),
     ("class_name", pa.string()),
     ("name", pa.string()),
     ("family_name", pa.string()),
@@ -33,18 +40,40 @@ ELEMENT_PARQUET_SCHEMA = pa.schema([
     ("parameter_count", pa.int32()),
 ])
 
+# Per-element parameter export. element_id is the STABLE JOIN KEY back to
+# elements.parquet / elements.jsonl (same run_id, int64). Identity + value
+# contract + provenance fields are denormalized onto each row so DiscoveryHarness
+# can populate ProductPropertyRegistry, candidate capabilities, and the value
+# contract directly. See docs/architecture/inventorymodel-parameter-discovery-contract.md.
 PARAMETER_PARQUET_SCHEMA = pa.schema([
     ("run_id", pa.string()),
-    ("element_id", pa.int64()),
+    # ── identity / join ──
+    ("element_id", pa.int64()),          # STABLE JOIN KEY -> elements.element_id
+    ("category", pa.string()),           # denormalized parent element category
+    ("built_in_category", pa.string()),  # denormalized OST_* where available
     ("param_name", pa.string()),
-    ("storage_type", pa.string()),
+    ("built_in_parameter_id", pa.string()),
+    # ── ownership ──
+    ("is_instance_param", pa.bool_()),
+    ("is_type_param", pa.bool_()),
+    # ── storage / access ──
+    ("storage_type", pa.string()),       # String | Integer | Double | ElementId
+    ("is_read_only", pa.bool_()),
+    # ── value ──
     ("value_string", pa.string()),
     ("value_number", pa.float64()),
     ("value_integer", pa.int64()),
-    ("built_in_parameter_id", pa.string()),
-    ("is_read_only", pa.bool_()),
-    ("is_instance_param", pa.bool_()),
+    ("value_element_id", pa.int64()),
+    # ── value contract (semantic/unit metadata) ──
+    ("spec_type_id", pa.string()),
+    ("forge_type_id", pa.string()),
+    ("unit_type_id", pa.string()),
+    ("display_unit", pa.string()),
+    ("format_options", pa.string()),
     ("parameter_group", pa.string()),
+    # ── discovery metadata ──
+    ("parameter_source", pa.string()),
+    ("discovered_at", pa.string()),
 ])
 
 PARAMETER_SCHEMA_PARQUET_SCHEMA = pa.schema([
@@ -81,6 +110,7 @@ def _element_to_flat(elem: dict, run_id: str = "", source_model: str = "") -> di
         "element_id": elem.get("ElementId", 0),
         "unique_id": elem.get("UniqueId", ""),
         "category": elem.get("Category", ""),
+        "built_in_category": elem.get("BuiltInCategory", ""),
         "class_name": elem.get("ClassName", ""),
         "name": elem.get("Name", ""),
         "family_name": elem.get("FamilyName", ""),
@@ -93,25 +123,77 @@ def _element_to_flat(elem: dict, run_id: str = "", source_model: str = "") -> di
     }
 
 
+def _param_first(param: dict, *keys, default=None):
+    """Return the first present, non-None value among ``keys`` in ``param``."""
+    for k in keys:
+        if k in param and param[k] is not None:
+            return param[k]
+    return default
+
+
+def _coerce_int(value) -> Optional[int]:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _param_to_flat(
     element_id: int,
     param: dict,
     run_id: str = "",
     is_instance_param: bool = True,
+    category: str = "",
+    built_in_category: str = "",
+    discovered_at: str = "",
+    parameter_source: str = PARAMETER_SOURCE,
 ) -> dict:
-    """Flatten a parameter dict for the parameters Parquet table."""
+    """Flatten a parameter dict for the parameters Parquet table.
+
+    ``element_id`` is the stable join key back to the elements export. Identity,
+    value-contract and provenance fields are denormalized so DiscoveryHarness can
+    consume the parameter row directly. Field names accept both the C# add-in's
+    PascalCase keys and pre-flattened snake_case keys.
+    """
     return {
         "run_id": run_id,
+        # identity / join
         "element_id": element_id,
-        "param_name": param.get("Name", ""),
-        "storage_type": param.get("StorageType", ""),
-        "value_string": param.get("ValueString", ""),
-        "value_number": param.get("ValueDouble"),
-        "value_integer": param.get("ValueInt"),
-        "built_in_parameter_id": param.get("BuiltInParameterId", ""),
-        "is_read_only": param.get("IsReadOnly", False),
+        "category": category,
+        "built_in_category": built_in_category,
+        "param_name": _param_first(param, "Name", "param_name", default=""),
+        "built_in_parameter_id": _param_first(
+            param, "BuiltInParameterId", "built_in_parameter_id", default=""),
+        # ownership
         "is_instance_param": is_instance_param,
-        "parameter_group": param.get("ParameterGroup", ""),
+        "is_type_param": not is_instance_param,
+        # storage / access
+        "storage_type": _param_first(param, "StorageType", "storage_type", default=""),
+        "is_read_only": bool(_param_first(
+            param, "IsReadOnly", "is_read_only", default=False)),
+        # value
+        "value_string": _param_first(param, "ValueString", "value_string", default=""),
+        "value_number": _param_first(param, "ValueDouble", "value_number"),
+        "value_integer": _coerce_int(_param_first(param, "ValueInt", "value_integer")),
+        "value_element_id": _coerce_int(_param_first(
+            param, "ValueElementId", "value_element_id")),
+        # value contract
+        "spec_type_id": _param_first(
+            param, "SpecTypeId", "DataTypeId", "spec_type_id", default=""),
+        "forge_type_id": _param_first(
+            param, "ForgeTypeId", "forge_type_id", default=""),
+        "unit_type_id": _param_first(param, "UnitTypeId", "unit_type_id", default=""),
+        "display_unit": _param_first(
+            param, "DisplayUnit", "UnitLabel", "display_unit", default=""),
+        "format_options": _param_first(
+            param, "FormatOptions", "format_options", default=""),
+        "parameter_group": _param_first(
+            param, "ParameterGroup", "parameter_group", default=""),
+        # discovery metadata
+        "parameter_source": parameter_source,
+        "discovered_at": discovered_at,
     }
 
 
@@ -144,19 +226,47 @@ def write_elements_parquet(
     return path
 
 
-def write_parameters_parquet(
+def collect_parameter_rows(
     elements: list[dict],
-    path: Path,
     run_id: str = "",
-) -> Path:
-    """Write all element parameters to a Parquet file."""
-    path.parent.mkdir(parents=True, exist_ok=True)
+    discovered_at: str = "",
+) -> list[dict]:
+    """Flatten every element's parameters into join-ready parameter rows.
+
+    Each row carries the stable join key (``element_id``), the denormalized
+    parent category, ownership (instance/type), the value contract metadata and
+    provenance. Shared by the Parquet / CSV / JSONL parameter writers so all
+    three exports stay identical.
+    """
+    if not discovered_at:
+        discovered_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     rows: list[dict] = []
     for elem in elements:
         eid = elem.get("ElementId", 0)
         is_instance = not elem.get("IsType", False)
-        for param in elem.get("Parameters", []):
-            rows.append(_param_to_flat(eid, param, run_id=run_id, is_instance_param=is_instance))
+        category = elem.get("Category", "")
+        built_in_category = elem.get("BuiltInCategory", "")
+        for param in elem.get("Parameters", []) or []:
+            rows.append(_param_to_flat(
+                eid, param,
+                run_id=run_id,
+                is_instance_param=is_instance,
+                category=category,
+                built_in_category=built_in_category,
+                discovered_at=discovered_at,
+            ))
+    return rows
+
+
+def write_parameters_parquet(
+    elements: list[dict],
+    path: Path,
+    run_id: str = "",
+    discovered_at: str = "",
+) -> Path:
+    """Write all element parameters to a Parquet file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows = collect_parameter_rows(elements, run_id=run_id, discovered_at=discovered_at)
     if not rows:
         rows = [dict.fromkeys(PARAMETER_PARQUET_SCHEMA.names)]
     arrays = {}
@@ -165,6 +275,39 @@ def write_parameters_parquet(
         arrays[field.name] = values
     table = pa.table(arrays, schema=PARAMETER_PARQUET_SCHEMA)
     pq.write_table(table, str(path))
+    return path
+
+
+def write_parameters_jsonl(
+    elements: list[dict],
+    path: Path,
+    run_id: str = "",
+    discovered_at: str = "",
+) -> Path:
+    """Write all element parameters to a JSONL file (one row per parameter)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows = collect_parameter_rows(elements, run_id=run_id, discovered_at=discovered_at)
+    with open(path, "w", encoding="utf-8") as f:
+        for row in rows:
+            f.write(json.dumps(row, default=str) + "\n")
+    return path
+
+
+def write_parameters_csv(
+    elements: list[dict],
+    path: Path,
+    run_id: str = "",
+    discovered_at: str = "",
+) -> Path:
+    """Write all element parameters to a CSV file (one row per parameter)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows = collect_parameter_rows(elements, run_id=run_id, discovered_at=discovered_at)
+    columns = list(PARAMETER_PARQUET_SCHEMA.names)
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=columns)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({c: row.get(c, "") for c in columns})
     return path
 
 
@@ -378,6 +521,8 @@ def persist_inventory(
     run_dir = output_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
+    discovered_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
     paths: dict[str, Path] = {}
     paths["jsonl"] = write_jsonl(elements, run_dir / "elements.jsonl")
     paths["elements_parquet"] = write_elements_parquet(
@@ -386,7 +531,15 @@ def persist_inventory(
     )
     paths["parameters_parquet"] = write_parameters_parquet(
         elements, run_dir / "parameters.parquet",
-        run_id=run_id,
+        run_id=run_id, discovered_at=discovered_at,
+    )
+    paths["parameters_csv"] = write_parameters_csv(
+        elements, run_dir / "parameters.csv",
+        run_id=run_id, discovered_at=discovered_at,
+    )
+    paths["parameters_jsonl"] = write_parameters_jsonl(
+        elements, run_dir / "parameters.jsonl",
+        run_id=run_id, discovered_at=discovered_at,
     )
 
     write_to_sqlite(elements, run_id, session_factory, source_model=source_model)

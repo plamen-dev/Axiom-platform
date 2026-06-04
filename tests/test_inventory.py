@@ -1248,6 +1248,131 @@ class TestInventoryStorage:
             for field in PARAMETER_PARQUET_SCHEMA:
                 assert field.name in table.schema.names
 
+
+# ---------------------------------------------------------------------------
+# PR #21 — enriched parameter export + stable join contract
+# ---------------------------------------------------------------------------
+
+ENRICHED_ELEMENTS = [
+    {
+        "ElementId": 500001,
+        "UniqueId": "enr-wall-001",
+        "Category": "Walls",
+        "BuiltInCategory": "OST_Walls",
+        "ClassName": "Wall",
+        "IsType": False,
+        "Parameters": [
+            # writable String
+            {"Name": "Comments", "StorageType": "String", "IsReadOnly": False,
+             "BuiltInParameterId": "ALL_MODEL_INSTANCE_COMMENTS",
+             "ValueString": "Exterior", "ParameterGroup": "Identity Data"},
+            # writable Double WITH unit metadata -> safely settable
+            {"Name": "Unconnected Height", "StorageType": "Double",
+             "IsReadOnly": False, "BuiltInParameterId": "WALL_USER_HEIGHT_PARAM",
+             "ValueDouble": 3.0, "ValueString": "3000 mm",
+             "SpecTypeId": "autodesk.spec.aec:length-2.0.0",
+             "UnitTypeId": "autodesk.unit.unit:millimeters-1.0.1",
+             "DisplayUnit": "millimeters"},
+            # ElementId param
+            {"Name": "Phase Created", "StorageType": "ElementId",
+             "IsReadOnly": False, "BuiltInParameterId": "PHASE_CREATED",
+             "ValueElementId": 777, "ValueString": "New Construction"},
+        ],
+    },
+    {
+        "ElementId": 500002,
+        "UniqueId": "enr-walltype-001",
+        "Category": "Walls",
+        "BuiltInCategory": "OST_Walls",
+        "ClassName": "WallType",
+        "IsType": True,
+        "Parameters": [
+            {"Name": "Fire Rating", "StorageType": "String", "IsReadOnly": False,
+             "BuiltInParameterId": "FIRE_RATING", "ValueString": "2HR"},
+        ],
+    },
+]
+
+
+class TestEnrichedParameterExport:
+    def test_enriched_columns_present(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "parameters.parquet"
+            write_parameters_parquet(ENRICHED_ELEMENTS, path, run_id="enr")
+            names = pq.read_table(str(path)).schema.names
+            for col in (
+                "category", "built_in_category", "is_type_param",
+                "value_element_id", "spec_type_id", "forge_type_id",
+                "unit_type_id", "display_unit", "format_options",
+                "parameter_source", "discovered_at",
+            ):
+                assert col in names, f"missing enriched column: {col}"
+
+    def test_value_contract_and_join_fields_populated(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "parameters.parquet"
+            write_parameters_parquet(ENRICHED_ELEMENTS, path, run_id="enr")
+            rows = pq.read_table(str(path)).to_pylist()
+            by_name = {r["param_name"]: r for r in rows}
+
+            height = by_name["Unconnected Height"]
+            assert height["element_id"] == 500001  # stable join key
+            assert height["category"] == "Walls"
+            assert height["built_in_category"] == "OST_Walls"
+            assert height["spec_type_id"] == "autodesk.spec.aec:length-2.0.0"
+            assert height["unit_type_id"] == "autodesk.unit.unit:millimeters-1.0.1"
+            assert height["display_unit"] == "millimeters"
+            assert height["is_instance_param"] is True
+            assert height["is_type_param"] is False
+            assert height["parameter_source"] == "revit_inventory_model"
+            assert height["discovered_at"]
+
+            phase = by_name["Phase Created"]
+            assert phase["value_element_id"] == 777
+
+            fire = by_name["Fire Rating"]
+            assert fire["is_type_param"] is True
+            assert fire["is_instance_param"] is False
+
+    def test_join_key_matches_elements_export(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            d = Path(tmpdir)
+            write_elements_parquet(ENRICHED_ELEMENTS, d / "elements.parquet",
+                                   run_id="enr")
+            write_parameters_parquet(ENRICHED_ELEMENTS, d / "parameters.parquet",
+                                    run_id="enr")
+            elem_ids = set(pq.read_table(str(d / "elements.parquet"))
+                           .column("element_id").to_pylist())
+            param_ids = set(pq.read_table(str(d / "parameters.parquet"))
+                            .column("element_id").to_pylist())
+            # every parameter's element_id resolves to an exported element
+            assert param_ids.issubset(elem_ids)
+
+    def test_persist_inventory_writes_param_csv_and_jsonl(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            paths = persist_inventory(
+                ENRICHED_ELEMENTS, Path(tmpdir), "enr_run",
+                source_model="Enriched.rvt",
+            )
+            assert paths["parameters_csv"].exists()
+            assert paths["parameters_jsonl"].exists()
+            # CSV header carries the enriched columns
+            header = paths["parameters_csv"].read_text().splitlines()[0]
+            assert "unit_type_id" in header and "category" in header
+            # JSONL rows are per-parameter and carry the join key
+            lines = [json.loads(x) for x in
+                     paths["parameters_jsonl"].read_text().splitlines()]
+            assert lines and all("element_id" in r for r in lines)
+
+    def test_csv_jsonl_parquet_row_counts_match(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            paths = persist_inventory(ENRICHED_ELEMENTS, Path(tmpdir), "enr_run")
+            n_parquet = pq.read_table(str(paths["parameters_parquet"])).num_rows
+            n_csv = len(paths["parameters_csv"].read_text().splitlines()) - 1
+            n_jsonl = len(paths["parameters_jsonl"].read_text().splitlines())
+            total = sum(len(e["Parameters"]) for e in ENRICHED_ELEMENTS)
+            assert n_parquet == n_csv == n_jsonl == total
+
     def test_grids_and_levels_storage(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             paths = persist_inventory(
