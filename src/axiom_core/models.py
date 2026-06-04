@@ -304,3 +304,38 @@ class CandidateCapabilityRow(Base):
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="candidate")
     source_run_id: Mapped[str] = mapped_column(String(100), nullable=False, default="")
     generated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
+
+
+class ValidationProcedureRow(Base):
+    """A persisted Capability Validation Registry definition (PR #23).
+
+    Stores the governance contract for how a capability is validated: identity,
+    procedure steps, input/environment requirements, evidence contract,
+    pass/failure criteria, retry policy, and promotion-eligibility contract.
+    This is metadata only — persisting a row never executes a validation.
+
+    Keyed (uniquely upserted) by ``capability_name``. List/enum/nested fields
+    are stored as JSON text, mirroring the existing JSON-column pattern.
+    """
+
+    __tablename__ = "validation_procedures"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    capability_name: Mapped[str] = mapped_column(String(255), nullable=False, default="", index=True)
+    capability_type: Mapped[str] = mapped_column(String(50), nullable=False, default="")
+    adapter: Mapped[str] = mapped_column(String(50), nullable=False, default="revit", index=True)
+    version: Mapped[str] = mapped_column(String(50), nullable=False, default="")
+    validation_procedure_id: Mapped[str] = mapped_column(String(255), nullable=False, default="", index=True)
+    validation_name: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    validation_description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    steps_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    required_inputs_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    optional_inputs_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    environment_requirements_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    evidence_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    pass_conditions_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    failure_conditions_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    retry_policy_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    promotion_eligibility_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    notes: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    registered_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)

@@ -3466,5 +3466,184 @@ def discovery_run(adapter, simulate, inventory_export_path, run_id, output_dir, 
         console.print(f"[dim]Persisted: {result.persisted}[/dim]")
 
 
+@cli.command("validation-registry")
+@click.option("--name", "name", default=None,
+              help="Inspect one capability's validation definition "
+                   "(unknown capabilities are denied).")
+@click.option("--type", "capability_type", default=None,
+              help="Filter the list by capability type "
+                   "(inventory/discovery/mutation/bridge/creation).")
+@click.option("--json", "as_json", is_flag=True, default=False,
+              help="Emit machine-readable JSON instead of tables.")
+@click.option("--persist", "persist", is_flag=True, default=False,
+              help="Persist the validation definitions to SQLite "
+                   "(definitions only — nothing is executed).")
+@click.option("--db-path", "db_path", default=None,
+              help="SQLite db path to persist into (with --persist).")
+def validation_registry(name, capability_type, as_json, persist, db_path):
+    """Capability Validation Registry — list/inspect how Axiom capabilities are
+    validated.
+
+    Governance only: this prints the validation contract (procedure, inputs,
+    environment requirements, evidence, pass/failure criteria, retry policy,
+    promotion eligibility). It does NOT execute, promote, or score anything.
+    Unknown capabilities are denied by default.
+
+    \b
+    Examples:
+      axiom validation-registry                      # list all definitions
+      axiom validation-registry --type mutation      # filter by capability type
+      axiom validation-registry --name InventoryModel  # inspect one capability
+      axiom validation-registry --json               # machine-readable catalog
+      axiom validation-registry --persist --db-path validation.db
+    """
+    import json as _json
+
+    from axiom_core.validation import (
+        CapabilityType,
+        get_procedure,
+        is_known,
+        list_procedures,
+    )
+
+    # Optional: persist the definitions to SQLite (definitions only).
+    if persist:
+        from axiom_core.database import (
+            create_db_engine,
+            init_db,
+            make_session_factory,
+        )
+        from axiom_core.validation import persist_default_registry
+
+        engine = create_db_engine(db_path)
+        init_db(engine)
+        counts = persist_default_registry(make_session_factory(engine))
+        console.print(
+            f"[green]Persisted validation definitions[/green] "
+            f"(inserted={counts['inserted']}, updated={counts['updated']})")
+        if not (name or as_json):
+            return
+
+    # Inspect a single capability.
+    if name:
+        if not is_known(name):
+            allowed = ", ".join(p.capability_name for p in list_procedures())
+            if as_json:
+                console.print_json(_json.dumps({
+                    "capability_name": name,
+                    "known": False,
+                    "reason": "unknown capability — denied by default",
+                    "known_capabilities": [p.capability_name for p in list_procedures()],
+                }))
+            else:
+                console.print(
+                    f"[red]Capability '{name}' is not in the validation registry "
+                    f"(unknown capabilities are denied by default).[/red]")
+                console.print(f"[dim]Known: {allowed}[/dim]")
+            raise SystemExit(2)
+
+        proc = get_procedure(name)
+        if as_json:
+            console.print_json(_json.dumps(proc.to_dict()))
+            return
+
+        console.print(f"\n[bold blue]{proc.capability_name}[/bold blue]  "
+                      f"[dim]{proc.validation_procedure_id}[/dim]\n")
+        console.print(proc.validation_description)
+        meta = Table(show_header=False, box=None)
+        meta.add_column("k", style="cyan")
+        meta.add_column("v")
+        meta.add_row("Validation", proc.validation_name)
+        meta.add_row("Capability type", proc.capability_type.value)
+        meta.add_row("Adapter / version", f"{proc.adapter} / {proc.version}")
+        meta.add_row("Requires Revit", "yes" if proc.requires_revit else "no")
+        meta.add_row("Requires model open", "yes" if proc.requires_model_open else "no")
+        meta.add_row("Requires test model", "yes" if proc.requires_test_model else "no")
+        meta.add_row("Requires runner", "yes" if proc.requires_runner else "no")
+        meta.add_row("Required inputs", ", ".join(proc.required_inputs) or "none")
+        meta.add_row("Optional inputs", ", ".join(proc.optional_inputs) or "none")
+        meta.add_row("Environment",
+                     ", ".join(e.value for e in proc.environment_requirements) or "none")
+        console.print(meta)
+
+        steps = Table(title="Procedure steps", show_header=False)
+        steps.add_column("#", justify="right", style="dim")
+        steps.add_column("step")
+        for i, step in enumerate(proc.steps, 1):
+            steps.add_row(str(i), step)
+        console.print(steps)
+
+        ev = Table(title="Required evidence")
+        ev.add_column("Kind", style="cyan")
+        ev.add_column("Name")
+        ev.add_column("Required", justify="center")
+        for item in proc.evidence.all_items():
+            ev.add_row(item.kind.value, item.name, "yes" if item.required else "no")
+        console.print(ev)
+
+        crit = Table(show_header=False, box=None)
+        crit.add_column("k", style="cyan")
+        crit.add_column("v")
+        crit.add_row("Pass conditions",
+                     ", ".join(c.value for c in proc.pass_conditions))
+        crit.add_row("Failure conditions",
+                     ", ".join(c.value for c in proc.failure_conditions))
+        rp = proc.retry_policy
+        crit.add_row("Retry policy",
+                     f"max_retries={rp.max_retries}, delay={rp.retry_delay_seconds}s, "
+                     f"on={', '.join(c.value for c in rp.retry_conditions) or 'none'}")
+        pe = proc.promotion_eligibility
+        crit.add_row("Promotion eligibility",
+                     f"successes>={pe.minimum_successes}, "
+                     f"evidence_sets>={pe.minimum_evidence_sets}, "
+                     f"confidence>={pe.required_confidence}")
+        console.print(crit)
+        if proc.notes:
+            console.print(f"\n[dim]Note: {proc.notes}[/dim]")
+        return
+
+    # List (optionally filtered).
+    procs = list_procedures()
+    if capability_type:
+        try:
+            wanted = CapabilityType(capability_type.strip().lower())
+        except ValueError:
+            valid = ", ".join(t.value for t in CapabilityType)
+            console.print(f"[red]Invalid capability type '{capability_type}'. "
+                          f"Valid: {valid}[/red]")
+            raise SystemExit(2)
+        procs = [p for p in procs if p.capability_type is wanted]
+
+    if as_json:
+        console.print_json(_json.dumps([p.to_dict() for p in procs]))
+        return
+
+    console.print("\n[bold blue]Axiom Capability Validation Registry[/bold blue]")
+    console.print("[dim]Governed validation policy — unknown capabilities denied by "
+                  "default. This registry does not execute, promote, or score "
+                  "anything.[/dim]\n")
+    table = Table(title="Validation Definitions")
+    table.add_column("Capability", style="cyan")
+    table.add_column("Type")
+    table.add_column("Adapter")
+    table.add_column("Version")
+    table.add_column("Revit", justify="center")
+    table.add_column("Pass conditions", justify="right")
+    table.add_column("Evidence", justify="right")
+    for proc in procs:
+        table.add_row(
+            proc.capability_name,
+            proc.capability_type.value,
+            proc.adapter,
+            proc.version,
+            "yes" if proc.requires_revit else "no",
+            str(len(proc.pass_conditions)),
+            str(len(proc.evidence.all_items())),
+        )
+    console.print(table)
+    console.print(f"\n[dim]{len(procs)} validation definition(s). "
+                  f"Inspect one with: axiom validation-registry --name <capability>[/dim]")
+
+
 if __name__ == "__main__":
     cli()
