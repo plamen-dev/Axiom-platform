@@ -3466,6 +3466,134 @@ def discovery_run(adapter, simulate, inventory_export_path, run_id, output_dir, 
         console.print(f"[dim]Persisted: {result.persisted}[/dim]")
 
 
+@cli.command("runner-commands")
+@click.option("--name", "name", default=None,
+              help="Inspect a single command in detail (unknown names are denied).")
+@click.option("--classification", "classification", default=None,
+              help="Filter the list by classification "
+                   "(read_only/test/build/mutation/live_revit_required).")
+@click.option("--json", "as_json", is_flag=True, default=False,
+              help="Emit machine-readable JSON instead of tables.")
+def runner_commands(name, classification, as_json):
+    """Runner Command Registry — list/inspect the commands the AXIOM-01 runner
+    is allowed to execute.
+
+    Governance only: this prints the execution policy (safety level,
+    prerequisites, evidence outputs, timeout, failure classification). It does
+    NOT execute anything. Unknown commands are denied by default.
+
+    \b
+    Examples:
+      axiom runner-commands                       # list all allowed commands
+      axiom runner-commands --classification test # filter by classification
+      axiom runner-commands --name pytest         # inspect one command
+      axiom runner-commands --json                # machine-readable catalog
+    """
+    import json as _json
+
+    from axiom_core.runner import (
+        CommandClass,
+        get_command,
+        is_allowed,
+        list_commands,
+    )
+
+    # Inspect a single command.
+    if name:
+        if not is_allowed(name):
+            allowed = ", ".join(c.name for c in list_commands())
+            if as_json:
+                console.print_json(_json.dumps({
+                    "name": name,
+                    "allowed": False,
+                    "reason": "unknown command — denied by default",
+                    "allowed_commands": [c.name for c in list_commands()],
+                }))
+            else:
+                console.print(
+                    f"[red]Command '{name}' is not allowed "
+                    f"(unknown commands are denied by default).[/red]")
+                console.print(f"[dim]Allowed: {allowed}[/dim]")
+            raise SystemExit(2)
+
+        spec = get_command(name)
+        if as_json:
+            console.print_json(_json.dumps(spec.to_dict()))
+            return
+
+        console.print(f"\n[bold blue]{spec.name}[/bold blue]  "
+                      f"[dim]{spec.command}[/dim]\n")
+        console.print(spec.description)
+        meta = Table(show_header=False, box=None)
+        meta.add_column("k", style="cyan")
+        meta.add_column("v")
+        meta.add_row("Classification", spec.classification.value)
+        meta.add_row("Safety level", spec.safety_level.value)
+        meta.add_row("Requires Revit", "yes" if spec.requires_revit else "no")
+        meta.add_row("Requires model open", "yes" if spec.requires_model_open else "no")
+        meta.add_row("Timeout (s)", str(spec.timeout_seconds))
+        meta.add_row("Prerequisites",
+                     ", ".join(p.value for p in spec.prerequisites) or "none")
+        console.print(meta)
+
+        ev = Table(title="Evidence outputs", show_header=False)
+        ev.add_column("output")
+        for out in spec.evidence_outputs:
+            ev.add_row(out.location)
+        console.print(ev)
+
+        fm = Table(title="Failure classification")
+        fm.add_column("Class", style="yellow")
+        fm.add_column("Retryable", justify="center")
+        fm.add_column("Description")
+        for mode in spec.failure_modes:
+            fm.add_row(mode.code.value, "yes" if mode.retryable else "no",
+                       mode.description)
+        console.print(fm)
+        if spec.notes:
+            console.print(f"\n[dim]Note: {spec.notes}[/dim]")
+        return
+
+    # List (optionally filtered).
+    specs = list_commands()
+    if classification:
+        try:
+            wanted = CommandClass(classification.strip().lower())
+        except ValueError:
+            valid = ", ".join(c.value for c in CommandClass)
+            console.print(f"[red]Invalid classification '{classification}'. "
+                          f"Valid: {valid}[/red]")
+            raise SystemExit(2)
+        specs = [s for s in specs if s.classification is wanted]
+
+    if as_json:
+        console.print_json(_json.dumps([s.to_dict() for s in specs]))
+        return
+
+    console.print("\n[bold blue]Axiom Runner Command Registry[/bold blue]")
+    console.print("[dim]Governed execution policy — unknown commands denied by "
+                  "default. This catalog does not execute anything.[/dim]\n")
+    table = Table(title="Allowed Commands")
+    table.add_column("Name", style="cyan")
+    table.add_column("Classification")
+    table.add_column("Safety")
+    table.add_column("Revit", justify="center")
+    table.add_column("Timeout", justify="right")
+    table.add_column("Prerequisites")
+    for spec in specs:
+        table.add_row(
+            spec.name,
+            spec.classification.value,
+            spec.safety_level.value,
+            "yes" if spec.requires_revit else "no",
+            f"{spec.timeout_seconds}s",
+            ", ".join(p.value for p in spec.prerequisites) or "none",
+        )
+    console.print(table)
+    console.print(f"\n[dim]{len(specs)} command(s). "
+                  f"Inspect one with: axiom runner-commands --name <name>[/dim]")
+
+
 @cli.command("validation-registry")
 @click.option("--name", "name", default=None,
               help="Inspect one capability's validation definition "

@@ -1,0 +1,1145 @@
+"""Runner Command Registry — governed catalog of commands the AXIOM-01 runner
+is allowed to execute.
+
+This is the **execution policy layer**: a declarative, read-only catalog that
+states *which* local commands are permitted, *under what conditions*
+(prerequisites), *how their outputs are validated* (evidence outputs), and
+*how failures are classified*. It does NOT execute anything — it is consulted
+by runners/automation loops before they act.
+
+Architecture boundary (see docs/architecture/runner-command-registry.md):
+  - This module is pure governance/metadata. No subprocess, no I/O, no Revit.
+  - The Local Runner (``tools/local_runner``) remains the execution harness;
+    this registry is the policy it (and future automation loops) consults.
+  - Unknown commands are denied by default: ``is_allowed`` returns False for
+    anything not explicitly cataloged here.
+
+Scope (PR #22): governance/infrastructure only. No autonomous execution, no
+scheduling, no model mutation, no promotion loop.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from enum import Enum
+
+# ---------------------------------------------------------------------------
+# Classification enums
+# ---------------------------------------------------------------------------
+
+
+class CommandClass(str, Enum):
+    """Primary effect classification for a cataloged command.
+
+    These are the governance categories requested for PR #22:
+    read-only / mutation / build / test / live-Revit-required.
+    """
+
+    READ_ONLY = "read_only"          # produces artifacts only; no model/repo mutation
+    TEST = "test"                    # verification gate (pytest, validation loop)
+    BUILD = "build"                  # compiles/produces binaries
+    MUTATION = "mutation"            # mutates the model or repository state
+    LIVE_REVIT_REQUIRED = "live_revit_required"  # talks to a running Revit add-in
+
+
+class SafetyLevel(str, Enum):
+    """How much caution a command requires before it may run."""
+
+    SAFE = "safe"            # no side effects beyond artifacts; runnable anytime
+    GUARDED = "guarded"      # has prerequisites / environment constraints
+    HIGH_RISK = "high_risk"  # mutates model/state; must be explicitly gated
+
+
+class Prerequisite(str, Enum):
+    """Conditions that must hold before a command may be dispatched."""
+
+    NONE = "none"
+    POETRY_ENV = "poetry_env"                          # poetry virtualenv available
+    DOTNET_SDK = "dotnet_sdk"                          # .NET SDK on PATH (Windows build)
+    REVIT_RUNNING = "revit_running"                    # Revit process up with add-in
+    MODEL_OPEN = "model_open"                          # a document is open in Revit
+    BRANCH_CHECKED_OUT = "branch_checked_out"          # target git branch checked out
+    WORKSPACE_CLEAN = "workspace_clean"                # no uncommitted changes
+    DB_PATH_AVAILABLE = "db_path_available"            # writable SQLite db path
+    INVENTORY_EXPORT_AVAILABLE = "inventory_export_available"  # an InventoryModel export exists
+
+
+class FailureClass(str, Enum):
+    """Stable taxonomy for classifying how a command failed.
+
+    Automation loops use this to decide retry vs. escalate. Whether a given
+    occurrence is retryable is recorded per-command on :class:`FailureMode`.
+    """
+
+    NONZERO_EXIT = "nonzero_exit"              # process returned a non-zero code
+    TIMEOUT = "timeout"                        # exceeded the command timeout
+    MISSING_PREREQUISITE = "missing_prerequisite"  # a declared prerequisite was not met
+    ENVIRONMENT_ERROR = "environment_error"    # toolchain/interpreter/SDK problem
+    PIPE_UNAVAILABLE = "pipe_unavailable"      # Revit named-pipe bridge not reachable
+    MALFORMED_INPUT = "malformed_input"        # input artifact missing/unparseable
+    BUILD_ERROR = "build_error"                # compilation failure
+    TEST_FAILURE = "test_failure"              # one or more tests/assertions failed
+    LINT_VIOLATION = "lint_violation"          # linter reported violations
+    INCOMPLETE_DISCOVERY = "incomplete_discovery"  # ran but produced no usable result
+    MISSING_EVIDENCE = "missing_evidence"      # expected evidence artifact absent
+
+
+# ``FailureClassification`` is the public name for the failure taxonomy enum.
+# ``FailureClass`` is kept as a short alias used throughout the catalog.
+FailureClassification = FailureClass
+
+
+# ---------------------------------------------------------------------------
+# Schema
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class FailureMode:
+    """A classified way a command can fail, with retry guidance.
+
+    ``code`` is the stable :class:`FailureClassification`; ``retryable`` tells a
+    future automation loop whether this failure is worth a bounded retry.
+    """
+
+    code: FailureClassification
+    description: str
+    retryable: bool = False
+
+    def to_dict(self) -> dict:
+        return {
+            "code": self.code.value,
+            "description": self.description,
+            "retryable": self.retryable,
+        }
+
+
+@dataclass(frozen=True)
+class EvidenceOutput:
+    """A declared place to look to validate a command's result.
+
+    ``location`` is a path/pattern or console descriptor; ``required`` marks
+    whether its absence should be treated as a ``missing_evidence`` failure.
+    """
+
+    location: str
+    description: str = ""
+    required: bool = True
+
+    def to_dict(self) -> dict:
+        return {
+            "location": self.location,
+            "description": self.description,
+            "required": self.required,
+        }
+
+
+@dataclass(frozen=True)
+class Timeout:
+    """A typed command timeout.
+
+    On expiry the runner should kill the process (``kill_on_expire``) and
+    classify the result as :attr:`FailureClassification.TIMEOUT`.
+    """
+
+    seconds: int
+    kill_on_expire: bool = True
+
+    @property
+    def classification_on_expire(self) -> FailureClassification:
+        return FailureClassification.TIMEOUT
+
+    def to_dict(self) -> dict:
+        return {
+            "seconds": self.seconds,
+            "kill_on_expire": self.kill_on_expire,
+            "classification_on_expire": self.classification_on_expire.value,
+        }
+
+
+# Maps each prerequisite to the boolean attribute on ExecutionContext that
+# satisfies it. ``NONE`` is always satisfied.
+_PREREQ_CONTEXT_ATTR: dict[Prerequisite, str] = {
+    Prerequisite.POETRY_ENV: "poetry_env",
+    Prerequisite.DOTNET_SDK: "dotnet_sdk",
+    Prerequisite.REVIT_RUNNING: "revit_running",
+    Prerequisite.MODEL_OPEN: "model_open",
+    Prerequisite.BRANCH_CHECKED_OUT: "branch_checked_out",
+    Prerequisite.WORKSPACE_CLEAN: "workspace_clean",
+    Prerequisite.DB_PATH_AVAILABLE: "db_path_available",
+    Prerequisite.INVENTORY_EXPORT_AVAILABLE: "inventory_export_available",
+}
+
+
+@dataclass(frozen=True)
+class ExecutionContext:
+    """The runtime conditions a runner reports when asking whether a command
+    may run. Pure data — consulted by the policy layer, never executes anything.
+
+    Defaults describe a plain dev checkout: a Poetry env on a checked-out
+    branch, with no Revit, no .NET SDK, no inventory export, and an unverified
+    (possibly dirty) workspace.
+    """
+
+    poetry_env: bool = True
+    dotnet_sdk: bool = False
+    revit_running: bool = False
+    model_open: bool = False
+    branch_checked_out: bool = True
+    workspace_clean: bool = False
+    db_path_available: bool = False
+    inventory_export_available: bool = False
+
+    def satisfies(self, prerequisite: Prerequisite) -> bool:
+        if prerequisite is Prerequisite.NONE:
+            return True
+        attr = _PREREQ_CONTEXT_ATTR.get(prerequisite)
+        return bool(getattr(self, attr)) if attr else False
+
+
+@dataclass(frozen=True)
+class AllowedCommand:
+    """A single governed command entry — a command the runner is allowed to run.
+
+    Carries its safety classification, prerequisites, evidence expectations,
+    timeout, and failure classification. This is policy metadata only; nothing
+    here executes a command.
+    """
+
+    name: str
+    command: str
+    description: str
+    classification: CommandClass
+    safety_level: SafetyLevel
+    prerequisites: tuple[Prerequisite, ...] = ()
+    evidence_outputs: tuple[EvidenceOutput, ...] = ()
+    timeout_seconds: int = 300
+    failure_modes: tuple[FailureMode, ...] = ()
+    notes: str = ""
+
+    def __post_init__(self) -> None:
+        # Allow plain strings in evidence_outputs for catalog brevity; coerce
+        # them to EvidenceOutput so the public type is always EvidenceOutput.
+        coerced = tuple(
+            e if isinstance(e, EvidenceOutput) else EvidenceOutput(location=str(e))
+            for e in self.evidence_outputs
+        )
+        object.__setattr__(self, "evidence_outputs", coerced)
+
+    # --- explicit, first-class predicates ---------------------------------
+
+    @property
+    def requires_revit(self) -> bool:
+        """RequiresRevit: the command needs a running Revit add-in."""
+        return (
+            self.classification is CommandClass.LIVE_REVIT_REQUIRED
+            or Prerequisite.REVIT_RUNNING in self.prerequisites
+        )
+
+    # Back-compat alias.
+    requires_live_revit = requires_revit
+
+    @property
+    def requires_model_open(self) -> bool:
+        """RequiresModelOpen: the command needs a document open in Revit."""
+        return Prerequisite.MODEL_OPEN in self.prerequisites
+
+    @property
+    def is_read_only(self) -> bool:
+        return self.classification is CommandClass.READ_ONLY
+
+    @property
+    def is_mutation(self) -> bool:
+        return self.classification is CommandClass.MUTATION
+
+    @property
+    def timeout(self) -> Timeout:
+        """Typed timeout view of ``timeout_seconds``."""
+        return Timeout(seconds=self.timeout_seconds)
+
+    def unmet_prerequisites(self, context: ExecutionContext) -> list[Prerequisite]:
+        """Prerequisites NOT satisfied by ``context`` (empty == runnable)."""
+        return [p for p in self.prerequisites if not context.satisfies(p)]
+
+    def can_run(self, context: ExecutionContext) -> bool:
+        """Whether all prerequisites are satisfied by ``context``."""
+        return not self.unmet_prerequisites(context)
+
+    def to_dict(self) -> dict:
+        """JSON-serializable view (enum values flattened to strings)."""
+        return {
+            "name": self.name,
+            "command": self.command,
+            "description": self.description,
+            "classification": self.classification.value,
+            "safety_level": self.safety_level.value,
+            "prerequisites": [p.value for p in self.prerequisites],
+            "evidence_outputs": [e.to_dict() for e in self.evidence_outputs],
+            "timeout": self.timeout.to_dict(),
+            "timeout_seconds": self.timeout_seconds,
+            "failure_modes": [fm.to_dict() for fm in self.failure_modes],
+            "requires_revit": self.requires_revit,
+            "requires_model_open": self.requires_model_open,
+            "is_read_only": self.is_read_only,
+            "is_mutation": self.is_mutation,
+            "notes": self.notes,
+        }
+
+
+# Back-compat alias for the original name used during initial implementation.
+CommandSpec = AllowedCommand
+
+
+# ---------------------------------------------------------------------------
+# Reusable failure modes (keep the catalog DRY)
+# ---------------------------------------------------------------------------
+
+FM_TIMEOUT = FailureMode(FailureClass.TIMEOUT,
+                         "Exceeded the command timeout.", retryable=True)
+FM_NONZERO = FailureMode(FailureClass.NONZERO_EXIT,
+                         "Command returned a non-zero exit code.", retryable=False)
+FM_ENV = FailureMode(FailureClass.ENVIRONMENT_ERROR,
+                     "Toolchain / interpreter / poetry env problem.", retryable=False)
+FM_PIPE = FailureMode(FailureClass.PIPE_UNAVAILABLE,
+                      "Revit add-in pipe not reachable (Revit not running).",
+                      retryable=True)
+FM_MALFORMED = FailureMode(FailureClass.MALFORMED_INPUT,
+                           "Required input artifact missing or unparseable.",
+                           retryable=False)
+FM_MISSING_PRE = FailureMode(FailureClass.MISSING_PREREQUISITE,
+                             "A declared prerequisite was not met.", retryable=False)
+
+# Common evidence for commands whose only output is console + exit code.
+EV_CONSOLE = ("stdout/stderr: human-readable output", "exit code: 0 = success")
+
+
+# ---------------------------------------------------------------------------
+# Catalog — covers all built-in axiom CLI commands + dev toolchain (PR #22)
+# ---------------------------------------------------------------------------
+
+_CATALOG: dict[str, CommandSpec] = {}
+
+
+def _register(spec: CommandSpec) -> None:
+    if spec.name in _CATALOG:
+        raise ValueError(f"Duplicate command name in catalog: {spec.name}")
+    _CATALOG[spec.name] = spec
+
+
+_register(
+    CommandSpec(
+        name="pytest",
+        command="poetry run pytest",
+        description="Run the full Python test suite via Poetry.",
+        classification=CommandClass.TEST,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            "stdout/stderr: pass/fail summary and tracebacks",
+            "exit code: 0 = all tests passed",
+        ),
+        timeout_seconds=1800,
+        failure_modes=(
+            FailureMode(FailureClass.TEST_FAILURE,
+                        "One or more tests failed (non-zero exit).", retryable=False),
+            FailureMode(FailureClass.ENVIRONMENT_ERROR,
+                        "Collection/import error before tests ran.", retryable=False),
+            FailureMode(FailureClass.TIMEOUT,
+                        "Suite exceeded the timeout.", retryable=True),
+        ),
+    )
+)
+
+_register(
+    CommandSpec(
+        name="ruff",
+        command="poetry run ruff check .",
+        description="Run the ruff linter over the workspace (no autofix).",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            "stdout: lint findings (file:line:rule)",
+            "exit code: 0 = clean",
+        ),
+        timeout_seconds=300,
+        failure_modes=(
+            FailureMode(FailureClass.LINT_VIOLATION,
+                        "Linter reported violations (non-zero exit).", retryable=False),
+            FailureMode(FailureClass.ENVIRONMENT_ERROR,
+                        "ruff not installed / poetry env missing.", retryable=False),
+        ),
+        notes="Read-only check: `ruff check .` does not modify files (no --fix).",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="dotnet-build",
+        command="dotnet build src/axiom_revit/Axiom.Revit.2027.sln -c Release -p:Platform=x64",
+        description="Build the Revit 2027 add-in solution (Release|x64). Does not deploy.",
+        classification=CommandClass.BUILD,
+        safety_level=SafetyLevel.GUARDED,
+        prerequisites=(Prerequisite.DOTNET_SDK,),
+        evidence_outputs=(
+            "stdout: MSBuild log (warnings/errors)",
+            "exit code: 0 = build succeeded",
+            "bin/Release output assemblies under src/axiom_revit/**",
+        ),
+        timeout_seconds=1200,
+        failure_modes=(
+            FailureMode(FailureClass.BUILD_ERROR,
+                        "Compilation errors (non-zero exit).", retryable=False),
+            FailureMode(FailureClass.ENVIRONMENT_ERROR,
+                        "Missing .NET SDK / Revit API references.", retryable=False),
+            FailureMode(FailureClass.TIMEOUT,
+                        "Build exceeded the timeout.", retryable=True),
+        ),
+        notes="Windows runner only. Preserves the 2024 baseline; builds the 2027 adapter.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="bridge-execute",
+        command="axiom bridge-execute --capability InventoryModel",
+        description=(
+            "Send ONE capability request to a running Revit add-in over the "
+            "named-pipe bridge and record durable evidence. Default args are "
+            "safe summary mode ({\"SummaryOnly\": true})."
+        ),
+        classification=CommandClass.LIVE_REVIT_REQUIRED,
+        safety_level=SafetyLevel.GUARDED,
+        prerequisites=(
+            Prerequisite.POETRY_ENV,
+            Prerequisite.REVIT_RUNNING,
+            Prerequisite.MODEL_OPEN,
+        ),
+        evidence_outputs=(
+            "artifacts/validation_runs/<run_id>/request.json",
+            "artifacts/validation_runs/<run_id>/response.json",
+            "artifacts/validation_runs/<run_id>/summary + pass/fail record",
+        ),
+        timeout_seconds=600,
+        failure_modes=(
+            FailureMode(FailureClass.PIPE_UNAVAILABLE,
+                        "Revit add-in pipe not reachable (Revit not running).",
+                        retryable=True),
+            FailureMode(FailureClass.NONZERO_EXIT,
+                        "Capability returned an error response.", retryable=False),
+            FailureMode(FailureClass.TIMEOUT,
+                        "No response within the timeout.", retryable=True),
+        ),
+        notes="`--simulate` uses the mock path (no Revit) for off-Windows driver/evidence proof.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="validation-run",
+        command="axiom validation-run --scenario <id> --phase <pre|scan|all>",
+        description=(
+            "Validation Automation Loop v0 — automate everything around the "
+            "single live-Revit human step and classify the result."
+        ),
+        classification=CommandClass.TEST,
+        safety_level=SafetyLevel.GUARDED,
+        prerequisites=(
+            Prerequisite.POETRY_ENV,
+            Prerequisite.BRANCH_CHECKED_OUT,
+        ),
+        evidence_outputs=(
+            "artifacts/validation_runs/<run_id>/ (pre/scan evidence)",
+            "classification result (pass/fail/retry) in the run bundle",
+        ),
+        timeout_seconds=1800,
+        failure_modes=(
+            FailureMode(FailureClass.TEST_FAILURE,
+                        "Pre-phase tests/ruff failed.", retryable=False),
+            FailureMode(FailureClass.MISSING_EVIDENCE,
+                        "Scan phase found no live-Revit evidence to evaluate.",
+                        retryable=True),
+            FailureMode(FailureClass.TIMEOUT,
+                        "A phase exceeded the timeout.", retryable=True),
+        ),
+        notes="The live Revit step is performed manually between the pre and scan phases.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="inventory-import",
+        command="axiom inventory-import --latest",
+        description=(
+            "Import a Revit InventoryModel JSON export into the Python artifact "
+            "pipeline (elements + enriched parameters)."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(
+            Prerequisite.POETRY_ENV,
+            Prerequisite.INVENTORY_EXPORT_AVAILABLE,
+        ),
+        evidence_outputs=(
+            "artifacts/model_inventory_runs/<run_id>/elements.jsonl + elements.parquet",
+            "artifacts/model_inventory_runs/<run_id>/parameters.parquet|csv|jsonl",
+            "artifacts/model_inventory_runs/<run_id>/run_metadata.json + summary.md",
+        ),
+        timeout_seconds=600,
+        failure_modes=(
+            FailureMode(FailureClass.MISSING_PREREQUISITE,
+                        "No inventory export found to import.", retryable=False),
+            FailureMode(FailureClass.MALFORMED_INPUT,
+                        "Export JSON missing/unparseable.", retryable=False),
+            FailureMode(FailureClass.NONZERO_EXIT,
+                        "Import failed for another reason.", retryable=False),
+        ),
+        notes="Produces artifacts only; does not mutate the Revit model or repo source.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="discovery-run",
+        command=(
+            "axiom discovery-run --adapter revit "
+            "--inventory-export-path <run_folder> --db-path discovery.db"
+        ),
+        description=(
+            "Discovery Harness v1 — interpret an InventoryModel export into the "
+            "ProductObject/ProductProperty registries, candidate capabilities, "
+            "and a reviewable report bundle. Read-only discovery."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(
+            Prerequisite.POETRY_ENV,
+            Prerequisite.INVENTORY_EXPORT_AVAILABLE,
+            Prerequisite.DB_PATH_AVAILABLE,
+        ),
+        evidence_outputs=(
+            "artifacts/discovery_runs/<run_id>/summary.json + summary.md",
+            "artifacts/discovery_runs/<run_id>/categories.csv + parameters.csv",
+            "artifacts/discovery_runs/<run_id>/candidate_capabilities.csv",
+            "artifacts/discovery_runs/<run_id>/discovery_evidence.jsonl",
+        ),
+        timeout_seconds=600,
+        failure_modes=(
+            FailureMode(FailureClass.MALFORMED_INPUT,
+                        "Export folder/file missing or unsupported format.",
+                        retryable=False),
+            FailureMode(FailureClass.INCOMPLETE_DISCOVERY,
+                        "Ran but discovered 0 parameters (category-only).",
+                        retryable=False),
+            FailureMode(FailureClass.NONZERO_EXIT,
+                        "Discovery failed for another reason.", retryable=False),
+        ),
+        notes="--db-path is optional; omit to skip registry persistence (DB_PATH_AVAILABLE then N/A).",
+    )
+)
+
+# --- Live-Revit / model-mutating capability commands -----------------------
+
+_register(
+    CommandSpec(
+        name="inventory-model",
+        command="axiom inventory-model",
+        description=(
+            "Run a read-only model inventory (InventoryModel capability) by "
+            "sending the InventoryModel prompt to a running Revit add-in. "
+            "Summary mode by default — counts/categories only, no parameter dump."
+        ),
+        classification=CommandClass.LIVE_REVIT_REQUIRED,
+        safety_level=SafetyLevel.GUARDED,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.REVIT_RUNNING,
+                       Prerequisite.MODEL_OPEN),
+        evidence_outputs=(
+            "artifacts/model_inventory_runs/<run_id>/elements.* + parameters.*",
+            "artifacts/model_inventory_runs/<run_id>/summary.md",
+        ),
+        timeout_seconds=900,
+        failure_modes=(FM_PIPE, FM_NONZERO, FM_TIMEOUT),
+        notes="Read-only scan. Full/whole-model value extraction is blocked/guarded "
+              "(crashed Revit 2027); use category/level/sample modes for parameters.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="prompt",
+        command="axiom prompt \"<natural language>\"",
+        description=(
+            "Resolve and EXECUTE a natural-language prompt (e.g. CreateGrids/"
+            "CreateLevels) in Revit. Executes live by default; --simulate "
+            "validates only."
+        ),
+        classification=CommandClass.MUTATION,
+        safety_level=SafetyLevel.HIGH_RISK,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.REVIT_RUNNING,
+                       Prerequisite.MODEL_OPEN),
+        evidence_outputs=(
+            "execution plan + result status (console)",
+            "capability execution log / job + plan records",
+        ),
+        timeout_seconds=600,
+        failure_modes=(
+            FM_PIPE,
+            FailureMode(FailureClass.NONZERO_EXIT,
+                        "Prompt could not be resolved or execution failed.",
+                        retryable=False),
+            FM_TIMEOUT,
+        ),
+        notes="DEFAULT IS LIVE EXECUTION and can mutate the model. Use --simulate "
+              "to validate only (safe). Prefer simulate before any live apply.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execute",
+        command="axiom execute <plan_id>",
+        description=(
+            "Execute a previously generated plan. Simulation by default; "
+            "--production executes against the live model."
+        ),
+        classification=CommandClass.MUTATION,
+        safety_level=SafetyLevel.HIGH_RISK,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.REVIT_RUNNING,
+                       Prerequisite.MODEL_OPEN),
+        evidence_outputs=(
+            "execution result + per-step status (console)",
+            "execution log / updated job + plan records",
+        ),
+        timeout_seconds=600,
+        failure_modes=(FM_PIPE, FM_NONZERO, FM_TIMEOUT),
+        notes="Simulation by default (safe). --production mutates the live model — "
+              "high risk; gate explicitly.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="set-parameter-value",
+        command="axiom set-parameter-value \"<edit prompt>\"",
+        description=(
+            "Preview or apply a constrained text parameter edit (v0: text/"
+            "instance/writable/category-constrained, max 5 elements). Preview "
+            "by default; apply mutates the model."
+        ),
+        classification=CommandClass.MUTATION,
+        safety_level=SafetyLevel.HIGH_RISK,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.REVIT_RUNNING,
+                       Prerequisite.MODEL_OPEN),
+        evidence_outputs=(
+            "preview/apply summary (before/after values, console)",
+            "SetParameterValue evidence bundle under artifacts/",
+        ),
+        timeout_seconds=600,
+        failure_modes=(FM_PIPE, FM_NONZERO, FM_TIMEOUT),
+        notes="Preview by default (safe). Apply mutates the model — preview must be "
+              "verified first; apply on a disposable/sample model before production.",
+    )
+)
+
+# --- Test harnesses --------------------------------------------------------
+
+_register(
+    CommandSpec(
+        name="test-grids",
+        command="axiom test-grids --mode simulate",
+        description="Run the CreateGrids deterministic test harness (simulate by default).",
+        classification=CommandClass.TEST,
+        safety_level=SafetyLevel.GUARDED,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            "artifacts/<run_id>/ test results (+ optional CSV/XLSX/MD with --review-output)",
+            "exit code: 0 = all cases passed",
+        ),
+        timeout_seconds=600,
+        failure_modes=(
+            FailureMode(FailureClass.TEST_FAILURE,
+                        "One or more grid test cases failed.", retryable=False),
+            FM_PIPE, FM_TIMEOUT,
+        ),
+        notes="--mode real requires a Revit pipe and CREATES grids in the model "
+              "(treat real mode as live-Revit/mutation).",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="test-levels",
+        command="axiom test-levels --mode simulate",
+        description="Run the CreateLevels deterministic test harness (simulate by default).",
+        classification=CommandClass.TEST,
+        safety_level=SafetyLevel.GUARDED,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            "artifacts/<run_id>/ test results (+ optional CSV/XLSX/MD with --review-output)",
+            "exit code: 0 = all cases passed",
+        ),
+        timeout_seconds=600,
+        failure_modes=(
+            FailureMode(FailureClass.TEST_FAILURE,
+                        "One or more level test cases failed.", retryable=False),
+            FM_PIPE, FM_TIMEOUT,
+        ),
+        notes="--mode real requires a Revit pipe and CREATES levels in the model "
+              "(treat real mode as live-Revit/mutation).",
+    )
+)
+
+# --- Inventory pipeline (artifact-producing, read-only) --------------------
+
+_register(
+    CommandSpec(
+        name="inventory-export",
+        command="axiom inventory-export --file <export.json> --chunk-by discipline",
+        description="Import a Revit inventory JSON and extract it by discipline chunks.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.INVENTORY_EXPORT_AVAILABLE),
+        evidence_outputs=(
+            "artifacts/model_inventory_runs/<run_id>/<discipline>/ CSV + XLSX + Markdown",
+        ),
+        timeout_seconds=600,
+        failure_modes=(FM_MALFORMED, FM_NONZERO),
+        notes="Produces artifacts only; does not mutate the model.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="inventory-combine",
+        command="axiom inventory-combine --batch-dir <dir>",
+        description=(
+            "Combine multiple batch inventory JSON files into a single inventory "
+            "(optionally run discipline extraction on the result)."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.INVENTORY_EXPORT_AVAILABLE),
+        evidence_outputs=(
+            "artifacts/model_inventory_runs/<run_id>/ combined inventory + review files",
+        ),
+        timeout_seconds=600,
+        failure_modes=(FM_MALFORMED, FM_NONZERO),
+        notes="Reads batch_*.json (or a manifest); produces artifacts only.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="inventory-import-batch",
+        command="axiom inventory-import-batch --dir <dir>",
+        description=(
+            "Batch-import all matching inventory JSON exports from a directory or "
+            "manifest (optionally filtered by scan_mode)."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.INVENTORY_EXPORT_AVAILABLE),
+        evidence_outputs=(
+            "artifacts/model_inventory_runs/<run_id>/ per imported export",
+        ),
+        timeout_seconds=900,
+        failure_modes=(FM_MALFORMED, FM_NONZERO),
+        notes="Produces artifacts only; does not mutate the model.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="inventory-plan",
+        command="axiom inventory-plan --file <summary.json>",
+        description=(
+            "Build an adaptive extraction plan from a summary-mode inventory "
+            "export (groups small categories, isolates/chunks large ones)."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.INVENTORY_EXPORT_AVAILABLE),
+        evidence_outputs=(
+            "inventory_extraction_plan.json + .md + .xlsx under the output dir",
+        ),
+        timeout_seconds=300,
+        failure_modes=(FM_MALFORMED, FM_NONZERO),
+        notes="Planning only; does not extract or mutate anything.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="inventory-plan-status",
+        command="axiom inventory-plan-status",
+        description="Show status of the latest parameter schema plan and handoff paths.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only status inspector.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="inventory-summary",
+        command="axiom inventory-summary --latest",
+        description="Inspect and summarize an InventoryModel run from Parquet artifacts.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.INVENTORY_EXPORT_AVAILABLE),
+        evidence_outputs=("inventory summary tables (console)",) + EV_CONSOLE,
+        timeout_seconds=120,
+        failure_modes=(FM_MISSING_PRE, FM_NONZERO),
+        notes="Read-only. Summary-mode runs with zero parameters are valid (not an error).",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="parameter-registry-build",
+        command="axiom parameter-registry-build --from-inventory <dir>",
+        description=(
+            "Build a property registry candidate from multiple category parameter "
+            "schema runs (dedup + coverage summary)."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.INVENTORY_EXPORT_AVAILABLE),
+        evidence_outputs=(
+            "registry candidate + coverage summary under the output dir",
+        ),
+        timeout_seconds=600,
+        failure_modes=(FM_MALFORMED, FM_NONZERO),
+        notes="Produces a registry candidate artifact; read-only over inventory runs.",
+    )
+)
+
+# --- Job / plan orchestration (internal state, no model mutation) ----------
+
+_register(
+    CommandSpec(
+        name="submit",
+        command="axiom submit <excel_file>",
+        description="Submit a new job from an Excel file (--dry-run validates only).",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("created job id + parsed job summary (console)",) + EV_CONSOLE,
+        timeout_seconds=120,
+        failure_modes=(FM_MALFORMED, FM_NONZERO),
+        notes="Creates an internal job record; does not touch the Revit model. "
+              "Requires a valid Excel input file.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="plan",
+        command="axiom plan <job_id>",
+        description="Generate an execution plan for a job (--approve auto-approves).",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("generated plan id + plan steps (console)",) + EV_CONSOLE,
+        timeout_seconds=120,
+        failure_modes=(FM_MISSING_PRE, FM_NONZERO),
+        notes="Planning only — generates/approves a plan record; no execution, no "
+              "model mutation. Execute the plan with `execute`.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="jobs",
+        command="axiom jobs",
+        description="List all jobs (optionally filtered by status).",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("jobs table (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only query over the job store.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="plans",
+        command="axiom plans",
+        description="List all plans.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("plans table (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only query over the plan store.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="stats",
+        command="axiom stats",
+        description="Show storage statistics.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("storage statistics (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="tools",
+        command="axiom tools",
+        description="List available tools in the MCP layer.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("MCP tools list (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="demo",
+        command="axiom demo <excel_file>",
+        description="Run a complete demo: submit, plan, simulate, and report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("end-to-end demo report (console)",) + EV_CONSOLE,
+        timeout_seconds=600,
+        failure_modes=(FM_MALFORMED, FM_NONZERO),
+        notes="Simulation only (no live Revit, no production execution). Creates "
+              "internal job/plan records; requires a valid Excel input file.",
+    )
+)
+
+# --- Evidence / snapshots --------------------------------------------------
+
+_register(
+    CommandSpec(
+        name="pr-snapshot",
+        command="axiom pr-snapshot --pr <n> --title <t> --branch <b> --status <s>",
+        description=(
+            "Capture a durable PR review/evidence snapshot as repo-native "
+            "artifacts (JSON + Markdown). No GitHub API dependency."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            "artifacts/pr_reviews/pr_NNNN/review_snapshot.json + .md",
+        ),
+        timeout_seconds=120,
+        failure_modes=(FM_MALFORMED, FM_NONZERO),
+        notes="Writes snapshot artifacts under artifacts/pr_reviews/; no model mutation.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="evidence-update",
+        command="axiom evidence-update --from-pr-snapshot <dir>",
+        description=(
+            "Generate proposed ledger entries from a PR snapshot. Prints + saves "
+            "to the snapshot dir by default; --apply appends to ledger files."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.GUARDED,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            "proposed ledger Markdown blocks (saved to the snapshot dir)",
+        ),
+        timeout_seconds=120,
+        failure_modes=(FM_MALFORMED, FM_NONZERO),
+        notes="Default is read-only (writes to the snapshot dir). --apply MUTATES "
+              "docs/logs ledger files — treat that form as a docs mutation.",
+    )
+)
+
+# --- Meta-executor + governance inspector ----------------------------------
+
+_register(
+    CommandSpec(
+        name="local-runner",
+        command="axiom local-runner --task <task.json>",
+        description=(
+            "Execute an allowlisted local action from a task.json (restricted "
+            "harness — only named allowlisted actions, no arbitrary shell)."
+        ),
+        classification=CommandClass.MUTATION,
+        safety_level=SafetyLevel.HIGH_RISK,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.WORKSPACE_CLEAN),
+        evidence_outputs=(
+            "artifacts/<run_id>/ captured stdout/stderr + result/failure summary",
+        ),
+        timeout_seconds=1800,
+        failure_modes=(FM_MISSING_PRE, FM_NONZERO, FM_ENV, FM_TIMEOUT),
+        notes="Meta-executor: effect depends on the action it runs (tests/build/"
+              "deploy). Deploy actions mutate the installed Revit add-in. Bounded "
+              "by the local_runner allowlist + workspace policy; classified at its "
+              "worst-case (mutation) for governance.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="runner-commands",
+        command="axiom runner-commands",
+        description=(
+            "List/inspect this Runner Command Registry (the execution policy "
+            "layer). Read-only governance inspector — executes nothing."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("command catalog table / JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Self-describing: this command is itself cataloged. Unknown commands "
+              "are denied by default.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="validation-registry",
+        command="axiom validation-registry",
+        description=(
+            "List/inspect the Capability Validation Registry (how each capability "
+            "is validated). Read-only governance inspector — executes nothing."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("validation definition table / JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Governance only: prints validation contracts. Unknown capabilities "
+              "are denied by default.",
+    )
+)
+
+
+# ---------------------------------------------------------------------------
+# CommandRegistry — the governed catalog as an object
+# ---------------------------------------------------------------------------
+
+
+class CommandRegistry:
+    """The execution policy layer: the set of commands the runner is allowed to
+    run, plus governance queries over them.
+
+    Read-only governance — it answers "is this allowed, and how is its result
+    judged?" and "may it run in this :class:`ExecutionContext`?". It never
+    executes a command. Unknown commands are denied by default.
+    """
+
+    def __init__(self, commands: dict[str, AllowedCommand]):
+        self._commands = dict(commands)
+
+    def list_commands(self) -> list[AllowedCommand]:
+        """All allowed commands, sorted by name."""
+        return [self._commands[name] for name in sorted(self._commands)]
+
+    def command_names(self) -> list[str]:
+        return sorted(self._commands)
+
+    def get(self, name: str) -> AllowedCommand | None:
+        """The :class:`AllowedCommand` for ``name``, or None if not cataloged."""
+        return self._commands.get(name)
+
+    def is_allowed(self, name: str) -> bool:
+        """Whether ``name`` is explicitly cataloged. Unknown ⇒ denied."""
+        return name in self._commands
+
+    def by_classification(self, classification: CommandClass) -> list[AllowedCommand]:
+        return [c for c in self.list_commands()
+                if c.classification is classification]
+
+    def runnable_in(self, context: ExecutionContext) -> list[AllowedCommand]:
+        """Allowed commands whose prerequisites are all met by ``context``."""
+        return [c for c in self.list_commands() if c.can_run(context)]
+
+    def validate(self) -> None:
+        """Assert structural integrity. Raises ValueError on problems. No I/O."""
+        for name, spec in self._commands.items():
+            if name != spec.name:
+                raise ValueError(f"Catalog key '{name}' != spec.name '{spec.name}'")
+            if not spec.command.strip():
+                raise ValueError(f"Command '{name}' has an empty invocation string")
+            if not spec.description.strip():
+                raise ValueError(f"Command '{name}' has no description")
+            if spec.timeout_seconds <= 0:
+                raise ValueError(f"Command '{name}' has a non-positive timeout")
+            if not spec.failure_modes:
+                raise ValueError(f"Command '{name}' declares no failure modes")
+            if not spec.evidence_outputs:
+                raise ValueError(f"Command '{name}' declares no evidence outputs")
+            if not isinstance(spec.classification, CommandClass):
+                raise ValueError(f"Command '{name}' has an invalid classification")
+            if not isinstance(spec.safety_level, SafetyLevel):
+                raise ValueError(f"Command '{name}' has an invalid safety level")
+            for ev in spec.evidence_outputs:
+                if not isinstance(ev, EvidenceOutput):
+                    raise ValueError(f"Command '{name}' has a non-EvidenceOutput output")
+
+
+# The default registry, built from the module catalog above.
+DEFAULT_REGISTRY = CommandRegistry(_CATALOG)
+
+
+# ---------------------------------------------------------------------------
+# Public API (module-level convenience — delegate to DEFAULT_REGISTRY)
+# ---------------------------------------------------------------------------
+
+
+def list_commands() -> list[AllowedCommand]:
+    """Return all cataloged commands, sorted by name."""
+    return DEFAULT_REGISTRY.list_commands()
+
+
+def command_names() -> list[str]:
+    """Return the allowed command names, sorted."""
+    return DEFAULT_REGISTRY.command_names()
+
+
+def get_command(name: str) -> AllowedCommand | None:
+    """Return the :class:`AllowedCommand` for ``name``, or None if not cataloged."""
+    return DEFAULT_REGISTRY.get(name)
+
+
+def is_allowed(name: str) -> bool:
+    """Whether ``name`` is an explicitly cataloged (allowed) command.
+
+    Unknown commands are denied by default.
+    """
+    return DEFAULT_REGISTRY.is_allowed(name)
+
+
+def commands_by_classification(classification: CommandClass) -> list[AllowedCommand]:
+    """All cataloged commands with the given classification, sorted by name."""
+    return DEFAULT_REGISTRY.by_classification(classification)
+
+
+def validate_catalog() -> None:
+    """Assert structural integrity of the default catalog. Raises on problems."""
+    DEFAULT_REGISTRY.validate()
+
+
+# Fail fast at import if the catalog is structurally broken.
+validate_catalog()
