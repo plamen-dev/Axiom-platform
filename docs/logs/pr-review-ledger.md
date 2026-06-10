@@ -112,6 +112,84 @@ future capabilities.
 
 ---
 
+## PR #33: Capability Registry and MCP-Compatible Server Surface
+
+**Status:** Open
+**Scope:** Enhanced capability registry with MCP-oriented metadata + local tool
+surface exposing diagnostics, capabilities, dry-run, history, and artifact
+lookup. GridCreation registered as first capability.
+
+### What changed
+- New `src/axiom_core/server_tools.py`: `AxiomCapabilityRegistry`,
+  `EnhancedCapabilityMeta`, `get_enhanced_registry()`, tool functions
+  `axiom_server_diagnose`, `axiom_server_get_log_path`,
+  `axiom_server_get_version`, `axiom_capabilities_list`,
+  `axiom_capabilities_describe`, `axiom_runs_create_dry_run`,
+  `axiom_runs_list_history`, `axiom_runs_get_artifacts`,
+  `axiom_model_health_get_latest`, `axiom_capability_readiness_get`.
+- New `tests/test_server_tools.py`: 10 test classes, 34 tests covering
+  registry, description schema, diagnose, dry-run creation, unknown capability
+  errors, run history, artifacts lookup, JSON serialization, optional health
+  tools, and registry operations.
+- New `docs/architecture/capability-registry.md`
+- New `docs/architecture/mcp-compatible-server-surface.md`
+
+### What behavior changed
+- Axiom has a local MCP-compatible tool surface. Agents can list capabilities,
+  launch dry-runs, query history, and retrieve artifacts through structured
+  tool functions that return JSON-serializable dicts.
+- **Review follow-up fixes:**
+  - **Path traversal guard** on `axiom_runs_get_artifacts`: resolved path
+    validated against runs root via `is_relative_to()`.
+  - **Capability filter** in `axiom_runs_list_history`: fetches all runs when
+    filtering (no `limit*2` heuristic), accepts both `capability_id` and
+    display name (case-insensitive, underscore-normalized).
+  - **Missing `Length` property** added to `_GRID_CREATION_INPUT_SCHEMA`,
+    matching the foundational `_CREATE_GRIDS_SCHEMA` in
+    `capability_registry.py`.
+- **Review follow-up (round 2 — full code audit):**
+  - **Private path helpers promoted to public API** in run_spine:
+    `_artifacts_root` → `artifacts_root`, `_runs_root` → `runs_root`,
+    `_audit_log_path` → `audit_log_path`.  server_tools no longer depends
+    on private names.
+  - **`reset_registry()` added** for test isolation, matching
+    `model_health.reset_readiness_registry()`.
+  - **`axiom_model_health_get_latest` now redacts `model_path`** in the
+    response.  MCP tool responses may transit externally; raw user paths
+    should not leak.  The on-disk artifact retains both fields.
+
+### What did NOT change
+- No existing capabilities modified. No network service exposed. No OAuth,
+  cloud, or telemetry. Existing tests, CLI, runner infrastructure, and MCP
+  layer untouched.
+
+### Tests run
+- `tests/test_server_tools.py` (new): registry, capability description, server
+  diagnostics, dry-run creation with spine artifacts, unknown capability errors,
+  run history with filtering/limits, artifact lookup, JSON serialization,
+  optional health tool error handling.
+- Full suite: all existing tests still pass. `ruff check` clean.
+
+### Validation still pending
+- None required. Infrastructure-only PR with no live Revit interaction.
+
+### Known risks
+- Low. Read-only surface over existing capabilities and artifact store. Dry-run
+  delegates to run spine (PR #31) which writes only to local artifacts.
+
+### Revit live validation required
+- No.
+
+### 2024 baseline affected
+- No.
+
+### Verification-factory impact
+- Creates the agent-addressable tool surface for capabilities. Future MCP
+  transport can wrap these functions directly. Strengthens the discovery/
+  execution loop by providing structured capability lookup and dry-run launch.
+
+---
+
 ## PR #31: Local Audit, Evidence, and Run Spine
 
 **Status:** Open

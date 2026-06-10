@@ -44,19 +44,22 @@ from uuid import uuid4
 _DEFAULT_ARTIFACTS_ROOT = "artifacts"
 
 
-def _artifacts_root() -> Path:
+def artifacts_root() -> Path:
+    """Return the root directory for all Axiom artifacts."""
     return Path(os.environ.get("AXIOM_ARTIFACTS_ROOT", _DEFAULT_ARTIFACTS_ROOT))
 
 
-def _runs_root() -> Path:
-    return _artifacts_root() / "Runs"
+def runs_root() -> Path:
+    """Return the directory containing all run artifact folders."""
+    return artifacts_root() / "Runs"
 
 
 def _audit_dir() -> Path:
-    return _artifacts_root() / "audit"
+    return artifacts_root() / "audit"
 
 
-def _audit_log_path() -> Path:
+def audit_log_path() -> Path:
+    """Return the path to the JSONL command audit log."""
     return _audit_dir() / "axiom_command_log.jsonl"
 
 
@@ -86,7 +89,7 @@ def generate_run_id(capability: str, mode: str = "dry_run") -> str:
 
 def create_run_folder(run_id: str) -> Path:
     """Create the standard run artifact folder and return its path."""
-    folder = _runs_root() / run_id
+    folder = runs_root() / run_id
     folder.mkdir(parents=True, exist_ok=True)
     return folder
 
@@ -312,7 +315,7 @@ def write_run_summary(folder: Path, run_id: str, metadata: RunMetadata, status: 
 
 def append_audit_entry(entry: AuditEntry) -> Path:
     """Append an entry to the command audit JSONL log."""
-    log_path = _audit_log_path()
+    log_path = audit_log_path()
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with open(log_path, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry.to_dict(), default=str) + "\n")
@@ -329,7 +332,7 @@ def list_runs(limit: int = 50) -> list[dict[str, Any]]:
 
     Returns most-recent-first, up to ``limit`` entries.
     """
-    runs_dir = _runs_root()
+    runs_dir = runs_root()
     if not runs_dir.is_dir():
         return []
 
