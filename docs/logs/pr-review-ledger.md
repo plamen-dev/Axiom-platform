@@ -1,5 +1,63 @@
 # PR Review Ledger
 
+## PR #35: Event-Driven Automation Planner and Multi-Runner Strategy
+
+**Status:** Open
+**Scope:** Event-driven planning layer that accepts project/model/change
+events, determines which capabilities should respond, classifies execution
+lane requirements, applies a policy gate, and generates a dry-run plan.
+No auto-execution of model mutations.
+
+### What changed
+- New `src/axiom_core/automation_planner.py`: `AutomationEvent`, `RecommendedAction`,
+  `PolicyGateDecision`, `AutomationPlan`, `classify_execution_lane()`,
+  `plan_for_event()`, `apply_policy_gate()`, `execute_plan_run()`.
+- New `tests/test_automation_planner.py`: 7 test classes covering event validation,
+  model-updated planning, ruleset-updated planning, GridCreation impact, lane
+  classification, policy gate enforcement, and planner artifact production.
+- New `docs/architecture/event-driven-automation-planner.md`
+- New `docs/architecture/multi-runner-strategy.md`
+
+### What behavior changed
+- New `execute_plan_run()` function produces spine-integrated artifacts for
+  automation planning runs: `automation_plan.json`, `automation_plan.md`,
+  `policy_gate.json`, plus all standard spine files.
+- Multi-runner classification: every recommended action includes an
+  `execution_lane` (desktop_revit, aps, non_revit_data, unknown).
+- Policy gate: no action auto-executes in default policy regardless of
+  risk level or mode.
+
+### What did NOT change
+- No existing capabilities modified. No file watchers built. No ACC
+  integration. No auto-execution of model mutations. No APS runner.
+  No scheduling UI. Existing tests pass unchanged.
+
+### Tests run
+- `tests/test_automation_planner.py` (new): 7 test classes.
+- Full suite including run spine, model health, dialog watcher, server tools.
+- `ruff check` clean.
+
+### Validation still pending
+- None required. Planning/classification infrastructure only.
+
+### Known risks
+- Low. Additive planning layer. No model mutation, no external calls,
+  no license consumption, no network access.
+
+### Revit live validation required
+- No.
+
+### 2024 baseline affected
+- No.
+
+### Verification-factory impact
+- Strengthens the verification factory by adding event-driven triggering
+  for health checks and readiness re-evaluation. Establishes execution lane
+  classification needed for future license-aware scheduling. Policy gate
+  ensures no uncontrolled mutations.
+
+---
+
 ## PR #34: Revit Dialog Watcher and UI-Automation Risk Logging
 
 **Status:** Open
