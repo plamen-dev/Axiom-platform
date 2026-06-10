@@ -4454,5 +4454,60 @@ def promotion_check(capability, check_all, as_json, no_write, out_dir, db_path,
         raise SystemExit(2)
 
 
+# ---------------------------------------------------------------------------
+# Knowledge Source Registry
+# ---------------------------------------------------------------------------
+
+
+@cli.command("knowledge-sources")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+@click.option("--name", "name_filter", default=None, help="Filter sources by name substring")
+@click.option("--refresh", is_flag=True, help="Deterministic refresh of active sources")
+@click.option("--include-disabled", is_flag=True, help="Include disabled sources in output")
+def knowledge_sources_cmd(as_json: bool, name_filter: Optional[str], refresh: bool, include_disabled: bool):
+    """List registered knowledge sources."""
+    from axiom_core.knowledge_registry import KnowledgeSourceRegistry
+
+    registry = KnowledgeSourceRegistry()
+
+    if refresh:
+        sources = registry.refresh(include_disabled=include_disabled, name_filter=name_filter)
+    else:
+        sources = registry.list_sources(include_disabled=include_disabled, name_filter=name_filter)
+
+    if as_json:
+        import json as json_mod
+
+        output = [s.to_dict() for s in sources]
+        click.echo(json_mod.dumps(output, indent=2, default=str))
+        return
+
+    if not sources:
+        console.print("[dim]No knowledge sources registered.[/dim]")
+        return
+
+    table = Table(title="Knowledge Sources")
+    table.add_column("ID", style="cyan", no_wrap=True)
+    table.add_column("Name", style="bold")
+    table.add_column("Type")
+    table.add_column("Status")
+    table.add_column("Trust")
+    table.add_column("Path", style="dim")
+
+    for s in sources:
+        status_style = "green" if s.status.value == "active" else "yellow" if s.status.value == "deprecated" else "red"
+        table.add_row(
+            s.source_id,
+            s.source_name,
+            s.source_type.value if hasattr(s.source_type, "value") else str(s.source_type),
+            f"[{status_style}]{s.status.value}[/{status_style}]",
+            s.trust_level,
+            s.path or "",
+        )
+
+    console.print(table)
+    console.print(f"\n[dim]{len(sources)} source(s) shown[/dim]")
+
+
 if __name__ == "__main__":
     cli()

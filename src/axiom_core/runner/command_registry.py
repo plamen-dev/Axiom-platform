@@ -1174,6 +1174,26 @@ _register(
 )
 
 
+_register(
+    CommandSpec(
+        name="knowledge-sources",
+        command="axiom knowledge-sources [--json-output] [--name <filter>] [--refresh] [--include-disabled]",
+        description=(
+            "Knowledge Source Registry: list registered knowledge sources "
+            "with human-readable table or machine-readable JSON output. "
+            "Metadata and governance only — no retrieval, no embeddings."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("Knowledge sources table/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only registry query. No model mutation, no external calls.",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------

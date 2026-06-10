@@ -1,5 +1,57 @@
 # PR Review Ledger
 
+## PR #36: Knowledge Source Registry v1
+
+**Status:** Open
+**Scope:** Governed registry of all knowledge sources Axiom may consume.
+Metadata and governance only — no retrieval, no embeddings, no graph,
+no learning, no workflow execution.
+
+### What changed
+- New `src/axiom_core/knowledge_registry.py`: `KnowledgeSourceRegistry`,
+  `KnowledgeSourceMetadata`, `KnowledgeSourceType` (12 types),
+  `KnowledgeSourceStatus`, `KnowledgeSourceRow`, `KnowledgeSourceEventRow`.
+- Updated `src/axiom_cli/main.py`: `axiom knowledge-sources` command with
+  `--json-output`, `--name`, `--refresh`, `--include-disabled` options.
+- New `tests/test_knowledge_registry.py`: 6 test classes covering all
+  acceptance criteria.
+- New `docs/architecture/knowledge-source-registry.md`
+
+### What behavior changed
+- New `knowledge_sources` and `knowledge_source_events` SQLite tables created
+  on first registry use.
+- New CLI command `axiom knowledge-sources` for human/machine output.
+
+### What did NOT change
+- No existing capabilities, registries, or persistence modified. No retrieval,
+  embeddings, vector DB, graph, or learning. Existing tests pass unchanged.
+
+### Tests run
+- `tests/test_knowledge_registry.py` (new): 6 test classes.
+- Full suite including run spine, model health, dialog watcher, automation
+  planner, server tools.
+- `ruff check` clean.
+
+### Validation still pending
+- None required. Metadata/governance infrastructure only.
+
+### Known risks
+- Low. Additive registry with no model mutation, no external calls.
+
+### Revit live validation required
+- No.
+
+### 2024 baseline affected
+- No.
+
+### Verification-factory impact
+- Establishes governed knowledge origin tracking. Future retrieval,
+  relevance ranking, and learning layers will build on this registry.
+  Supports the discovery and validation factory by making knowledge
+  sources explicit and auditable.
+
+---
+
 ## PR #35: Event-Driven Automation Planner and Multi-Runner Strategy
 
 **Status:** Open
