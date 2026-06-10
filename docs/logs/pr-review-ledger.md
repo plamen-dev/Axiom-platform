@@ -1,5 +1,117 @@
 # PR Review Ledger
 
+## PR #32: Model Health and Capability Readiness Engine
+
+**Status:** Open
+**Scope:** Local model health/readiness report engine integrated with the run
+spine (PR #31). GridCreation is the first readiness target; extensible for
+future capabilities.
+
+### What changed
+- New `src/axiom_core/model_health.py`: `ModelHealth`, `EnvironmentReport`,
+  `CapabilityReadiness`, `HealthRunContext`, `HealthRunResult`,
+  `execute_health_run()`, `evaluate_readiness()`, `evaluate_all_readiness()`,
+  `capture_environment()`, `generate_health_markdown()`, readiness registry
+  (`register_readiness_check()`, `list_readiness_capabilities()`), and
+  GridCreation readiness check.
+- New `tests/test_model_health.py`: 9 test classes, 42 tests covering health
+  schema, READY/WARNING/BLOCKED classification, UNKNOWN defaults, timestamps,
+  markdown generation, null safety, run spine integration, capabilities
+  truthiness, model_path_redacted auto-redaction, and registry extensibility.
+- New `docs/architecture/model-health-and-capability-readiness.md`: explains
+  schemas, readiness levels, GridCreation logic, extensibility contract, and
+  run spine integration.
+
+### What behavior changed
+- Axiom can now assess model health and per-capability readiness. A health run
+  produces `axiom_model_health.json`, `axiom_capability_readiness.json`,
+  `axiom_environment_report.json`, and `axiom_model_health.md` alongside
+  standard run spine artifacts.
+- **Review follow-up behavior changes (post-review):**
+  - `CapabilityReadiness.execute_available` default changed from `True` to
+    `False` (conservative). UNKNOWN readiness no longer implies execution is
+    available.
+  - `model_path_redacted` is auto-computed via `redact_path()` fallback when
+    not explicitly provided, matching the run spine's `execute_run()` pattern.
+  - Existing grids now produce a **warning** in addition to a user decision.
+    Previously only populated `required_user_decisions`.
+  - `ctx.capabilities` truthiness fix: `None` evaluates all registered
+    capabilities; `[]` (empty list) evaluates zero. Previously both were
+    treated the same due to falsy check.
+  - Removed private `_write_json` import from run_spine; replaced with local
+    helper to avoid cross-module private coupling.
+  - `capabilities_requested` in `input_data` (audit trail) fixed to use
+    `is not None` instead of `or`, matching the evaluation logic. Previously
+    `ctx.capabilities=[]` recorded all registered capabilities in the audit
+    entry instead of an empty list.
+  - **Global readiness registry documented as intentional mutable
+    module-level state.** Added `reset_readiness_registry()` for test
+    isolation so custom checks registered by tests do not leak.
+  - **Private `_redact_path` promoted to public `redact_path`** in
+    run_spine.  model_health now imports the public name.  Single source
+    of truth for path redaction across all modules.
+  - **`command_input.json` now writes redacted `model_path`** instead of
+    the raw path.  Audit-facing summaries use `redact_path()`.  Path
+    redaction policy documented in architecture docs.
+  - **Audit entries are no longer mutated/reused.**  Started and completed
+    audit payloads are independent `AuditEntry` instances constructed from
+    shared keyword arguments.  Same fix applied to `execute_run` in
+    run_spine.
+- **Review follow-up behaviour changes (round 3 — Devin Review auto-triage):**
+  - **`execute_health_run` completed audit entry now passes
+    `ext_calls.external_calls_made`** instead of inheriting the hardcoded
+    `False` from `_audit_common`.  `external_calls_made` removed from the
+    shared dict; passed explicitly to each `AuditEntry` (started=`False`,
+    completed=`ext_calls.external_calls_made`), matching `execute_run`.
+  - **`write_run_summary` now uses `redact_path(metadata.model_path)`**
+    instead of writing the raw path.  `run_summary.md` is human-readable
+    and should not leak user-specific path segments.
+  - **Path redaction policy table corrected:** `axiom_command_log.jsonl`
+    documented as containing both `model_path` (raw) and
+    `model_path_redacted`; consumers should prefer the redacted variant.
+- **Review follow-up (round 4 — full code audit):**
+  - **`generate_health_markdown` now uses `model_path_redacted`** instead of
+    writing the raw `model_path`.  `axiom_model_health.md` is human-readable
+    and should not leak raw user paths (same rationale as `run_summary.md`).
+  - **Redundant `redact_path()` call removed.** Line 572 now uses
+    `health.model_path_redacted` already computed at line 538 instead of
+    re-calling `redact_path(ctx.model_path)`.
+
+### What did NOT change
+- No existing capabilities modified. No MCP, UI, OAuth, cloud, telemetry. No
+  broad MEP readiness checks. Existing tests, CLI, and runner infrastructure
+  untouched. Run spine updated only to rename `_redact_path` → `redact_path`
+  (public API) and to stop mutating audit entry objects (both non-behavioural
+  refactors — output is identical).
+
+### Tests run
+- `tests/test_model_health.py`: 45 tests (37 original + 5 covering
+  UNKNOWN execute_available default, empty vs None capabilities, and
+  model_path_redacted auto-redaction + 3 new covering
+  `capabilities_requested` audit trail for None/[]/explicit cases).
+- Full suite: 875 passed, 1 skipped. `ruff check` clean.
+
+### Validation still pending
+- None required. Infrastructure-only PR with no live Revit interaction.
+
+### Known risks
+- Low. Read-only health/readiness assessment; writes only to local artifact
+  directories. No model mutation, no external calls.
+
+### Revit live validation required
+- No.
+
+### 2024 baseline affected
+- No.
+
+### Verification-factory impact
+- Creates the model health/readiness gate that capabilities consult before
+  execution. Strengthens evidence quality by capturing model state at run time.
+  Extensible architecture allows future capabilities to register their own
+  readiness checks.
+
+---
+
 ## PR #31: Local Audit, Evidence, and Run Spine
 
 **Status:** Open

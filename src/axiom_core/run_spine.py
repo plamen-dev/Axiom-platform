@@ -296,7 +296,7 @@ def write_run_summary(folder: Path, run_id: str, metadata: RunMetadata, status: 
         f"- **Axiom Version**: {metadata.axiom_version}",
     ]
     if metadata.model_path:
-        lines.append(f"- **Model**: {metadata.model_path}")
+        lines.append(f"- **Model**: {redact_path(metadata.model_path)}")
     if metadata.revit_version:
         lines.append(f"- **Revit Version**: {metadata.revit_version}")
     lines.append("")
@@ -362,8 +362,14 @@ def _get_user() -> str:
         return "unknown"
 
 
-def _redact_path(path: str | None) -> str | None:
-    """Redact user-specific portions of a file path."""
+def redact_path(path: str | None) -> str | None:
+    """Redact user-specific portions of a file path.
+
+    Replaces the username segment following ``Users`` or ``home`` directory
+    components with ``***``.  This is a core audit/trust behaviour — all
+    modules that write audit entries or summary artifacts should use this
+    single implementation to keep redaction consistent.
+    """
     if path is None:
         return None
     parts = path.replace("\\", "/").split("/")
@@ -457,22 +463,21 @@ def execute_run(
         write_parsed_intent(folder, context.parsed_intent)
 
     # --- Audit entry (started) ---
-    audit_entry = AuditEntry(
-        timestamp_utc=now_utc,
+    _audit_common = dict(
         run_id=run_id,
         source=context.source,
         capability=context.capability,
         mode=context.mode,
         risk_level=context.risk_level,
         model_path=context.model_path,
-        model_path_redacted=_redact_path(context.model_path),
+        model_path_redacted=redact_path(context.model_path),
         user=user,
         input_summary=json.dumps(context.input_data, default=str)[:200],
         artifact_path=str(folder),
-        status="started",
-        external_calls_made=False,
     )
-    append_audit_entry(audit_entry)
+    append_audit_entry(
+        AuditEntry(timestamp_utc=now_utc, status="started", external_calls_made=False, **_audit_common)
+    )
 
     # --- Execute ---
     result_data: dict[str, Any] = {}
@@ -518,10 +523,14 @@ def execute_run(
     write_artifact_manifest(folder, run_id)
 
     # --- Audit entry (final) ---
-    audit_entry.timestamp_utc = datetime.now(timezone.utc).isoformat()
-    audit_entry.status = status
-    audit_entry.external_calls_made = ext_calls.external_calls_made
-    append_audit_entry(audit_entry)
+    append_audit_entry(
+        AuditEntry(
+            timestamp_utc=datetime.now(timezone.utc).isoformat(),
+            status=status,
+            external_calls_made=ext_calls.external_calls_made,
+            **_audit_common,
+        )
+    )
 
     return RunResult(
         run_id=run_id,
