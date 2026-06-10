@@ -4686,5 +4686,53 @@ def knowledge_provenance_cmd(
     console.print(f"\n[dim]{len(records)} provenance record(s) shown[/dim]")
 
 
+@cli.command("workflows")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+@click.option("--name", "name_filter", default=None, help="Filter by workflow name substring")
+@click.option("--include-deprecated", is_flag=True, help="Include deprecated workflows")
+def workflows_cmd(as_json: bool, name_filter: Optional[str], include_deprecated: bool):
+    """List registered workflow knowledge definitions."""
+    from axiom_core.workflow_registry import WorkflowKnowledgeRegistry
+
+    registry = WorkflowKnowledgeRegistry()
+    workflows = registry.list_workflows(
+        name_filter=name_filter, include_deprecated=include_deprecated
+    )
+
+    if as_json:
+        import json as json_mod
+
+        output = [w.to_dict() for w in workflows]
+        click.echo(json_mod.dumps(output, indent=2, default=str))
+        return
+
+    if not workflows:
+        console.print("[dim]No workflow definitions registered.[/dim]")
+        return
+
+    table = Table(title="Workflow Knowledge Registry")
+    table.add_column("ID", style="cyan", no_wrap=True)
+    table.add_column("Name", style="bold")
+    table.add_column("Status")
+    table.add_column("Version")
+    table.add_column("Steps", justify="right")
+    table.add_column("Rules", justify="right")
+    table.add_column("Description", style="dim")
+
+    for w in workflows:
+        table.add_row(
+            w.workflow_id[:12] + "…" if len(w.workflow_id) > 12 else w.workflow_id,
+            w.workflow_name,
+            w.status.value if hasattr(w.status, "value") else str(w.status),
+            w.version,
+            str(len(w.steps)),
+            str(len(w.rules)),
+            (w.description or "")[:40],
+        )
+
+    console.print(table)
+    console.print(f"\n[dim]{len(workflows)} workflow(s) shown[/dim]")
+
+
 if __name__ == "__main__":
     cli()

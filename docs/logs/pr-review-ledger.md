@@ -1,5 +1,38 @@
 # PR Review Ledger
 
+## PR #39: Workflow Knowledge Registry v1
+
+**Status:** Open
+**Branch:** `devin/XXXXX-workflow-knowledge-registry`
+
+### What Changed
+- New `workflow_registry.py` with `WorkflowDefinition`, `WorkflowStep`, `WorkflowInput`, `WorkflowOutput`, `WorkflowRule`
+- SQLite persistence via `WorkflowKnowledgeRegistry` (tables: `workflow_definitions`, `workflow_steps`, `workflow_rules`)
+- CLI: `axiom workflows [--json-output] [--name <filter>] [--include-deprecated]`
+- Command registry cataloged as READ_ONLY/SAFE
+
+### What Behavior Changed
+- Engineering workflows can now be registered, queried, filtered, and deprecated via CLI and Python API
+- Step ordering is deterministic (ordered by `step_order`)
+- Cycles in `depends_on` are accepted (metadata only — no execution)
+
+### What Did NOT Change
+- No workflow execution
+- No automation or planners
+- No knowledge object model changes
+- No provenance changes
+- All existing tests pass (no regression)
+
+### Tests
+- 25+ tests across 6 test classes (persistence, ordering, inputs/outputs, cycles, rules, JSON)
+- Full pytest suite passes
+- Ruff clean
+
+### Known Risks
+- None — metadata/governance only, no model mutation
+
+---
+
 ## PR #38: Knowledge Provenance & Trust Engine v1
 
 **Status:** Open

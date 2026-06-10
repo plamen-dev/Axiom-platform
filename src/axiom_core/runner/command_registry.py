@@ -1254,6 +1254,26 @@ _register(
 )
 
 
+_register(
+    CommandSpec(
+        name="workflows",
+        command="axiom workflows [--json-output] [--name <filter>] [--include-deprecated]",
+        description=(
+            "Workflow Knowledge Registry: list registered workflow definitions "
+            "with steps, inputs, outputs, and rules. Supports filtering by name. "
+            "Metadata and governance only — no execution, no automation."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("Workflow definitions table/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only registry query. No model mutation, no external calls.",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------

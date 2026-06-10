@@ -57,7 +57,7 @@ EXPECTED_AXIOM_COMMANDS = {
     "parameter-registry-build", "plan", "plans", "pr-snapshot", "promotion-check",
     "prompt",
     "runner-commands", "set-parameter-value", "stats", "submit", "test-grids",
-    "test-levels", "tools", "validation-registry", "validation-run",
+    "test-levels", "tools", "validation-registry", "validation-run", "workflows",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 
