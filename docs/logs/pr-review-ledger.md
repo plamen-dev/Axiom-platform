@@ -1,5 +1,48 @@
 # PR Review Ledger
 
+## PR #40: Learning Candidate Engine v1
+
+**Status:** Open
+**Branch:** `devin/XXXXX-learning-candidate-engine`
+
+### What Changed
+- New `learning_candidates.py` with `LearningCandidate`, `CandidateSource`, `CandidateStrength`, `CandidateEvidence`
+- SQLite persistence via `LearningCandidateRegistry` (table: `learning_candidates`)
+- CLI: `axiom learning-candidates [--json-output] [--name <filter>] [--type <type>] [--include-dismissed]`
+- Duplicate candidate merging (same name+type → increment observation, accumulate evidence)
+- Confidence ordering (highest first, alphabetical tiebreaker)
+- Command registry cataloged as READ_ONLY/SAFE
+
+### What Behavior Changed
+- Axiom can now identify and track patterns worth learning
+- Duplicate observations strengthen candidates automatically (3+ → moderate, 5+ → strong)
+- No registries are mutated, no learning occurs — candidates are suggestions only
+
+### What Did NOT Change
+- No workflow execution
+- No capability state mutation
+- No knowledge registry changes
+- No autonomous changes
+- All existing tests pass (no regression)
+
+### Devin Review Findings (resolved)
+- **BUG:** CLI exit code on invalid --type — fixed: `raise SystemExit(1)` + valid types list
+- **BUG:** `updated_at` mismatch — fixed: row persists `updated_at=now`
+- **FLAG:** Truthiness bug — `if candidate.sources`/evidence/metadata treated `[]`/`{}` as falsy; fixed with `is not None`
+- **FLAG:** Repeated try/except enum coercion — extracted `_coerce_enum()` helper
+- **FLAG:** Duplicated JSON merge logic — extracted `_merge_json_list()` helper
+
+### Tests
+- 25 tests across 5 test classes (persistence, merging, evidence, ordering, JSON)
+- 3 new tests for empty collection roundtrips (metadata, sources, evidence)
+- Full pytest suite: 1100 passed, 1 skipped
+- Ruff clean
+
+### Known Risks
+- None — read-only suggestions, no model mutation
+
+---
+
 ## PR #39: Workflow Knowledge Registry v1
 
 **Status:** Open

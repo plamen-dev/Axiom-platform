@@ -53,6 +53,7 @@ EXPECTED_AXIOM_COMMANDS = {
     "inventory-plan-status", "inventory-summary", "jobs",
     "knowledge-objects", "knowledge-provenance", "knowledge-relationships",
     "knowledge-sources",
+    "learning-candidates",
     "local-runner",
     "parameter-registry-build", "plan", "plans", "pr-snapshot", "promotion-check",
     "prompt",

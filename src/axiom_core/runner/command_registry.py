@@ -1274,6 +1274,26 @@ _register(
 )
 
 
+_register(
+    CommandSpec(
+        name="learning-candidates",
+        command="axiom learning-candidates [--json-output] [--name <filter>] [--type <type>] [--include-dismissed]",
+        description=(
+            "Learning Candidate Engine: list patterns identified as worth "
+            "learning. Shows candidates with strength, confidence score, "
+            "observation count. Does not learn or mutate registries."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("Learning candidates table/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only registry query. No model mutation, no external calls.",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------

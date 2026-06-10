@@ -4734,5 +4734,71 @@ def workflows_cmd(as_json: bool, name_filter: Optional[str], include_deprecated:
     console.print(f"\n[dim]{len(workflows)} workflow(s) shown[/dim]")
 
 
+@cli.command("learning-candidates")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+@click.option("--name", "name_filter", default=None, help="Filter by candidate name substring")
+@click.option("--type", "ctype", default=None, help="Filter by candidate type")
+@click.option("--include-dismissed", is_flag=True, help="Include dismissed candidates")
+def learning_candidates_cmd(
+    as_json: bool, name_filter: Optional[str], ctype: Optional[str], include_dismissed: bool
+):
+    """List learning candidates — patterns worth learning."""
+    from axiom_core.learning_candidates import (
+        CandidateType,
+        LearningCandidateRegistry,
+    )
+
+    registry = LearningCandidateRegistry()
+
+    candidate_type = None
+    if ctype:
+        try:
+            candidate_type = CandidateType(ctype)
+        except ValueError:
+            console.print(f"[red]Unknown candidate type: {ctype}[/red]")
+            console.print(f"[dim]Valid types: {', '.join(t.value for t in CandidateType)}[/dim]")
+            raise SystemExit(1)
+
+    candidates = registry.list_candidates(
+        name_filter=name_filter,
+        candidate_type=candidate_type,
+        include_dismissed=include_dismissed,
+    )
+
+    if as_json:
+        import json as json_mod
+
+        output = [c.to_dict() for c in candidates]
+        click.echo(json_mod.dumps(output, indent=2, default=str))
+        return
+
+    if not candidates:
+        console.print("[dim]No learning candidates identified.[/dim]")
+        return
+
+    table = Table(title="Learning Candidates")
+    table.add_column("ID", style="cyan", no_wrap=True)
+    table.add_column("Name", style="bold")
+    table.add_column("Type")
+    table.add_column("Strength")
+    table.add_column("Score", justify="right")
+    table.add_column("Observations", justify="right")
+    table.add_column("Evidence", justify="right")
+
+    for c in candidates:
+        table.add_row(
+            c.candidate_id[:12] + "…" if len(c.candidate_id) > 12 else c.candidate_id,
+            c.candidate_name,
+            c.candidate_type.value if hasattr(c.candidate_type, "value") else str(c.candidate_type),
+            c.strength.value if hasattr(c.strength, "value") else str(c.strength),
+            str(c.confidence_score),
+            str(c.observation_count),
+            str(len(c.evidence)),
+        )
+
+    console.print(table)
+    console.print(f"\n[dim]{len(candidates)} candidate(s) shown[/dim]")
+
+
 if __name__ == "__main__":
     cli()
