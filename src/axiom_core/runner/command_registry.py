@@ -1234,6 +1234,26 @@ _register(
 )
 
 
+_register(
+    CommandSpec(
+        name="knowledge-provenance",
+        command="axiom knowledge-provenance [--json-output] [--name <filter>] [--trust-level <level>] [--include-deprecated]",
+        description=(
+            "Knowledge Provenance & Trust: list provenance records with trust "
+            "levels and confidence scores. Supports filtering by name or trust "
+            "level. Metadata and governance only — no automatic trust updates."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("Knowledge provenance table/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only registry query. No model mutation, no external calls.",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------

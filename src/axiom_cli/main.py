@@ -4620,5 +4620,71 @@ def knowledge_relationships_cmd(as_json: bool, object_id: Optional[str], rel_typ
     console.print(f"\n[dim]{len(rels)} relationship(s) shown[/dim]")
 
 
+@cli.command("knowledge-provenance")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+@click.option("--name", "name_filter", default=None, help="Filter by knowledge name substring")
+@click.option("--trust-level", "trust_level", default=None, help="Filter by trust level")
+@click.option("--include-deprecated", is_flag=True, help="Include deprecated provenance records")
+def knowledge_provenance_cmd(
+    as_json: bool,
+    name_filter: Optional[str],
+    trust_level: Optional[str],
+    include_deprecated: bool,
+):
+    """List knowledge provenance and trust records."""
+    from axiom_core.knowledge_provenance import KnowledgeProvenanceRegistry, TrustLevel
+
+    registry = KnowledgeProvenanceRegistry()
+
+    level_filter = None
+    if trust_level is not None:
+        try:
+            level_filter = TrustLevel(trust_level)
+        except ValueError:
+            console.print(f"[red]Unknown trust level: {trust_level}[/red]")
+            console.print(f"[dim]Valid levels: {', '.join(t.value for t in TrustLevel)}[/dim]")
+            raise SystemExit(1)
+
+    records = registry.list_provenance(
+        name_filter=name_filter,
+        trust_level=level_filter,
+        include_deprecated=include_deprecated,
+    )
+
+    if as_json:
+        import json as json_mod
+
+        output = [r.to_dict() for r in records]
+        click.echo(json_mod.dumps(output, indent=2, default=str))
+        return
+
+    if not records:
+        console.print("[dim]No knowledge provenance records registered.[/dim]")
+        return
+
+    table = Table(title="Knowledge Provenance")
+    table.add_column("ID", style="cyan", no_wrap=True)
+    table.add_column("Name", style="bold")
+    table.add_column("Trust Level")
+    table.add_column("Confidence")
+    table.add_column("Status")
+    table.add_column("Origin", style="dim")
+    table.add_column("Superseded By", style="dim")
+
+    for r in records:
+        table.add_row(
+            r.provenance_id[:12] + "…",
+            r.knowledge_name,
+            r.trust_level.value if hasattr(r.trust_level, "value") else str(r.trust_level),
+            r.source_confidence.value if hasattr(r.source_confidence, "value") else str(r.source_confidence),
+            r.status.value if hasattr(r.status, "value") else str(r.status),
+            (r.origin or "")[:30],
+            (r.superseded_by or "")[:12],
+        )
+
+    console.print(table)
+    console.print(f"\n[dim]{len(records)} provenance record(s) shown[/dim]")
+
+
 if __name__ == "__main__":
     cli()

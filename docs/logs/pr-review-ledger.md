@@ -1,5 +1,57 @@
 # PR Review Ledger
 
+## PR #38: Knowledge Provenance & Trust Engine v1
+
+**Status:** Open
+**Scope:** Trust and provenance infrastructure for knowledge. Allows Axiom to
+distinguish facts from suggestions. Metadata and governance only — no automatic
+trust updates, no confidence learning, no LLM scoring.
+
+### What changed
+
+- New: `src/axiom_core/knowledge_provenance.py` — `KnowledgeProvenance`, `TrustLevel` (6 levels), `SourceConfidence`, `ProvenanceStatus`, `KnowledgeProvenanceRegistry`
+- New: `tests/test_knowledge_provenance.py` — 6 test classes covering persistence, trust ordering, deprecated knowledge, supersession chains, JSON output, name filtering
+- New: `docs/architecture/knowledge-provenance-trust.md`
+- Updated: `src/axiom_cli/main.py` — added `knowledge-provenance` command
+- Updated: `src/axiom_core/runner/command_registry.py` — cataloged command as READ_ONLY/SAFE
+- Updated: `tests/test_command_registry.py` — added command to EXPECTED_AXIOM_COMMANDS
+
+### What behavior changed
+
+- Two new SQLite tables: `knowledge_provenance`, `knowledge_provenance_events`
+- One new CLI command: `axiom knowledge-provenance`
+- Trust ordering function `trust_rank()` provides deterministic comparison
+
+### What did NOT change
+
+- No existing capabilities modified
+- No automatic trust updates or learning
+- No LLM scoring or embeddings
+- Knowledge Object Model (PR #37) unchanged
+- Knowledge Source Registry (PR #36) unchanged
+
+### Tests
+
+- 6 test classes, 28 tests
+- Persistence: register/retrieve, update, multiple records, empty name rejected
+- Trust ordering: rank correctness, deterministic listing, repeated queries stable
+- Deprecated: excluded from default list, include flag works, status persists
+- Supersession: simple chain, multi-step chain walk, cycle detection, missing link tolerance
+- JSON: all fields present, trust level serialized as string, valid output
+- Name filtering: substring match, SQL wildcard escape, backslash escape
+
+### Known risks
+
+- Low: new tables only; no mutations to existing data
+- Supersession chains assume single-link (no branching)
+
+### Verification-factory impact
+
+Directly supports the verification factory: provenance tracks trust levels for
+capabilities, evidence, and patterns, enabling promotion scoring decisions.
+
+---
+
 ## PR #37: Knowledge Object Model v1
 
 **Status:** Open
