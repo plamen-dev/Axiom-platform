@@ -1,5 +1,65 @@
 # PR Review Ledger
 
+## PR #34: Revit Dialog Watcher and UI-Automation Risk Logging
+
+**Status:** Open
+**Scope:** Dialog/modal interference detection and logging during Revit
+automation runs. Produces per-run artifacts for visibility and failure
+classification. No broad UI automation — first goal is observability.
+
+### What changed
+- New `src/axiom_core/dialog_watcher.py`: `DialogEvent`, `DialogEventsRecord`,
+  `UIAutomationRisk`, `DialogWatcher`, `write_default_dialog_artifacts()`,
+  `BLOCKED_BY_DIALOG` failure classification constant.
+- Updated `src/axiom_core/run_spine.py`: `execute_run()` now produces
+  `dialog_events.json`, `dialog_events.md`, and `ui_automation_risk.json` for
+  every run. `RunContext` accepts optional `dialog_watcher` parameter. Blocking
+  dialogs cause run failure with `BLOCKED_BY_DIALOG`.
+- New `tests/test_dialog_watcher.py`: 7 test classes covering file creation,
+  empty events, blocking classification, risk defaults, risk declaration,
+  existing runs unaffected, and manifest inclusion.
+- New `docs/architecture/revit-dialog-watcher.md`
+- New `docs/architecture/ui-automation-risk-policy.md`
+
+### What behavior changed
+- Every `execute_run()` call now writes 3 additional artifact files:
+  `dialog_events.json`, `dialog_events.md`, `ui_automation_risk.json`.
+- If a `DialogWatcher` with a blocking event is passed via `RunContext`, the
+  run status becomes `"failed"` with `error_type: "BLOCKED_BY_DIALOG"`.
+- Existing runs without a dialog watcher are unaffected — default empty
+  artifacts are written automatically.
+
+### What did NOT change
+- No existing capabilities modified. No UI automation implemented. No
+  auto-dismissal of dialogs. No Desktop Connector integration. No cloud,
+  OAuth, telemetry. Existing tests pass unchanged.
+
+### Tests run
+- `tests/test_dialog_watcher.py` (new): 7 test classes.
+- Full suite including existing run spine, model health, and server tools.
+- `ruff check` clean.
+
+### Validation still pending
+- None required. Infrastructure-only PR with no live Revit interaction.
+
+### Known risks
+- Low. Additive artifact production only. No model mutation, no external
+  calls, no network access.
+
+### Revit live validation required
+- No.
+
+### 2024 baseline affected
+- No.
+
+### Verification-factory impact
+- Adds dialog interference visibility to the evidence trail. Future retry
+  logic can consult `dialog_events.json` to classify recurring blockers.
+  Strengthens failure classification by distinguishing dialog-blocked runs
+  from code errors.
+
+---
+
 ## PR #32: Model Health and Capability Readiness Engine
 
 **Status:** Open

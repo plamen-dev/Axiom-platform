@@ -660,6 +660,12 @@ def execute_health_run(ctx: HealthRunContext) -> HealthRunResult:
     write_execution_result(folder, result_data)
     ext_calls = ExternalCallDeclaration()
     write_external_calls(folder, ext_calls)
+
+    # --- Dialog artifacts (default — health runs are non-interactive) ---
+    from axiom_core.dialog_watcher import write_default_dialog_artifacts
+
+    write_default_dialog_artifacts(folder, run_id)
+
     metadata.status = status
     write_run_metadata(folder, metadata)
     write_run_summary(folder, run_id, metadata, status)

@@ -14,6 +14,9 @@ Artifact folder pattern::
         validation_result.json  (optional)
         error_result.json       (written only on failure)
         external_calls.json
+        dialog_events.json
+        dialog_events.md
+        ui_automation_risk.json
         artifact_manifest.json
         run_summary.md
 
@@ -36,6 +39,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
+
+from axiom_core.dialog_watcher import (
+    DialogWatcher,
+    UIAutomationRisk,
+    write_default_dialog_artifacts,
+)
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -401,6 +410,8 @@ class RunContext:
     active_view_type: str | None = None
     input_data: dict[str, Any] = field(default_factory=dict)
     parsed_intent: dict[str, Any] | None = None
+    dialog_watcher: DialogWatcher | None = None
+    ui_automation_risk: UIAutomationRisk | None = None
 
 
 @dataclass
@@ -516,6 +527,25 @@ def execute_run(
     # --- External calls ---
     ext_calls = ExternalCallDeclaration()
     write_external_calls(folder, ext_calls)
+
+    # --- Dialog artifacts ---
+    if context.dialog_watcher is not None:
+        context.dialog_watcher.run_id = run_id
+        context.dialog_watcher.write_artifacts(folder, ui_risk=context.ui_automation_risk)
+        if context.dialog_watcher.has_blocking_event and status != "failed":
+            status = "failed"
+            if error_data is None:
+                error_data = {
+                    "error_type": "BLOCKED_BY_DIALOG",
+                    "error_message": "Run blocked by dialog/modal interference.",
+                    "run_id": run_id,
+                    "capability": context.capability,
+                    "mode": context.mode,
+                    "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+                }
+                write_error_result(folder, error_data)
+    else:
+        write_default_dialog_artifacts(folder, run_id)
 
     # --- Update metadata status ---
     metadata.status = status
