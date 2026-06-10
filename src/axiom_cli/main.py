@@ -4509,5 +4509,116 @@ def knowledge_sources_cmd(as_json: bool, name_filter: Optional[str], refresh: bo
     console.print(f"\n[dim]{len(sources)} source(s) shown[/dim]")
 
 
+# ---------------------------------------------------------------------------
+# Knowledge Object Model
+# ---------------------------------------------------------------------------
+
+
+@cli.command("knowledge-objects")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+@click.option("--name", "name_filter", default=None, help="Filter objects by name substring")
+@click.option("--type", "obj_type", default=None, help="Filter by object type")
+def knowledge_objects_cmd(as_json: bool, name_filter: Optional[str], obj_type: Optional[str]):
+    """List registered knowledge objects."""
+    from axiom_core.knowledge_objects import KnowledgeObjectRegistry, KnowledgeObjectType
+
+    registry = KnowledgeObjectRegistry()
+
+    type_filter = None
+    if obj_type is not None:
+        try:
+            type_filter = KnowledgeObjectType(obj_type)
+        except ValueError:
+            console.print(f"[red]Unknown object type: {obj_type}[/red]")
+            console.print(f"[dim]Valid types: {', '.join(t.value for t in KnowledgeObjectType)}[/dim]")
+            raise SystemExit(1)
+
+    objects = registry.list_objects(object_type=type_filter, name_filter=name_filter)
+
+    if as_json:
+        import json as json_mod
+
+        output = [o.to_dict() for o in objects]
+        click.echo(json_mod.dumps(output, indent=2, default=str))
+        return
+
+    if not objects:
+        console.print("[dim]No knowledge objects registered.[/dim]")
+        return
+
+    table = Table(title="Knowledge Objects")
+    table.add_column("ID", style="cyan", no_wrap=True)
+    table.add_column("Name", style="bold")
+    table.add_column("Type")
+    table.add_column("Version")
+    table.add_column("Source ID", style="dim")
+    table.add_column("Description", style="dim")
+
+    for o in objects:
+        table.add_row(
+            o.object_id,
+            o.object_name,
+            o.object_type.value if hasattr(o.object_type, "value") else str(o.object_type),
+            o.version,
+            o.source_id or "",
+            (o.description or "")[:50],
+        )
+
+    console.print(table)
+    console.print(f"\n[dim]{len(objects)} object(s) shown[/dim]")
+
+
+@cli.command("knowledge-relationships")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+@click.option("--object-id", "object_id", default=None, help="Filter by object ID (source or target)")
+@click.option("--type", "rel_type", default=None, help="Filter by relationship type")
+def knowledge_relationships_cmd(as_json: bool, object_id: Optional[str], rel_type: Optional[str]):
+    """List knowledge object relationships."""
+    from axiom_core.knowledge_objects import KnowledgeObjectRegistry, RelationshipType
+
+    registry = KnowledgeObjectRegistry()
+
+    type_filter = None
+    if rel_type is not None:
+        try:
+            type_filter = RelationshipType(rel_type)
+        except ValueError:
+            console.print(f"[red]Unknown relationship type: {rel_type}[/red]")
+            console.print(f"[dim]Valid types: {', '.join(t.value for t in RelationshipType)}[/dim]")
+            raise SystemExit(1)
+
+    rels = registry.list_relationships(object_id=object_id, relationship_type=type_filter)
+
+    if as_json:
+        import json as json_mod
+
+        output = [r.to_dict() for r in rels]
+        click.echo(json_mod.dumps(output, indent=2, default=str))
+        return
+
+    if not rels:
+        console.print("[dim]No knowledge relationships registered.[/dim]")
+        return
+
+    table = Table(title="Knowledge Relationships")
+    table.add_column("ID", style="cyan", no_wrap=True)
+    table.add_column("Source", style="bold")
+    table.add_column("Type")
+    table.add_column("Target", style="bold")
+    table.add_column("Notes", style="dim")
+
+    for r in rels:
+        table.add_row(
+            r.relationship_id[:12] + "…",
+            r.source_object_id,
+            r.relationship_type.value if hasattr(r.relationship_type, "value") else str(r.relationship_type),
+            r.target_object_id,
+            (r.notes or "")[:40],
+        )
+
+    console.print(table)
+    console.print(f"\n[dim]{len(rels)} relationship(s) shown[/dim]")
+
+
 if __name__ == "__main__":
     cli()

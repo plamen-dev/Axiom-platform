@@ -162,8 +162,8 @@ def _serialize_source_type(source_type: KnowledgeSourceType | str) -> str:
 
 
 def _escape_like(value: str) -> str:
-    """Escape SQL LIKE wildcards (% and _) in user-supplied filter strings."""
-    return value.replace("%", r"\%").replace("_", r"\_")
+    """Escape SQL LIKE wildcards (% and _) and the escape char (\\) in user-supplied filter strings."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 class KnowledgeSourceRegistry:

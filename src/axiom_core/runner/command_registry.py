@@ -1194,6 +1194,46 @@ _register(
 )
 
 
+_register(
+    CommandSpec(
+        name="knowledge-objects",
+        command="axiom knowledge-objects [--json-output] [--name <filter>] [--type <type>]",
+        description=(
+            "Knowledge Object Model: list registered knowledge objects "
+            "with human-readable table or machine-readable JSON output. "
+            "Metadata and governance only — no graph traversal, no inference."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("Knowledge objects table/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only registry query. No model mutation, no external calls.",
+    )
+)
+
+
+_register(
+    CommandSpec(
+        name="knowledge-relationships",
+        command="axiom knowledge-relationships [--json-output] [--object-id <id>] [--type <type>]",
+        description=(
+            "Knowledge Relationships: list relationships between knowledge "
+            "objects. Supports filtering by object ID or relationship type. "
+            "Metadata and governance only — no graph traversal, no inference."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("Knowledge relationships table/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only registry query. No model mutation, no external calls.",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------

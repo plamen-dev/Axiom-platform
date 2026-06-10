@@ -1,5 +1,49 @@
 # PR Review Ledger
 
+## PR #37: Knowledge Object Model v1
+
+**Status:** Open
+**Scope:** Universal first-class knowledge representation with typed objects
+and governed relationships.  Metadata and governance only — no graph traversal,
+no semantic search, no inference, no embeddings.
+
+### What changed
+
+- New: `src/axiom_core/knowledge_objects.py` — `KnowledgeObject`, `KnowledgeObjectType` (9 types), `KnowledgeRelationship`, `RelationshipType` (7 types), `KnowledgeReference`, `KnowledgeObjectRegistry`
+- New: `tests/test_knowledge_objects.py` — 5 test classes covering persistence, relationships, cycles, JSON validity, deterministic ordering
+- New: `docs/architecture/knowledge-object-model.md`
+- Updated: `src/axiom_cli/main.py` — added `knowledge-objects` and `knowledge-relationships` commands
+- Updated: `src/axiom_core/runner/command_registry.py` — cataloged both commands as READ_ONLY/SAFE
+- Updated: `tests/test_command_registry.py` — added both commands to EXPECTED_AXIOM_COMMANDS
+
+### What behavior changed
+
+- Two new SQLite tables: `knowledge_objects`, `knowledge_relationships`
+- Two new CLI commands: `axiom knowledge-objects`, `axiom knowledge-relationships`
+
+### What did NOT change
+
+- No existing capabilities modified
+- No retrieval, search, inference, or embedding functionality
+- No graph traversal algorithms
+- Knowledge Source Registry (PR #36) is unchanged
+
+### Tests
+
+- 5 test classes (TestObjectPersistence, TestRelationshipPersistence, TestCyclesDoNotCrash, TestJsonOutput, TestDeterministicOrdering, TestKnowledgeReference)
+- Full suite pass count: TBD (pending CI)
+
+### Known risks
+
+- Low: metadata-only, no execution paths affected
+
+### Verification-factory impact
+
+Creates a common language for all future reasoning — objects and relationships
+that discovery, validation, promotion, and learning layers can use.
+
+---
+
 ## PR #36: Knowledge Source Registry v1
 
 **Status:** Open
