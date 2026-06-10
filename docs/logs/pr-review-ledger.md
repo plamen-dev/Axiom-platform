@@ -1,5 +1,60 @@
 # PR Review Ledger
 
+## PR #31: Local Audit, Evidence, and Run Spine
+
+**Status:** Open
+**Scope:** Foundational local run infrastructure — every Axiom action gets a run
+ID, standard artifact folder, structured audit logs, and machine-readable result
+files. Narrow functional scope (GridCreation dry-run as proof case).
+
+### What changed
+- New `src/axiom_core/run_spine.py`: `execute_run()`, `RunContext`, `RunResult`,
+  `RunMetadata`, `AuditEntry`, `ExternalCallDeclaration`, `ArtifactManifest`,
+  `generate_run_id()`, `create_run_folder()`, `append_audit_entry()`,
+  `list_runs()`, plus per-file writers for metadata/input/result/error/
+  external-calls/manifest/summary.
+- New `tests/test_run_spine.py`: 8 test classes covering run ID generation,
+  artifact folder creation, JSONL audit append, manifest generation, dry-run
+  file production, failed-run file production, external call defaults, and run
+  history query.
+- New `docs/architecture/local-audit-and-run-spine.md`: explains artifact
+  structure, schemas, and integration contract.
+
+### What behavior changed
+- Axiom now has a durable local execution spine. Any capability can call
+  `execute_run()` to get a governed run with full audit/evidence artifacts
+  regardless of outcome. Failures never silently disappear.
+
+### What did NOT change
+- No existing capabilities modified. No MCP, UI, OAuth, cloud, telemetry,
+  workflow engine, or broad new Revit capabilities. Existing tests, CLI, and
+  runner infrastructure untouched.
+
+### Tests run
+- `tests/test_run_spine.py` (new): run ID, artifact folder, JSONL append,
+  manifest, dry-run files, failed-run files, external-call default, run history.
+- Full suite: all existing tests still pass. `ruff check` clean.
+
+### Validation still pending
+- None required. Infrastructure-only PR with no live Revit interaction.
+
+### Known risks
+- Low. Pure infrastructure; writes only to local artifact directories.
+  No model mutation, no external calls, no state changes to existing systems.
+
+### Revit live validation required
+- No.
+
+### 2024 baseline affected
+- No.
+
+### Verification-factory impact
+- Creates the audit/evidence backbone that every future capability execution,
+  discovery loop, validation run, and promotion check must use. Strengthens
+  evidence quality and traceability.
+
+---
+
 ## PR #30: Promotion Eligibility Engine v1
 
 **Status:** Open
