@@ -1335,6 +1335,27 @@ _register(
 )
 
 
+_register(
+    CommandSpec(
+        name="knowledge-graph",
+        command="axiom knowledge-graph [--json-output] [--refresh] [--node <id>] [--neighbors <id>] [--depth <n>]",
+        description=(
+            "Knowledge Graph Foundation: navigable structure connecting knowledge "
+            "objects, workflows, provenance, evidence, reviews, and candidates. "
+            "Supports summary, node lookup, neighbor traversal, and refresh. "
+            "Structural/navigation only — no semantic retrieval, no embeddings."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("Knowledge graph summary/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=120,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only graph queries. --refresh rebuilds from registries (writes to SQLite but no external calls).",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------

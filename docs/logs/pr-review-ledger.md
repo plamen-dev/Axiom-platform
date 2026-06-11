@@ -1,5 +1,38 @@
 # PR Review Ledger
 
+## PR #42: Knowledge Graph Foundation v1
+
+**Status:** Open
+**Branch:** `devin/1781218842-knowledge-graph-foundation`
+
+### What Changed
+- New `knowledge_graph.py` with `KnowledgeGraph`, `KnowledgeGraphNode`, `KnowledgeGraphEdge`, `KnowledgeGraphSnapshot`, `KnowledgeGraphTraversalResult`
+- SQLite persistence via 3 tables: `knowledge_graph_nodes`, `knowledge_graph_edges`, `knowledge_graph_snapshots`
+- Graph builds from existing registries: knowledge objects, relationships, sources, provenance, workflows, learning candidates, reviews
+- Bounded BFS traversal with cycle detection (max depth capped at 10)
+- Deterministic edge IDs: `{source}--{type}-->{target}`
+- CLI: `axiom knowledge-graph` with `--refresh`, `--json-output`, `--node`, `--neighbors`, `--depth`
+- 12 node types, 17 edge types (reuses knowledge_objects.RelationshipType values)
+- Command registry entry: READ_ONLY/SAFE
+- Architecture doc: `docs/architecture/knowledge-graph-foundation.md`
+
+### What Behavior Changed
+- New CLI command available: `knowledge-graph`
+- New SQLite tables created on first use
+- `--refresh` rebuilds graph from all available registries
+
+### What Did Not Change
+- No upstream knowledge registries mutated
+- No semantic retrieval, embeddings, or graph database
+- No autonomous reasoning or workflow execution
+- All existing tests unaffected
+
+### Tests
+- 33+ tests across 7 test classes
+- Covers: data models, helpers, persistence, neighbors, traversal, build-from-registries, JSON, enum coercion
+
+---
+
 ## PR #41: Knowledge Review and Approval Layer v1
 
 **Status:** Open

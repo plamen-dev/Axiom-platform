@@ -4942,5 +4942,125 @@ def knowledge_review_create_cmd(
         console.print(f"  Reason:    {created.reason.value}")
 
 
+# ---------------------------------------------------------------------------
+# Knowledge Graph
+# ---------------------------------------------------------------------------
+
+
+@cli.command("knowledge-graph")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+@click.option("--refresh", is_flag=True, help="Rebuild graph from existing registries")
+@click.option("--node", "node_id", default=None, help="Look up a specific node by ID")
+@click.option("--neighbors", "neighbor_id", default=None, help="List neighbors of a node")
+@click.option("--depth", "depth", default=None, type=int, help="Traversal depth (used with --neighbors)")
+def knowledge_graph_cmd(
+    as_json: bool,
+    refresh: bool,
+    node_id: Optional[str],
+    neighbor_id: Optional[str],
+    depth: Optional[int],
+):
+    """Knowledge graph summary, node lookup, or neighbor traversal."""
+    from enum import Enum
+
+    from axiom_core.knowledge_graph import (
+        MAX_TRAVERSAL_DEPTH,
+        KnowledgeGraph,
+    )
+
+    graph = KnowledgeGraph()
+
+    # --- Refresh ---
+    if refresh:
+        snapshot = graph.build_from_registries()
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps(snapshot.to_dict(), indent=2, default=str))
+        else:
+            console.print("[green]Graph rebuilt from registries[/green]")
+            console.print(f"  Nodes: {snapshot.node_count}")
+            console.print(f"  Edges: {snapshot.edge_count}")
+            console.print(f"  Node types: {', '.join(snapshot.node_types)}")
+            console.print(f"  Edge types: {', '.join(snapshot.edge_types)}")
+            console.print(f"  Source registries: {', '.join(snapshot.source_registries)}")
+            console.print(f"  Snapshot: {snapshot.snapshot_id}")
+        return
+
+    # --- Node lookup ---
+    if node_id is not None:
+        node = graph.get_node(node_id)
+        if node is None:
+            console.print(f"[red]Node not found: {node_id}[/red]")
+            raise SystemExit(1)
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps(node.to_dict(), indent=2, default=str))
+        else:
+            console.print(f"[bold]{node.label}[/bold]")
+            console.print(f"  ID:       {node.node_id}")
+            nt = node.node_type.value if isinstance(node.node_type, Enum) else str(node.node_type)
+            console.print(f"  Type:     {nt}")
+            console.print(f"  Registry: {node.source_registry}")
+            if node.metadata:
+                for k, v in node.metadata.items():
+                    console.print(f"  {k}: {v}")
+        return
+
+    # --- Neighbor traversal ---
+    if neighbor_id is not None:
+        effective_depth = min(depth if depth is not None else 1, MAX_TRAVERSAL_DEPTH)
+        result = graph.traverse(neighbor_id, max_depth=effective_depth)
+        if not result.visited_nodes:
+            console.print(f"[red]Node not found: {neighbor_id}[/red]")
+            raise SystemExit(1)
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps(result.to_dict(), indent=2, default=str))
+        else:
+            console.print(f"[bold]Traversal from {neighbor_id} (depth={effective_depth})[/bold]")
+            console.print(f"  Nodes visited: {len(result.visited_nodes)}")
+            console.print(f"  Edges visited: {len(result.visited_edges)}")
+            console.print(f"  Cycle detected: {result.cycle_detected}")
+            table = Table(title="Visited Nodes")
+            table.add_column("ID", style="cyan", no_wrap=True)
+            table.add_column("Label", style="bold")
+            table.add_column("Type")
+            table.add_column("Registry", style="dim")
+            for n in result.visited_nodes:
+                nt = n.node_type.value if isinstance(n.node_type, Enum) else str(n.node_type)
+                table.add_row(
+                    n.node_id[:20] + "…" if len(n.node_id) > 20 else n.node_id,
+                    n.label,
+                    nt,
+                    n.source_registry,
+                )
+            console.print(table)
+        return
+
+    # --- Default: summary ---
+    snapshot = graph.get_latest_snapshot()
+    if as_json:
+        import json as json_mod
+
+        click.echo(graph.to_json())
+        return
+
+    if snapshot is None:
+        console.print("[dim]No graph snapshot available. Run --refresh to build.[/dim]")
+        return
+
+    console.print("[bold]Knowledge Graph Summary[/bold]")
+    console.print(f"  Nodes: {snapshot.node_count}")
+    console.print(f"  Edges: {snapshot.edge_count}")
+    console.print(f"  Node types: {', '.join(snapshot.node_types)}")
+    console.print(f"  Edge types: {', '.join(snapshot.edge_types)}")
+    console.print(f"  Source registries: {', '.join(snapshot.source_registries)}")
+    console.print(f"  Snapshot: {snapshot.snapshot_id}")
+    console.print(f"  Created: {snapshot.created_at}")
+
+
 if __name__ == "__main__":
     cli()
