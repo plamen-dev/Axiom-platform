@@ -4800,5 +4800,147 @@ def learning_candidates_cmd(
     console.print(f"\n[dim]{len(candidates)} candidate(s) shown[/dim]")
 
 
+@cli.command("knowledge-reviews")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+@click.option("--name", "name_filter", default=None, help="Filter by knowledge name substring")
+@click.option("--decision", "decision_str", default=None, help="Filter by decision (e.g. approved, rejected)")
+@click.option("--status", "status_str", default=None, help="Filter by status (open, closed)")
+def knowledge_reviews_cmd(
+    as_json: bool,
+    name_filter: Optional[str],
+    decision_str: Optional[str],
+    status_str: Optional[str],
+):
+    """List knowledge review and approval records."""
+    from enum import Enum
+
+    from axiom_core.knowledge_reviews import (
+        KnowledgeReviewRegistry,
+        ReviewDecision,
+        ReviewStatus,
+    )
+
+    registry = KnowledgeReviewRegistry()
+
+    decision_filter = None
+    if decision_str is not None:
+        try:
+            decision_filter = ReviewDecision(decision_str)
+        except ValueError:
+            console.print(f"[red]Unknown decision: {decision_str}[/red]")
+            console.print(f"[dim]Valid decisions: {', '.join(d.value for d in ReviewDecision)}[/dim]")
+            raise SystemExit(1)
+
+    status_filter = None
+    if status_str is not None:
+        try:
+            status_filter = ReviewStatus(status_str)
+        except ValueError:
+            console.print(f"[red]Unknown status: {status_str}[/red]")
+            console.print(f"[dim]Valid statuses: {', '.join(s.value for s in ReviewStatus)}[/dim]")
+            raise SystemExit(1)
+
+    reviews = registry.list_reviews(
+        name_filter=name_filter,
+        decision_filter=decision_filter,
+        status_filter=status_filter,
+    )
+
+    if as_json:
+        import json as json_mod
+
+        output = [r.to_dict() for r in reviews]
+        click.echo(json_mod.dumps(output, indent=2, default=str))
+        return
+
+    if not reviews:
+        console.print("[dim]No knowledge reviews registered.[/dim]")
+        return
+
+    table = Table(title="Knowledge Reviews")
+    table.add_column("ID", style="cyan", no_wrap=True)
+    table.add_column("Knowledge", style="bold")
+    table.add_column("Decision")
+    table.add_column("Reason")
+    table.add_column("Status")
+    table.add_column("Reviewer", style="dim")
+    table.add_column("Superseded By", style="dim")
+
+    for r in reviews:
+        table.add_row(
+            r.review_id[:12] + "…" if len(r.review_id) > 12 else r.review_id,
+            r.knowledge_name,
+            r.decision.value if isinstance(r.decision, Enum) else str(r.decision),
+            r.reason.value if isinstance(r.reason, Enum) else str(r.reason),
+            r.status.value if isinstance(r.status, Enum) else str(r.status),
+            (r.reviewer or "")[:20],
+            (r.superseded_by or "")[:12],
+        )
+
+    console.print(table)
+    console.print(f"\n[dim]{len(reviews)} review(s) shown[/dim]")
+
+
+@cli.command("knowledge-review-create")
+@click.option("--knowledge-id", required=True, help="ID of the knowledge item to review")
+@click.option("--knowledge-name", required=True, help="Name of the knowledge item")
+@click.option("--decision", required=True, help="Review decision (e.g. approved, rejected, proposed)")
+@click.option("--reason", required=True, help="Reason for the decision")
+@click.option("--notes", default=None, help="Optional notes")
+@click.option("--reviewer", default=None, help="Reviewer identifier")
+@click.option("--json-output", "as_json", is_flag=True, help="Output created review as JSON")
+def knowledge_review_create_cmd(
+    knowledge_id: str,
+    knowledge_name: str,
+    decision: str,
+    reason: str,
+    notes: Optional[str],
+    reviewer: Optional[str],
+    as_json: bool,
+):
+    """Create a new knowledge review record."""
+    from axiom_core.knowledge_reviews import (
+        KnowledgeReview,
+        KnowledgeReviewRegistry,
+        ReviewDecision,
+        ReviewReason,
+    )
+
+    try:
+        dec = ReviewDecision(decision)
+    except ValueError:
+        console.print(f"[red]Unknown decision: {decision}[/red]")
+        console.print(f"[dim]Valid decisions: {', '.join(d.value for d in ReviewDecision)}[/dim]")
+        raise SystemExit(1)
+
+    try:
+        rsn = ReviewReason(reason)
+    except ValueError:
+        console.print(f"[red]Unknown reason: {reason}[/red]")
+        console.print(f"[dim]Valid reasons: {', '.join(r.value for r in ReviewReason)}[/dim]")
+        raise SystemExit(1)
+
+    registry = KnowledgeReviewRegistry()
+    review = KnowledgeReview(
+        knowledge_id=knowledge_id,
+        knowledge_name=knowledge_name,
+        decision=dec,
+        reason=rsn,
+        notes=notes,
+        reviewer=reviewer,
+    )
+    created = registry.create_review(review)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps(created.to_dict(), indent=2, default=str))
+    else:
+        console.print(f"[green]Review created:[/green] {created.review_id}")
+        console.print(f"  Knowledge: {created.knowledge_name}")
+        console.print(f"  Decision:  {created.decision.value}")
+        console.print(f"  Reason:    {created.reason.value}")
+
+
 if __name__ == "__main__":
     cli()

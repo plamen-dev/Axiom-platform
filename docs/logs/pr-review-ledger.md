@@ -1,5 +1,52 @@
 # PR Review Ledger
 
+## PR #41: Knowledge Review and Approval Layer v1
+
+**Status:** Open
+**Branch:** `devin/XXXXX-knowledge-review-approval`
+
+### What Changed
+- New `knowledge_reviews.py` with `KnowledgeReview`, `ReviewDecision`, `ReviewReason`, `ReviewStatus`, `ReviewEvidence`
+- SQLite persistence via `KnowledgeReviewRegistry` (tables: `knowledge_reviews`, `knowledge_review_events`)
+- CLI: `axiom knowledge-reviews` (list/filter) and `axiom knowledge-review-create` (create via CLI)
+- Deterministic ordering: decision priority (approved > proposed > needs_more_evidence > rejected > deprecated > superseded), then alphabetical
+- Supersession chains with cycle detection
+- Command registry entries for both CLI commands
+- Architecture doc: `docs/architecture/knowledge-review-approval.md`
+
+### What Behavior Changed
+- New CLI commands available: `knowledge-reviews`, `knowledge-review-create`
+- New SQLite tables created on first use: `knowledge_reviews`, `knowledge_review_events`
+
+### What Did Not Change
+- No upstream knowledge registries mutated (sources, objects, provenance, workflows, candidates)
+- No autonomous approval or rejection logic
+- All existing tests unaffected
+
+### Devin Review Findings (resolved — round 1)
+- **BUG:** Self-supersession corrupts record — fixed: `if old_id == new_id: return False` guard
+- **ANALYSIS:** `supersedes` field name semantically inverted — renamed to `superseded_by` (matches provenance module convention)
+- **FLAG:** `_row_to_review` truthiness check — changed `if row.evidence_paths_json:` to `if row.evidence_paths_json is not None:` for consistency
+- **FLAG:** Repeated `hasattr` enum serialization in CLI — replaced with `isinstance(r.decision, Enum)`
+- **FLAG:** Field naming inconsistency with provenance module — `supersedes` → `superseded_by` throughout
+
+### Additional Findings (resolved — round 2)
+- **FLAG:** `create_review` mutated the caller's input object (`review.updated_at = now`) — now returns a fresh `KnowledgeReview` from the persisted row via `_row_to_review`, input is never mutated
+- **FLAG:** `close_review` event recorded no audit details — now captures `prior_decision` and `prior_status` in event details (matches `supersede_review` pattern)
+- **FLAG:** `get_supersession_chain` opened N separate DB sessions (one per step) — now uses a single session for consistency and efficiency
+
+### Tests
+- 30 tests across 9 test classes (persistence incl. no-mutation check, ordering, filtering, supersession incl. self-supersession, duplicates, JSON, empty collections, close incl. audit details, enum coercion, evidence)
+- Full pytest suite: 1130 passed, 1 skipped
+- Ruff clean
+
+### Non-Goals
+- No autonomous approval, rejection, or learning
+- No semantic retrieval, graph traversal, or inference
+- No workflow or capability execution
+
+---
+
 ## PR #40: Learning Candidate Engine v1
 
 **Status:** Open

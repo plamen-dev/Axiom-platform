@@ -1294,6 +1294,47 @@ _register(
 )
 
 
+_register(
+    CommandSpec(
+        name="knowledge-reviews",
+        command="axiom knowledge-reviews [--json-output] [--name <filter>] [--decision <decision>] [--status <status>]",
+        description=(
+            "Knowledge Review & Approval: list review and approval records "
+            "with deterministic ordering by decision priority. Supports "
+            "filtering by name, decision, or status. Governance only — "
+            "no autonomous approval or knowledge mutation."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("Knowledge reviews table/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only registry query. No model mutation, no external calls.",
+    )
+)
+
+
+_register(
+    CommandSpec(
+        name="knowledge-review-create",
+        command="axiom knowledge-review-create --knowledge-id <id> --knowledge-name <name> --decision <decision> --reason <reason> [--notes <notes>] [--reviewer <reviewer>] [--json-output]",
+        description=(
+            "Knowledge Review & Approval: create a new review record for a "
+            "knowledge item. Persists the decision to SQLite. No mutation of "
+            "the knowledge item itself — governance only."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=("Created review confirmation/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Creates a review record in SQLite. Does not mutate any knowledge registries.",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
