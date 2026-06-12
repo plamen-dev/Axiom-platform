@@ -56,6 +56,7 @@ EXPECTED_AXIOM_COMMANDS = {
     "knowledge-review-create", "knowledge-reviews", "knowledge-sources",
     "learning-candidates",
     "local-runner",
+    "retrieve",
     "parameter-registry-build", "plan", "plans", "pr-snapshot", "promotion-check",
     "prompt",
     "runner-commands", "set-parameter-value", "stats", "submit", "test-grids",

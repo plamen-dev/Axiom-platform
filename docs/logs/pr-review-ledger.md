@@ -1,5 +1,46 @@
 # PR Review Ledger
 
+## PR #43: Semantic Retrieval Engine v1
+
+**Status:** Open
+**Branch:** `devin/1781220521-semantic-retrieval-engine`
+
+### What Changed
+- New `semantic_retrieval.py` with `SemanticRetrievalEngine`, `RetrievalQuery`, `RetrievalResult`, `RetrievalMatch`, `RetrievalEvidence`, `RetrievalExplanation`
+- Retrieves knowledge from existing graph nodes and edges — no new persistence tables
+- Supports exact, partial, type-filtered, and relationship-aware queries
+- Deterministic ranking: score DESC → trust rank → approval rank → name ASC
+- Trust weighting: founder_verified (+25) > human_verified (+20) > evidence_supported (+15) > derived (+10) > candidate (+5)
+- Approval weighting: approved (+15) > proposed (+5) > needs_more_evidence (+2)
+- Every match includes an explanation (exact, partial, or relationship-derived)
+- CLI: `axiom retrieve "<query>"` with `--json-output`, `--type`, `--max-results`
+- Command registry entry: READ_ONLY/SAFE
+- Architecture doc: `docs/architecture/semantic-retrieval-engine.md`
+
+### What Behavior Changed
+- New CLI command available: `retrieve`
+- Knowledge graph can now be queried with natural-language-like text searches
+- Approved/founder-verified knowledge ranks higher in results
+
+### What Did Not Change
+- No upstream registries or graph mutated by retrieval
+- No embeddings, vector database, or LLM scoring
+- No autonomous reasoning, planning, or execution
+- All existing tests unaffected
+
+### Tests
+- 35 tests across 12 test classes
+- Covers: data models, helpers, query validation, exact match, partial match, type-filtered, relationship-aware, explanations, trust weighting, approval weighting, deterministic ordering, JSON output, no-mutation guarantee
+
+### Known Risks
+- None identified
+
+### Validation Pending
+- CI pipeline
+- Devin Review findings
+
+---
+
 ## PR #42: Knowledge Graph Foundation v1
 
 **Status:** Open

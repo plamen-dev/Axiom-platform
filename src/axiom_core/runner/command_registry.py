@@ -1356,6 +1356,28 @@ _register(
 )
 
 
+_register(
+    CommandSpec(
+        name="retrieve",
+        command='axiom retrieve "<query>" [--json-output] [--type <type>] [--max-results <n>]',
+        description=(
+            "Semantic Retrieval Engine: retrieves knowledge from existing "
+            "registries and the knowledge graph.  Supports exact, partial, "
+            "type-filtered, and relationship-aware queries with deterministic "
+            "ranking, trust/approval weighting, and explanations.  "
+            "Read-only — never mutates knowledge."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("Retrieval results table/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only knowledge retrieval. Queries the knowledge graph — no external calls, no mutations.",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------

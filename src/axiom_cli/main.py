@@ -5062,5 +5062,80 @@ def knowledge_graph_cmd(
     console.print(f"  Created: {snapshot.created_at}")
 
 
+@cli.command("retrieve")
+@click.argument("query_text")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+@click.option("--type", "query_type", default=None, help="Filter by node type (workflow, capability, rule, etc.)")
+@click.option("--max-results", "max_results", default=None, type=int, help="Maximum results to return")
+def retrieve_cmd(
+    query_text: str,
+    as_json: bool,
+    query_type: Optional[str],
+    max_results: Optional[int],
+):
+    """Retrieve knowledge by query text."""
+    from axiom_core.semantic_retrieval import (
+        MAX_RESULTS_DEFAULT,
+        VALID_QUERY_TYPES,
+        RetrievalQuery,
+        SemanticRetrievalEngine,
+    )
+
+    if not query_text.strip():
+        console.print("[red]Error: query text must not be empty.[/red]")
+        raise SystemExit(1)
+
+    if query_type is not None and query_type.lower() not in VALID_QUERY_TYPES:
+        console.print(f"[red]Unknown type: {query_type}[/red]")
+        console.print(f"Valid types: {', '.join(sorted(VALID_QUERY_TYPES))}")
+        raise SystemExit(1)
+
+    effective_max = max_results if max_results is not None else MAX_RESULTS_DEFAULT
+    query = RetrievalQuery(
+        query_text=query_text,
+        query_type=query_type,
+        max_results=effective_max,
+    )
+
+    engine = SemanticRetrievalEngine()
+    result = engine.retrieve(query)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps(result.to_dict(), indent=2, default=str))
+        return
+
+    if not result.matches:
+        console.print(f"[dim]No results found for: {query_text}[/dim]")
+        return
+
+    console.print(f"[bold]Results for '{query_text}'[/bold] ({result.total_candidates} candidates, showing {len(result.matches)})")
+    console.print()
+
+    table = Table(title="Retrieval Results")
+    table.add_column("#", style="dim", width=3)
+    table.add_column("Name", style="bold")
+    table.add_column("Type")
+    table.add_column("Score", justify="right")
+    table.add_column("Trust", style="green")
+    table.add_column("Explanation", style="dim")
+
+    for i, m in enumerate(result.matches, 1):
+        ot = m.object_type
+        trust = m.trust_level or "-"
+        explanation = m.explanation.reason[:50] if m.explanation else "-"
+        table.add_row(
+            str(i),
+            m.object_name,
+            ot,
+            f"{m.score:.1f}",
+            trust,
+            explanation,
+        )
+
+    console.print(table)
+
+
 if __name__ == "__main__":
     cli()
