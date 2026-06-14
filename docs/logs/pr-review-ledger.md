@@ -1,5 +1,39 @@
 # PR Review Ledger
 
+## PR #45: Knowledge-Aware Capability Planner v1
+
+**Status:** Open
+**Branch:** `devin/1781226383-knowledge-capability-planner`
+
+### What Changed
+- New `capability_planner.py` with `CapabilityPlanner`, `PlanningRequest`, `PlanningResult`, `PlanningStep`, `PlanningDependency`, `PlanningEvidence`, `PlanningExplanation`
+- Consumes semantic retrieval engine + workflow registry to generate structured plans
+- Plans include: objective, assumptions, ordered steps, dependencies, evidence, risks, validations, explanations
+- Persists plans to SQLite (`capability_plans` table)
+- CLI: `axiom plan "<objective>"` with `--json-output`, `--max-steps`
+- Architecture doc: `docs/architecture/knowledge-capability-planner.md`
+- 35 tests covering plan generation, persistence, determinism, JSON output, safety
+
+### What Behavior Changed
+- New CLI command available: `plan`
+- Knowledge system can now produce structured capability plans from accumulated knowledge
+- Plans are recommendations only — no execution, no mutation
+
+### What Did Not Change
+- No upstream registries or knowledge mutated by planning
+- No execution, workflow mutation, or autonomous behavior
+- No embeddings, vector database, or LLM scoring
+- All existing tests unaffected
+
+### Tests Run
+- 35 new tests (all pass)
+- ruff clean
+
+### Risks
+- None — read-only layer with no side effects on existing data
+
+---
+
 ## PR #43: Semantic Retrieval Engine v1
 
 **Status:** Open

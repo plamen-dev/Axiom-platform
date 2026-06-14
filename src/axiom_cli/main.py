@@ -5134,5 +5134,91 @@ def retrieve_cmd(
     console.print(table)
 
 
+@cli.command("capability-plan")
+@click.argument("objective")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+@click.option("--max-steps", "max_steps", default=None, type=int, help="Maximum planning steps")
+def plan_capability_cmd(
+    objective: str,
+    as_json: bool,
+    max_steps: Optional[int],
+):
+    """Generate a knowledge-aware capability plan."""
+    from axiom_core.capability_planner import (
+        MAX_STEPS_DEFAULT,
+        CapabilityPlanner,
+        PlanningRequest,
+    )
+
+    if not objective.strip():
+        console.print("[red]Error: planning objective must not be empty.[/red]")
+        raise SystemExit(1)
+
+    effective_max = max_steps if max_steps is not None else MAX_STEPS_DEFAULT
+    request = PlanningRequest(objective=objective, max_steps=effective_max)
+
+    planner = CapabilityPlanner()
+    result = planner.generate_plan(request)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps(result.to_dict(), indent=2, default=str))
+        return
+
+    console.print(f"\n[bold]Plan: {result.objective}[/bold]")
+    console.print(f"[dim]ID: {result.plan_id}[/dim]")
+    console.print(f"[dim]Status: {result.status.value}[/dim]")
+    console.print()
+
+    if result.assumptions:
+        console.print("[bold cyan]Assumptions:[/bold cyan]")
+        for a in result.assumptions:
+            console.print(f"  • {a}")
+        console.print()
+
+    if result.steps:
+        table = Table(title="Planning Steps")
+        table.add_column("#", style="dim", width=3)
+        table.add_column("Title", style="bold")
+        table.add_column("Description", style="dim")
+        table.add_column("Capabilities")
+        table.add_column("Explanation", style="dim")
+
+        for s in result.steps:
+            caps = ", ".join(s.required_capabilities) if s.required_capabilities else "-"
+            explanation = s.explanation.reason[:50] if s.explanation else "-"
+            table.add_row(
+                str(s.sequence),
+                s.title,
+                (s.description or "")[:40],
+                caps,
+                explanation,
+            )
+        console.print(table)
+        console.print()
+
+    if result.risks:
+        console.print("[bold yellow]Risks:[/bold yellow]")
+        for r in result.risks:
+            console.print(f"  ⚠ {r}")
+        console.print()
+
+    if result.validations:
+        console.print("[bold green]Validations Required:[/bold green]")
+        for v in result.validations:
+            console.print(f"  ✓ {v}")
+        console.print()
+
+    if result.explanations:
+        console.print("[bold]Plan Explanations:[/bold]")
+        for e in result.explanations:
+            src = f" ({e.source})" if e.source else ""
+            console.print(f"  → {e.reason}{src}")
+        console.print()
+
+    console.print(f"[dim]{len(result.steps)} step(s), {len(result.dependencies)} dependency(ies)[/dim]")
+
+
 if __name__ == "__main__":
     cli()

@@ -1377,6 +1377,26 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="capability-plan",
+        command='axiom capability-plan "<objective>" [--json-output] [--max-steps <n>]',
+        description=(
+            "Knowledge-Aware Capability Planner: generates structured plans "
+            "from knowledge objects, workflows, retrieval results, and graph "
+            "relationships.  Plans are read-only recommendations — they never "
+            "execute capabilities or mutate knowledge."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("Planning steps table/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only planning. Consumes retrieval + graph — no external calls, no mutations.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
