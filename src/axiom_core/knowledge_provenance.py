@@ -257,7 +257,7 @@ class KnowledgeProvenanceRegistry:
                 existing.source_confidence = _serialize_confidence(prov.source_confidence)
                 existing.status = _serialize_status(prov.status)
                 existing.origin = prov.origin
-                existing.evidence_paths = json.dumps(prov.evidence_paths) if prov.evidence_paths else None
+                existing.evidence_paths = json.dumps(prov.evidence_paths) if prov.evidence_paths is not None else None
                 existing.approving_source = prov.approving_source
                 existing.confidence_score = str(prov.confidence_score) if prov.confidence_score is not None else None
                 existing.superseded_by = prov.superseded_by
@@ -274,7 +274,7 @@ class KnowledgeProvenanceRegistry:
                     source_confidence=_serialize_confidence(prov.source_confidence),
                     status=_serialize_status(prov.status),
                     origin=prov.origin,
-                    evidence_paths=json.dumps(prov.evidence_paths) if prov.evidence_paths else None,
+                    evidence_paths=json.dumps(prov.evidence_paths) if prov.evidence_paths is not None else None,
                     approving_source=prov.approving_source,
                     confidence_score=str(prov.confidence_score) if prov.confidence_score is not None else None,
                     superseded_by=prov.superseded_by,
@@ -417,7 +417,7 @@ class KnowledgeProvenanceRegistry:
             st = row.status  # type: ignore[assignment]
 
         evidence = []
-        if row.evidence_paths:
+        if row.evidence_paths is not None:
             try:
                 evidence = json.loads(row.evidence_paths)
             except (json.JSONDecodeError, TypeError):

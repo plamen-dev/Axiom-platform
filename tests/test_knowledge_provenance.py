@@ -448,3 +448,51 @@ class TestNameFiltering:
         results = registry.list_provenance(name_filter="\\")
         assert len(results) == 1
         assert results[0].provenance_id == "bs_1"
+
+
+# ---------------------------------------------------------------------------
+# Test: Empty evidence_paths [] roundtrip (truthiness fix)
+# ---------------------------------------------------------------------------
+
+
+class TestEmptyEvidencePathsTruthiness:
+    """Verify that empty list [] is preserved, not stored as NULL."""
+
+    def test_empty_list_persists_as_json(self, registry: KnowledgeProvenanceRegistry):
+        """Empty evidence_paths=[] must roundtrip, not collapse to None."""
+        prov = KnowledgeProvenance(
+            provenance_id="truth_1",
+            knowledge_name="Empty Evidence Test",
+            trust_level=TrustLevel.CANDIDATE,
+            evidence_paths=[],
+        )
+        registry.register(prov)
+        retrieved = registry.get("truth_1")
+        assert retrieved is not None
+        assert retrieved.evidence_paths == []
+
+    def test_none_evidence_stays_none(self, registry: KnowledgeProvenanceRegistry):
+        """evidence_paths=None must also roundtrip correctly."""
+        prov = KnowledgeProvenance(
+            provenance_id="truth_2",
+            knowledge_name="None Evidence Test",
+            trust_level=TrustLevel.CANDIDATE,
+            evidence_paths=None,
+        )
+        registry.register(prov)
+        retrieved = registry.get("truth_2")
+        assert retrieved is not None
+        assert retrieved.evidence_paths == []  # None → default empty list on read
+
+    def test_populated_evidence_roundtrips(self, registry: KnowledgeProvenanceRegistry):
+        """Non-empty evidence_paths must roundtrip."""
+        prov = KnowledgeProvenance(
+            provenance_id="truth_3",
+            knowledge_name="Populated Evidence Test",
+            trust_level=TrustLevel.CANDIDATE,
+            evidence_paths=["path/a.json", "path/b.json"],
+        )
+        registry.register(prov)
+        retrieved = registry.get("truth_3")
+        assert retrieved is not None
+        assert retrieved.evidence_paths == ["path/a.json", "path/b.json"]

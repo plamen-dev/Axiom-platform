@@ -1,6 +1,7 @@
 """Axiom CLI - Command-line interface for the Axiom platform."""
 
 import json
+from enum import Enum
 from typing import Optional
 from uuid import UUID
 
@@ -4499,7 +4500,7 @@ def knowledge_sources_cmd(as_json: bool, name_filter: Optional[str], refresh: bo
         table.add_row(
             s.source_id,
             s.source_name,
-            s.source_type.value if hasattr(s.source_type, "value") else str(s.source_type),
+            s.source_type.value if isinstance(s.source_type, Enum) else str(s.source_type),
             f"[{status_style}]{s.status.value}[/{status_style}]",
             s.trust_level,
             s.path or "",
@@ -4558,7 +4559,7 @@ def knowledge_objects_cmd(as_json: bool, name_filter: Optional[str], obj_type: O
         table.add_row(
             o.object_id,
             o.object_name,
-            o.object_type.value if hasattr(o.object_type, "value") else str(o.object_type),
+            o.object_type.value if isinstance(o.object_type, Enum) else str(o.object_type),
             o.version,
             o.source_id or "",
             (o.description or "")[:50],
@@ -4611,7 +4612,7 @@ def knowledge_relationships_cmd(as_json: bool, object_id: Optional[str], rel_typ
         table.add_row(
             r.relationship_id[:12] + "…",
             r.source_object_id,
-            r.relationship_type.value if hasattr(r.relationship_type, "value") else str(r.relationship_type),
+            r.relationship_type.value if isinstance(r.relationship_type, Enum) else str(r.relationship_type),
             r.target_object_id,
             (r.notes or "")[:40],
         )
@@ -4675,9 +4676,9 @@ def knowledge_provenance_cmd(
         table.add_row(
             r.provenance_id[:12] + "…",
             r.knowledge_name,
-            r.trust_level.value if hasattr(r.trust_level, "value") else str(r.trust_level),
-            r.source_confidence.value if hasattr(r.source_confidence, "value") else str(r.source_confidence),
-            r.status.value if hasattr(r.status, "value") else str(r.status),
+            r.trust_level.value if isinstance(r.trust_level, Enum) else str(r.trust_level),
+            r.source_confidence.value if isinstance(r.source_confidence, Enum) else str(r.source_confidence),
+            r.status.value if isinstance(r.status, Enum) else str(r.status),
             (r.origin or "")[:30],
             (r.superseded_by or "")[:12],
         )
@@ -4723,7 +4724,7 @@ def workflows_cmd(as_json: bool, name_filter: Optional[str], include_deprecated:
         table.add_row(
             w.workflow_id[:12] + "…" if len(w.workflow_id) > 12 else w.workflow_id,
             w.workflow_name,
-            w.status.value if hasattr(w.status, "value") else str(w.status),
+            w.status.value if isinstance(w.status, Enum) else str(w.status),
             w.version,
             str(len(w.steps)),
             str(len(w.rules)),
@@ -4789,8 +4790,8 @@ def learning_candidates_cmd(
         table.add_row(
             c.candidate_id[:12] + "…" if len(c.candidate_id) > 12 else c.candidate_id,
             c.candidate_name,
-            c.candidate_type.value if hasattr(c.candidate_type, "value") else str(c.candidate_type),
-            c.strength.value if hasattr(c.strength, "value") else str(c.strength),
+            c.candidate_type.value if isinstance(c.candidate_type, Enum) else str(c.candidate_type),
+            c.strength.value if isinstance(c.strength, Enum) else str(c.strength),
             str(c.confidence_score),
             str(c.observation_count),
             str(len(c.evidence)),
@@ -4812,8 +4813,6 @@ def knowledge_reviews_cmd(
     status_str: Optional[str],
 ):
     """List knowledge review and approval records."""
-    from enum import Enum
-
     from axiom_core.knowledge_reviews import (
         KnowledgeReviewRegistry,
         ReviewDecision,
@@ -4961,8 +4960,6 @@ def knowledge_graph_cmd(
     depth: Optional[int],
 ):
     """Knowledge graph summary, node lookup, or neighbor traversal."""
-    from enum import Enum
-
     from axiom_core.knowledge_graph import (
         MAX_TRAVERSAL_DEPTH,
         KnowledgeGraph,
