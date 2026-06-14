@@ -45,7 +45,8 @@ SEED_COMMANDS = {
 
 # Every built-in axiom CLI command must be cataloged (extended scope).
 EXPECTED_AXIOM_COMMANDS = {
-    "bridge-execute", "capability-run", "capability-state", "classify-failure",
+    "bridge-execute", "capability-plan", "capability-run", "capability-state",
+    "classify-failure",
     "demo", "discovery-run", "evidence-run",
     "evidence-update", "execute",
     "inventory-combine", "inventory-export", "inventory-import",
@@ -56,6 +57,7 @@ EXPECTED_AXIOM_COMMANDS = {
     "knowledge-review-create", "knowledge-reviews", "knowledge-sources",
     "learning-candidates",
     "local-runner",
+    "plan-review", "plan-review-create", "plan-reviews",
     "retrieve",
     "parameter-registry-build", "plan", "plans", "pr-snapshot", "promotion-check",
     "prompt",

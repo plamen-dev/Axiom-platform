@@ -1398,6 +1398,67 @@ _register(
 )
 
 
+_register(
+    CommandSpec(
+        name="plan-reviews",
+        command="axiom plan-reviews [--json-output] [--name <filter>] [--decision <decision>] [--status <status>] [--plan-id <id>]",
+        description=(
+            "Plan Review Queue: list plan review and approval records "
+            "with deterministic ordering by decision priority. Supports "
+            "filtering by name, decision, status, or plan ID. Governance only — "
+            "no plan execution, no automatic approval."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("Plan reviews table/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only registry query. No plan execution, no mutations.",
+    )
+)
+
+
+_register(
+    CommandSpec(
+        name="plan-review",
+        command="axiom plan-review --plan-id <id> [--json-output]",
+        description=(
+            "Plan Review Queue: show review details and history for a "
+            "specific plan ID. Returns full decision history with "
+            "latest decision summary."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("Plan review details/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only review lookup. Returns exit 2 for unknown plan IDs.",
+    )
+)
+
+
+_register(
+    CommandSpec(
+        name="plan-review-create",
+        command="axiom plan-review-create --plan-id <id> --decision <decision> --reason <reason> [--plan-name <name>] [--notes <notes>] [--reviewer <reviewer>] [--json-output]",
+        description=(
+            "Plan Review Queue: create a new review record for a capability "
+            "plan. Persists the decision to SQLite. No execution of the plan — "
+            "governance only."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=("Created plan review confirmation/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Creates a plan review record in SQLite. Does not execute any plans.",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------

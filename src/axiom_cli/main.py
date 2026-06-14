@@ -5225,5 +5225,234 @@ def plan_capability_cmd(
     console.print(f"[dim]{len(result.steps)} step(s), {len(result.dependencies)} dependency(ies)[/dim]")
 
 
+# ---------------------------------------------------------------------------
+# Plan Review Queue commands (PR #51)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("plan-reviews")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+@click.option("--name", "name_filter", default=None, help="Filter by plan name substring")
+@click.option("--decision", "decision_str", default=None, help="Filter by decision (e.g. approved, rejected)")
+@click.option("--status", "status_str", default=None, help="Filter by status (open, closed)")
+@click.option("--plan-id", "plan_id", default=None, help="Show all reviews for a specific plan ID")
+def plan_reviews_cmd(
+    as_json: bool,
+    name_filter: Optional[str],
+    decision_str: Optional[str],
+    status_str: Optional[str],
+    plan_id: Optional[str],
+):
+    """List plan review and approval records."""
+    from enum import Enum
+
+    from axiom_core.plan_reviews import (
+        PlanReviewDecision,
+        PlanReviewRegistry,
+        PlanReviewStatus,
+    )
+
+    registry = PlanReviewRegistry()
+
+    # Single-plan history mode
+    if plan_id is not None:
+        history = registry.get_history(plan_id)
+        if not history.reviews:
+            if as_json:
+                import json as json_mod
+
+                click.echo(json_mod.dumps(history.to_dict(), indent=2, default=str))
+            else:
+                console.print(f"[dim]No reviews found for plan: {plan_id}[/dim]")
+            raise SystemExit(2)
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps(history.to_dict(), indent=2, default=str))
+            return
+        console.print(f"\n[bold]Review History: {plan_id}[/bold]")
+        console.print(f"[dim]Latest decision: {history.latest_decision.value if history.latest_decision else 'none'}[/dim]\n")
+        table = Table(title="Plan Review History")
+        table.add_column("ID", style="cyan", no_wrap=True)
+        table.add_column("Decision")
+        table.add_column("Reason")
+        table.add_column("Status")
+        table.add_column("Reviewer", style="dim")
+        table.add_column("Created", style="dim")
+        for r in history.reviews:
+            table.add_row(
+                r.review_id[:12] + "…" if len(r.review_id) > 12 else r.review_id,
+                r.decision.value if isinstance(r.decision, Enum) else str(r.decision),
+                r.reason.value if isinstance(r.reason, Enum) else str(r.reason),
+                r.status.value if isinstance(r.status, Enum) else str(r.status),
+                (r.reviewer or "")[:20],
+                r.created_at[:19] if r.created_at else "",
+            )
+        console.print(table)
+        console.print(f"\n[dim]{len(history.reviews)} review(s) shown[/dim]")
+        return
+
+    # List mode
+    decision_filter = None
+    if decision_str is not None:
+        try:
+            decision_filter = PlanReviewDecision(decision_str)
+        except ValueError:
+            console.print(f"[red]Unknown decision: {decision_str}[/red]")
+            console.print(f"[dim]Valid decisions: {', '.join(d.value for d in PlanReviewDecision)}[/dim]")
+            raise SystemExit(1)
+
+    status_filter = None
+    if status_str is not None:
+        try:
+            status_filter = PlanReviewStatus(status_str)
+        except ValueError:
+            console.print(f"[red]Unknown status: {status_str}[/red]")
+            console.print(f"[dim]Valid statuses: {', '.join(s.value for s in PlanReviewStatus)}[/dim]")
+            raise SystemExit(1)
+
+    reviews = registry.list_reviews(
+        name_filter=name_filter,
+        decision_filter=decision_filter,
+        status_filter=status_filter,
+    )
+
+    if as_json:
+        import json as json_mod
+
+        output = [r.to_dict() for r in reviews]
+        click.echo(json_mod.dumps(output, indent=2, default=str))
+        return
+
+    if not reviews:
+        console.print("[dim]No plan reviews registered.[/dim]")
+        return
+
+    table = Table(title="Plan Reviews")
+    table.add_column("ID", style="cyan", no_wrap=True)
+    table.add_column("Plan ID", style="bold")
+    table.add_column("Plan Name", style="bold")
+    table.add_column("Decision")
+    table.add_column("Reason")
+    table.add_column("Status")
+    table.add_column("Reviewer", style="dim")
+
+    for r in reviews:
+        table.add_row(
+            r.review_id[:12] + "…" if len(r.review_id) > 12 else r.review_id,
+            r.plan_id[:12] + "…" if len(r.plan_id) > 12 else r.plan_id,
+            r.plan_name,
+            r.decision.value if isinstance(r.decision, Enum) else str(r.decision),
+            r.reason.value if isinstance(r.reason, Enum) else str(r.reason),
+            r.status.value if isinstance(r.status, Enum) else str(r.status),
+            (r.reviewer or "")[:20],
+        )
+
+    console.print(table)
+    console.print(f"\n[dim]{len(reviews)} review(s) shown[/dim]")
+
+
+@cli.command("plan-review")
+@click.option("--plan-id", required=True, help="Plan ID to look up")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+def plan_review_cmd(
+    plan_id: str,
+    as_json: bool,
+):
+    """Show review details for a specific plan ID."""
+    from axiom_core.plan_reviews import PlanReviewRegistry
+
+    registry = PlanReviewRegistry()
+    history = registry.get_history(plan_id)
+
+    if not history.reviews:
+        console.print(f"[red]No reviews found for plan: {plan_id}[/red]")
+        raise SystemExit(2)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps(history.to_dict(), indent=2, default=str))
+        return
+
+    console.print(f"\n[bold]Plan Review: {plan_id}[/bold]")
+    latest = history.reviews[-1]
+    console.print(f"  Plan Name:  {latest.plan_name}")
+    console.print(f"  Decision:   {latest.decision.value}")
+    console.print(f"  Reason:     {latest.reason.value}")
+    console.print(f"  Status:     {latest.status.value}")
+    console.print(f"  Reviewer:   {latest.reviewer or '(none)'}")
+    console.print(f"  Created:    {latest.created_at}")
+    if latest.notes:
+        console.print(f"  Notes:      {latest.notes}")
+    if latest.evidence:
+        console.print(f"  Evidence:   {len(latest.evidence)} item(s)")
+    console.print(f"\n[dim]Total reviews for this plan: {len(history.reviews)}[/dim]")
+
+
+@cli.command("plan-review-create")
+@click.option("--plan-id", required=True, help="ID of the plan to review")
+@click.option("--plan-name", default=None, help="Name of the plan (defaults to plan-id if omitted)")
+@click.option("--decision", required=True, help="Review decision (proposed, approved, rejected, deferred, needs_more_evidence, superseded)")
+@click.option("--reason", required=True, help="Reason for the decision")
+@click.option("--notes", default=None, help="Optional notes")
+@click.option("--reviewer", default=None, help="Reviewer identifier")
+@click.option("--json-output", "as_json", is_flag=True, help="Output created review as JSON")
+def plan_review_create_cmd(
+    plan_id: str,
+    plan_name: Optional[str],
+    decision: str,
+    reason: str,
+    notes: Optional[str],
+    reviewer: Optional[str],
+    as_json: bool,
+):
+    """Create a new plan review record."""
+    from axiom_core.plan_reviews import (
+        PlanReview,
+        PlanReviewDecision,
+        PlanReviewReason,
+        PlanReviewRegistry,
+    )
+
+    try:
+        dec = PlanReviewDecision(decision)
+    except ValueError:
+        console.print(f"[red]Unknown decision: {decision}[/red]")
+        console.print(f"[dim]Valid decisions: {', '.join(d.value for d in PlanReviewDecision)}[/dim]")
+        raise SystemExit(1)
+
+    try:
+        rsn = PlanReviewReason(reason)
+    except ValueError:
+        console.print(f"[red]Unknown reason: {reason}[/red]")
+        console.print(f"[dim]Valid reasons: {', '.join(r.value for r in PlanReviewReason)}[/dim]")
+        raise SystemExit(1)
+
+    effective_name = plan_name or plan_id
+
+    registry = PlanReviewRegistry()
+    review = PlanReview(
+        plan_id=plan_id,
+        plan_name=effective_name,
+        decision=dec,
+        reason=rsn,
+        notes=notes,
+        reviewer=reviewer,
+    )
+    created = registry.create_review(review)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps(created.to_dict(), indent=2, default=str))
+        return
+
+    console.print(f"[green]Plan review created:[/green] {created.review_id}")
+    console.print(f"  Plan:     {created.plan_id}")
+    console.print(f"  Decision: {created.decision.value}")
+    console.print(f"  Reason:   {created.reason.value}")
+
+
 if __name__ == "__main__":
     cli()
