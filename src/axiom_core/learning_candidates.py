@@ -248,13 +248,6 @@ def _merge_json_list(existing_json: str | None, new_items: list[dict[str, Any]])
     return json.dumps(existing, default=str)
 
 
-# Confidence ordering: strength → score mapping for deterministic sorting
-STRENGTH_ORDER: dict[CandidateStrength, int] = {
-    CandidateStrength.STRONG: 4,
-    CandidateStrength.MODERATE: 3,
-    CandidateStrength.WEAK: 2,
-    CandidateStrength.SPECULATIVE: 1,
-}
 
 
 class LearningCandidateRegistry:

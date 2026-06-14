@@ -29,7 +29,6 @@ from axiom_core.database import (
 from axiom_core.knowledge_graph import (
     GraphEdgeType,
     GraphNodeType,
-    KnowledgeGraph,
     KnowledgeGraphEdgeRow,
     KnowledgeGraphNodeRow,
     _escape_like,
@@ -291,7 +290,6 @@ class SemanticRetrievalEngine:
         self._engine = create_db_engine(db_path)
         init_db(self._engine)
         self._session_factory = make_session_factory(self._engine)
-        self._graph = KnowledgeGraph(db_path)
 
     # --- Public API ---
 

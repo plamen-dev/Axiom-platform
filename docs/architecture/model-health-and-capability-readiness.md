@@ -169,7 +169,7 @@ is `run_spine.redact_path()`.
 | `run_metadata.json`       | Yes (`model_path`)        | Machine-readable reference needed for re-execution.  |
 | `axiom_model_health.json` | Yes (`model_path`)        | Full diagnostic snapshot; also carries `model_path_redacted`. |
 | `command_input.json`      | No (redacted)             | Audit-facing summary; uses redacted path.            |
-| `axiom_command_log.jsonl` | Yes (`model_path`)        | Audit log carries both `model_path` and `model_path_redacted`; consumers should prefer the redacted variant. |
+| `axiom_command_log.jsonl` | No (redacted only)        | Audit log carries `model_path_redacted` only; raw path excluded from serialization. |
 | `axiom_model_health.md`   | No (redacted)             | Human-readable report uses `model_path_redacted`.    |
 | `run_summary.md`          | No (redacted)             | Human-readable summary uses redacted path.           |
 

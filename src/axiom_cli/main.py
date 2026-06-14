@@ -5007,7 +5007,7 @@ def knowledge_graph_cmd(
 
     # --- Neighbor traversal ---
     if neighbor_id is not None:
-        effective_depth = min(depth if depth is not None else 1, MAX_TRAVERSAL_DEPTH)
+        effective_depth = max(0, min(depth if depth is not None else 1, MAX_TRAVERSAL_DEPTH))
         result = graph.traverse(neighbor_id, max_depth=effective_depth)
         if not result.visited_nodes:
             console.print(f"[red]Node not found: {neighbor_id}[/red]")

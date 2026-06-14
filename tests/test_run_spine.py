@@ -144,7 +144,8 @@ class TestAuditJSONLAppend:
         data = json.loads(log_path.read_text().strip())
         assert data["source"] == "revit_ui"
         assert data["external_calls_made"] is False
-        assert data["model_path"] == "C:\\Models\\test.rvt"
+        assert data["model_path_redacted"] == "C:/Models/test.rvt"
+        assert "model_path" not in data
 
 
 # ---------------------------------------------------------------------------

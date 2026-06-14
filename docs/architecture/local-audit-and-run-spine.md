@@ -36,10 +36,13 @@ Structure:
 ## Run ID Format
 
 ```
-YYYYMMDD_HHMMSS_<capability_snake>_<mode>
+YYYYMMDD_HHMMSS_<capability_snake>_<mode>_<hex8>
 ```
 
-Example: `20260606_153012_grid_creation_dry_run`
+The 8-character hex suffix (from uuid4) prevents collisions when two runs
+for the same capability/mode occur within the same UTC second.
+
+Example: `20260606_153012_grid_creation_dry_run_a1b2c3d4`
 
 ## Command Audit Log
 

@@ -170,7 +170,6 @@ class AuditEntry:
             "capability": self.capability,
             "mode": self.mode,
             "risk_level": self.risk_level,
-            "model_path": self.model_path,
             "model_path_redacted": self.model_path_redacted,
             "user": self.user,
             "input_summary": self.input_summary,
@@ -526,6 +525,16 @@ def execute_run(
 
     # --- External calls ---
     ext_calls = ExternalCallDeclaration()
+    if isinstance(result_data, dict) and "external_calls" in result_data:
+        ec = result_data["external_calls"]
+        if isinstance(ec, ExternalCallDeclaration):
+            ext_calls = ec
+        elif isinstance(ec, dict):
+            ext_calls = ExternalCallDeclaration(
+                external_calls_made=ec.get("external_calls_made", False),
+                services=ec.get("services", []),
+                notes=ec.get("notes", ext_calls.notes),
+            )
     write_external_calls(folder, ext_calls)
 
     # --- Dialog artifacts ---

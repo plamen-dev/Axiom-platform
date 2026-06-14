@@ -16,6 +16,7 @@ Persistence via SQLAlchemy/SQLite (reuses the Axiom database layer).
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
@@ -31,6 +32,8 @@ from axiom_core.database import (
     make_session_factory,
 )
 from axiom_core.models import Base
+
+_logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Graph node types
@@ -373,7 +376,7 @@ class KnowledgeGraph:
                 ))
             source_registries_used.add("knowledge_objects")
         except Exception:
-            pass
+            _logger.debug("Failed to load knowledge_objects registry", exc_info=True)
 
         # --- Knowledge Sources ---
         try:
@@ -391,7 +394,7 @@ class KnowledgeGraph:
                 ))
             source_registries_used.add("knowledge_sources")
         except Exception:
-            pass
+            _logger.debug("Failed to load knowledge_sources registry", exc_info=True)
 
         # --- Knowledge Provenance ---
         try:
@@ -426,7 +429,7 @@ class KnowledgeGraph:
                     ))
             source_registries_used.add("knowledge_provenance")
         except Exception:
-            pass
+            _logger.debug("Failed to load knowledge_provenance registry", exc_info=True)
 
         # --- Workflow Definitions ---
         try:
@@ -480,7 +483,7 @@ class KnowledgeGraph:
                     ))
             source_registries_used.add("workflows")
         except Exception:
-            pass
+            _logger.debug("Failed to load workflows registry", exc_info=True)
 
         # --- Learning Candidates ---
         try:
@@ -506,7 +509,7 @@ class KnowledgeGraph:
                 # matching which is a future enhancement.
             source_registries_used.add("learning_candidates")
         except Exception:
-            pass
+            _logger.debug("Failed to load learning_candidates registry", exc_info=True)
 
         # --- Knowledge Reviews ---
         try:
@@ -553,7 +556,7 @@ class KnowledgeGraph:
                     ))
             source_registries_used.add("knowledge_reviews")
         except Exception:
-            pass
+            _logger.debug("Failed to load knowledge_reviews registry", exc_info=True)
 
         # --- Persist: clear old graph, write new ---
         snapshot = self._persist_graph(nodes, edges, sorted(source_registries_used), now)
