@@ -240,9 +240,16 @@ class EvidenceRunner:
             "scope": "read-only evidence generation (PR #25)",
         }
 
-        outcome, reason, checks, command_name, capability_name = self._resolve_and_run(
-            validation_name, inventory_export_path, cmd_out, context
-        )
+        try:
+            outcome, reason, checks, command_name, capability_name = (
+                self._resolve_and_run(
+                    validation_name, inventory_export_path, cmd_out, context
+                )
+            )
+        except Exception as exc:
+            outcome = EvidenceOutcome.FAILED
+            reason = f"Unhandled executor exception: {type(exc).__name__}: {exc}"
+            checks, command_name, capability_name = [], None, None
 
         finished = _now_iso()
         result = ValidationRunResult(

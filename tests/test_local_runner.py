@@ -98,7 +98,7 @@ class TestWorkspaceValidation:
         if platform.system() == "Windows":
             assert any("Dev" in r and "Axiom" in r for r in roots)
         else:
-            assert any(r == "/home" for r in roots)
+            assert any("repos" in r or "Dev" in r for r in roots)
 
     def test_shipped_config_lists_self_hosted_runner_root(self):
         """The shipped policy config declares the Axiom-01 runner work dir explicitly."""

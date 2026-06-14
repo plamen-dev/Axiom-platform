@@ -2432,6 +2432,8 @@ def parameter_registry_build(input_dir, output_dir, run_id, object_registry_dir)
                     executed_zero_defs.add(obj_cat)
     # Categories from parquet rows are also executed
     executed_categories.update(categories_with_definitions)
+    # A category that gained definitions in a later run is not truly zero-defs
+    executed_zero_defs -= categories_with_definitions
 
     # Check coverage against object registry if provided
     discovered_categories: set[str] = set()
@@ -2622,7 +2624,7 @@ def parameter_registry_build(input_dir, output_dir, run_id, object_registry_dir)
               help="Base directory for evidence artifacts")
 @click.option("--model-name", "model_name", default="",
               help="Revit model name for evidence")
-@click.option("--simulate", is_flag=True, default=True,
+@click.option("--simulate", is_flag=True, default=False,
               help="Simulation mode (no live Revit connection)")
 def set_parameter_value(prompt_text, registry_path, registry_dir,
                         artifact_dir, model_name, simulate):

@@ -245,6 +245,28 @@ class TestPromptParser:
         req = parse_set_parameter_prompt(prompt)
         assert req.raw_prompt == prompt
 
+    def test_value_containing_for_keyword(self):
+        """Regression: value with 'for' should not confuse the parser."""
+        req = parse_set_parameter_prompt(
+            'Set Comments to "value for 5 things" for 3 Walls'
+        )
+        assert not req.parse_errors
+        assert req.parameter_name == "Comments"
+        assert req.value == "value for 5 things"
+        assert req.element_count == 3
+        assert req.category == "Walls"
+
+    def test_unquoted_value_containing_for(self):
+        """Unquoted value with 'for' matches the last 'for <N> <Cat>'."""
+        req = parse_set_parameter_prompt(
+            "Set Comments to value for testing for 3 Walls"
+        )
+        assert not req.parse_errors
+        assert req.parameter_name == "Comments"
+        assert req.value == "value for testing"
+        assert req.element_count == 3
+        assert req.category == "Walls"
+
     def test_unparseable_count(self):
         req = parse_set_parameter_prompt(
             'Set Comments to "test" for many Walls'

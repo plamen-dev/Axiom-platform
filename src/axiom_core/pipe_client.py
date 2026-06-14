@@ -16,6 +16,18 @@ from uuid import UUID, uuid4
 
 from axiom_core.schemas import StepStatus, ToolResult
 
+
+def _alpha_name(index: int) -> str:
+    """A-Z, AA-AZ, BA-BZ, … — mirrors C# GridCreationService.GetAlphabeticName."""
+    name = ""
+    i = index + 1
+    while i > 0:
+        remainder = (i - 1) % 26
+        name = chr(65 + remainder) + name
+        i = (i - 1) // 26
+    return name
+
+
 # Error code mapping for structured C# responses
 _ERROR_CODES = {
     -32600: "Invalid JSON-RPC request",
@@ -310,7 +322,7 @@ class PipeClient:
             )
 
             created_ids = [f"grid_{i + 1}" for i in range(h_count)]
-            created_ids += [f"grid_{chr(65 + i)}" for i in range(min(v_count, 26))]
+            created_ids += [f"grid_{_alpha_name(i)}" for i in range(v_count)]
 
             return ToolResult(
                 step_id=UUID(request_id),

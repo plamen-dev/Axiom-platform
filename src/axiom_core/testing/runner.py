@@ -102,7 +102,7 @@ def run_single_case(
         result.created_ids.extend(r.created_ids)
         result.warnings.extend(r.warnings)
         result.errors.extend(r.errors)
-        result.duration_ms += r.duration_ms
+        # duration_ms is already the wall-clock elapsed; don't accumulate step durations
 
     result.created_count = len(result.created_ids)
 

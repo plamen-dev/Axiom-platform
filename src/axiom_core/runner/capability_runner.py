@@ -220,7 +220,7 @@ def _valid_limit(value: Any) -> bool:
         return False
     try:
         n = int(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return False
     return 0 < n <= _INVENTORY_MAX_BOUND
 

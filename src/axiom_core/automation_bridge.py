@@ -319,9 +319,11 @@ def execute_capability_via_bridge(
 
     pipe_available = False
     tool_result: ToolResult | None = None
+    request_attempted = False
     try:
         pipe_available = bool(pipe_client.is_available())
         if simulate or pipe_available:
+            request_attempted = True
             tool_result = pipe_client.execute_tool(
                 tool_name=capability,
                 args=args,
@@ -332,7 +334,7 @@ def execute_capability_via_bridge(
     except Exception as exc:  # transport/driver-level failure
         classification = CLASS_BRIDGE_ERROR
         reason = f"Bridge driver error: {exc}"
-        checkpoints = BridgeCheckpoints(request_sent=True)
+        checkpoints = BridgeCheckpoints(request_sent=request_attempted)
         result = BridgeRunResult(
             run_id=run_id,
             capability=capability,

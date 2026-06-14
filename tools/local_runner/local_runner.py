@@ -51,7 +51,6 @@ DEFAULT_WORKSPACE_ROOTS_WINDOWS = [
 DEFAULT_WORKSPACE_ROOTS_POSIX = [
     str(Path.home() / "repos"),
     str(Path.home() / "Dev" / "Axiom"),
-    "/home",
 ]
 
 # Back-compat aliases (external callers / tests import these names).
@@ -552,18 +551,28 @@ def execute_task(task: dict, artifact_base: str = "artifacts/local_runner_runs")
     all_stderr: list[str] = []
     start_time = time.monotonic()
 
+    remaining_timeout = timeout
     for cmd in commands:
         try:
+            if remaining_timeout <= 0:
+                result.timed_out = True
+                result.exit_code = -1
+                all_stderr.append(f"TIMEOUT: Budget exhausted before command: {cmd}")
+                break
+            cmd_start = time.monotonic()
             proc = subprocess.run(
                 cmd,
                 cwd=result.workspace,
                 capture_output=True,
                 text=True,
-                timeout=timeout,
+                timeout=remaining_timeout,
             )
             all_stdout.append(proc.stdout)
             all_stderr.append(proc.stderr)
             result.exit_code = proc.returncode
+            remaining_timeout -= time.monotonic() - cmd_start
+            if proc.returncode != 0:
+                break
         except subprocess.TimeoutExpired:
             result.timed_out = True
             result.exit_code = -1

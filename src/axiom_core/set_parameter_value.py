@@ -155,8 +155,9 @@ def parse_set_parameter_prompt(prompt: str) -> SetParameterRequest:
 
     # Find trailing "for <N> <Category>" from the end.
     # <N> is a digit or word-number, <Category> is one or more words.
+    # Use greedy .* prefix so the regex engine finds the *last* "for".
     trailing = re.search(
-        r"\bfor\s+(\w+)\s+(.+)$",
+        r"^(.*)\bfor\s+(\w+)\s+(.+)$",
         text,
         re.IGNORECASE,
     )
@@ -167,11 +168,11 @@ def parse_set_parameter_prompt(prompt: str) -> SetParameterRequest:
         )
         return req
 
-    count_str = trailing.group(1).strip().lower()
-    req.category = trailing.group(2).strip()
+    count_str = trailing.group(2).strip().lower()
+    req.category = trailing.group(3).strip()
 
     # Everything before the trailing "for ..." is "<Parameter> to <Value>"
-    before_for = text[: trailing.start()].strip()
+    before_for = trailing.group(1).strip()
 
     # Split at " to " to separate parameter from value
     to_match = re.search(r"\bto\s+", before_for, re.IGNORECASE)
