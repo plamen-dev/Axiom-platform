@@ -319,6 +319,7 @@ class WorkflowKnowledgeRegistry:
                 step.workflow_id = workflow.workflow_id
                 existing_step = session.get(WorkflowStepRow, step.step_id)
                 if existing_step:
+                    existing_step.workflow_id = workflow.workflow_id
                     existing_step.step_name = step.step_name
                     existing_step.step_order = step.step_order
                     existing_step.description = step.description
@@ -354,6 +355,7 @@ class WorkflowKnowledgeRegistry:
                 rule.workflow_id = workflow.workflow_id
                 existing_rule = session.get(WorkflowRuleRow, rule.rule_id)
                 if existing_rule:
+                    existing_rule.workflow_id = workflow.workflow_id
                     existing_rule.rule_name = rule.rule_name
                     existing_rule.condition = rule.condition
                     existing_rule.action = rule.action

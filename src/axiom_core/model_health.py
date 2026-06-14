@@ -367,7 +367,7 @@ def generate_health_markdown(
         "# Axiom Model Health Report",
         "",
         f"**Generated:** {health.generated_at_utc}",
-        f"**Model:** {health.model_path_redacted or health.model_path or 'N/A'}",
+        f"**Model:** {health.model_path_redacted or 'N/A'}",
         f"**Revit version:** {health.revit_version or 'N/A'}",
         f"**Active view:** {health.active_view_name or 'N/A'}"
         f" ({health.active_view_type or 'N/A'})",

@@ -526,12 +526,23 @@ class SemanticRetrievalEngine:
                 )
                 .all()
             )
+            # Build lookup: provenance node_id → trust_level
+            prov_trust_map: dict[str, str] = {}
             for pr in prov_rows:
-                if pr.node_id in match_map:
-                    meta = json.loads(pr.metadata_json) if pr.metadata_json else {}
-                    trust = meta.get("trust_level")
-                    if trust:
+                meta = json.loads(pr.metadata_json) if pr.metadata_json else {}
+                trust = meta.get("trust_level")
+                if trust:
+                    prov_trust_map[pr.node_id] = trust
+                    # If the provenance node is itself a match, set trust directly
+                    if pr.node_id in match_map:
                         match_map[pr.node_id].trust_level = trust
+
+            # Propagate trust from provenance nodes to source matched nodes
+            for edge in prov_edges:
+                prov_trust = prov_trust_map.get(edge.target_node_id)
+                if prov_trust and edge.source_node_id in match_map:
+                    if match_map[edge.source_node_id].trust_level is None:
+                        match_map[edge.source_node_id].trust_level = prov_trust
 
             # Look for review edges pointing to our nodes
             review_edges = (

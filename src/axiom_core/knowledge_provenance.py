@@ -172,13 +172,27 @@ class KnowledgeProvenance:
         now = datetime.now(timezone.utc).isoformat()
         self.provenance_id = provenance_id or str(uuid4())
         self.knowledge_name = knowledge_name
-        self.trust_level = trust_level if isinstance(trust_level, TrustLevel) else TrustLevel(trust_level)
-        self.source_confidence = (
-            source_confidence
-            if isinstance(source_confidence, SourceConfidence)
-            else SourceConfidence(source_confidence)
-        )
-        self.status = status if isinstance(status, ProvenanceStatus) else ProvenanceStatus(status)
+        if isinstance(trust_level, TrustLevel):
+            self.trust_level = trust_level
+        else:
+            try:
+                self.trust_level = TrustLevel(trust_level)
+            except ValueError:
+                self.trust_level = trust_level
+        if isinstance(source_confidence, SourceConfidence):
+            self.source_confidence = source_confidence
+        else:
+            try:
+                self.source_confidence = SourceConfidence(source_confidence)
+            except ValueError:
+                self.source_confidence = source_confidence
+        if isinstance(status, ProvenanceStatus):
+            self.status = status
+        else:
+            try:
+                self.status = ProvenanceStatus(status)
+            except ValueError:
+                self.status = status
         self.origin = origin
         self.evidence_paths = evidence_paths or []
         self.approving_source = approving_source
@@ -192,9 +206,9 @@ class KnowledgeProvenance:
         return {
             "provenance_id": self.provenance_id,
             "knowledge_name": self.knowledge_name,
-            "trust_level": self.trust_level.value,
-            "source_confidence": self.source_confidence.value,
-            "status": self.status.value,
+            "trust_level": self.trust_level.value if isinstance(self.trust_level, TrustLevel) else self.trust_level,
+            "source_confidence": self.source_confidence.value if isinstance(self.source_confidence, SourceConfidence) else self.source_confidence,
+            "status": self.status.value if isinstance(self.status, ProvenanceStatus) else self.status,
             "origin": self.origin,
             "evidence_paths": self.evidence_paths,
             "approving_source": self.approving_source,

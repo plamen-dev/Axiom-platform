@@ -289,7 +289,7 @@ def apply_policy_gate(action: RecommendedAction) -> PolicyGateDecision:
     - No high-risk action auto-executes.
     - No execute mode auto-executes.
     - Medium-risk requires approval.
-    - Low-risk health_check may auto-execute (but still recommends dry-run first).
+    - Low-risk health_check still requires approval (conservative default).
     """
     if action.risk_level == "high":
         return PolicyGateDecision(
