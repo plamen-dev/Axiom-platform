@@ -7,6 +7,7 @@ from uuid import UUID
 
 if TYPE_CHECKING:
     from axiom_core.mcp_layer import MCPLayer
+    from axiom_core.persistence import Storage
 
 from axiom_core.schemas import (
     JobType,
@@ -177,8 +178,13 @@ class PlanTemplate:
 class Orchestrator:
     """Central coordinator for job execution."""
 
-    def __init__(self, mcp_layer: Optional["MCPLayer"] = None):
+    def __init__(
+        self,
+        mcp_layer: Optional["MCPLayer"] = None,
+        storage: Optional["Storage"] = None,
+    ):
         self.mcp_layer = mcp_layer
+        self.storage = storage
         self.plans: dict[UUID, Plan] = {}
         self.results: dict[UUID, list[ToolResult]] = {}
 
@@ -225,6 +231,8 @@ class Orchestrator:
             plan.status = PlanStatus.SIMULATION_PASSED
 
         self.results[plan.plan_id] = results
+        if self.storage is not None:
+            self.storage.save_plan(plan)
         return plan, results
 
     def execute_plan(self, plan: Plan) -> tuple[Plan, list[ToolResult]]:
@@ -259,6 +267,8 @@ class Orchestrator:
             plan.status = PlanStatus.COMPLETED
 
         self.results[plan.plan_id] = results
+        if self.storage is not None:
+            self.storage.save_plan(plan)
         return plan, results
 
     def evaluate_results(self, plan: Plan, results: list[ToolResult]) -> QAReport:

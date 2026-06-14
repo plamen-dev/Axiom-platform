@@ -3701,11 +3701,14 @@ def validation_registry(name, capability_type, as_json, persist, db_path):
     if persist:
         from axiom_core.database import (
             create_db_engine,
+            get_database_url,
             init_db,
             make_session_factory,
         )
         from axiom_core.validation import persist_default_registry
 
+        if db_path is None:
+            console.print(f"[dim]No --db-path given; using {get_database_url()}[/dim]")
         engine = create_db_engine(db_path)
         init_db(engine)
         counts = persist_default_registry(make_session_factory(engine))
@@ -4193,7 +4196,7 @@ _CATEGORY_COLOUR: dict[str, str] = {
 
 @cli.command("classify-failure")
 @click.option("--evidence-path", "evidence_path", required=True,
-              type=click.Path(exists=True),
+              type=click.Path(exists=True, file_okay=False),
               help="Path to evidence bundle directory "
                    "(e.g. artifacts/capability_runs/<run_id>)")
 @click.option("--json", "as_json", is_flag=True, default=False,

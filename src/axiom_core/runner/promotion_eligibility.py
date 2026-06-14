@@ -29,6 +29,7 @@ Decisions are deterministic: the same state + artifacts always yield the same
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -457,6 +458,11 @@ class PromotionEligibilityEngine:
         if not command_name:
             spec = caprun.SUPPORTED_CAPABILITIES.get(state.capability_name)
             command_name = spec.command_name if spec else None
+        if not command_name:
+            # Fall back to kebab-case of the capability name itself.
+            kebab = re.sub(r"(?<=[a-z0-9])([A-Z])", r"-\1", state.capability_name).lower()
+            if cmdreg.get_command(kebab) is not None:
+                command_name = kebab
         if command_name:
             cmd = cmdreg.get_command(command_name)
             if cmd is not None:
@@ -527,7 +533,7 @@ def _slug(value: str) -> str:
 
 def promotion_run_id(scope: str, *, at: str | None = None) -> str:
     """Deterministic-ish run id for a promotion check evidence folder."""
-    stamp = (at or _now_iso()).replace(":", "").replace("-", "").replace(".", "")
+    stamp = (at or _now_iso()).replace(":", "").replace("-", "").replace(".", "").replace("+", "")
     return f"pcheck_{_slug(scope)}_{stamp}"
 
 

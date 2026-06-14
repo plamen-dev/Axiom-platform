@@ -104,10 +104,10 @@ def write_parquet(results: list[GridTestResult], path: Path) -> Path:
     return path
 
 
-def read_parquet(path: Path) -> list[dict]:
-    """Read a Parquet file and return list of row dicts."""
+def read_parquet(path: Path) -> dict[str, list]:
+    """Read a Parquet file and return column-oriented dict."""
     if not path.exists():
-        return []
+        return {}
     table = pq.read_table(str(path))
     return table.to_pydict()
 

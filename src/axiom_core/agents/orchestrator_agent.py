@@ -143,7 +143,11 @@ class OrchestratorAgent:
 
         # Step 4: Determine overall status
         failed = any(r.status == StepStatus.FAILED for r in results)
-        plan.status = PlanStatus.FAILED if failed else PlanStatus.COMPLETED
+        if simulate:
+            plan.status = (PlanStatus.SIMULATION_FAILED if failed
+                           else PlanStatus.SIMULATION_PASSED)
+        else:
+            plan.status = PlanStatus.FAILED if failed else PlanStatus.COMPLETED
 
         self.telemetry_agent.log_event(
             event_type="plan_completed",

@@ -287,8 +287,8 @@ def _run_argv(argv: list[str], cwd: str, timeout: int) -> dict:
             "command": argv,
             "exit_code": -1,
             "timed_out": True,
-            "stdout": exc.stdout or "" if isinstance(exc.stdout, str) else "",
-            "stderr": exc.stderr or "" if isinstance(exc.stderr, str) else "",
+            "stdout": (exc.stdout or "") if isinstance(exc.stdout, str) else "",
+            "stderr": (exc.stderr or "") if isinstance(exc.stderr, str) else "",
             "started_at": started.isoformat(),
             "completed_at": datetime.now(timezone.utc).isoformat(),
         }

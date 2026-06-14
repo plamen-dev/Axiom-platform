@@ -96,7 +96,7 @@ class TestOrchestratorAgent:
         assert result["status"] == "SUCCESS"
         assert result["resolved"] is not None
         assert result["resolved"].capability_name == "CreateGrids"
-        assert result["plan"].status == PlanStatus.COMPLETED
+        assert result["plan"].status == PlanStatus.SIMULATION_PASSED
         assert len(result["results"]) == 1
         assert result["results"][0].status == StepStatus.SUCCESS
 

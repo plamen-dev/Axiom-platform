@@ -7,12 +7,15 @@ CLI command because no session_factory is passed.
 """
 
 import json
+import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
 from uuid import uuid4
 
 from axiom_core.database import get_session
 from axiom_core.models import ExecutionTraceRow
+
+_logger = logging.getLogger(__name__)
 
 
 class TelemetryEvent:
@@ -87,4 +90,4 @@ class TelemetryAgent:
                 )
                 session.merge(row)
         except Exception:
-            pass
+            _logger.debug("Failed to persist telemetry event %s", event.event_id, exc_info=True)

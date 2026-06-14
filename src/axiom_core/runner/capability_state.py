@@ -31,6 +31,7 @@ same snapshot. Persistence reuses the shared SQLite stack
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -48,6 +49,8 @@ from axiom_core.models import (
 from axiom_core.runner import capability_runner as caprun
 from axiom_core.runner import command_registry as cmdreg
 from axiom_core.validation import validation_registry as valreg
+
+_logger = logging.getLogger(__name__)
 
 DEFAULT_CAPABILITY_RUNS_BASE = "artifacts/capability_runs"
 DEFAULT_VALIDATION_EVIDENCE_BASE = "artifacts/validation_evidence"
@@ -660,7 +663,16 @@ class CapabilityStateRegistry:
         try:
             with get_session(self.session_factory) as session:
                 rows = session.query(CapabilityStateRow).all()
-                states = [self._state_from_row(r) for r in rows]
+                states = []
+                for r in rows:
+                    try:
+                        states.append(self._state_from_row(r))
+                    except Exception:
+                        _logger.debug(
+                            "Skipping corrupt CapabilityStateRow %s",
+                            getattr(r, "capability_name", "?"),
+                            exc_info=True,
+                        )
         except Exception:
             # No capability_states table yet (db predates this feature).
             return None

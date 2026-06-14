@@ -11,12 +11,15 @@ Designed for batch/automated runs where CLI output isn't watched live.
 """
 
 import json
+import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
 from sqlalchemy.orm import sessionmaker
+
+_logger = logging.getLogger(__name__)
 
 
 def _get_log_path() -> Path:
@@ -135,4 +138,4 @@ def _persist_to_sqlite(
         with get_session(session_factory) as session:
             session.add(row)
     except Exception:
-        pass
+        _logger.debug("Failed to persist execution log for prompt %r", prompt, exc_info=True)
