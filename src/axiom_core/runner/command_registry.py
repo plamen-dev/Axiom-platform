@@ -1459,6 +1459,65 @@ _register(
 )
 
 
+_register(
+    CommandSpec(
+        name="validation-requests",
+        command="axiom validation-requests [--json-output] [--status <status>] [--plan-id <id>]",
+        description=(
+            "Validation Request Generator: list validation requests generated "
+            "from approved plans. Supports filtering by status or plan ID. "
+            "Governance only — no execution."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("Validation requests table/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only registry query. No execution, no mutations.",
+    )
+)
+
+
+_register(
+    CommandSpec(
+        name="validation-request",
+        command="axiom validation-request --id <id> [--json-output]",
+        description=(
+            "Validation Request Generator: show details for a specific "
+            "validation request including steps, blockers, and evidence requirements."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("Validation request details/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only request lookup. Returns exit 2 for unknown request IDs.",
+    )
+)
+
+
+_register(
+    CommandSpec(
+        name="validation-request-create",
+        command="axiom validation-request-create --plan-id <id> [--plan-name <name>] [--json-output]",
+        description=(
+            "Validation Request Generator: generate a validation request from "
+            "an approved plan. Refuses rejected plans. No execution — creates "
+            "a work description only."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=("Created validation request confirmation/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Generates a validation request. Requires an approved plan review. No execution.",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------

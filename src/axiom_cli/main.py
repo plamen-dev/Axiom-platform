@@ -5454,5 +5454,196 @@ def plan_review_create_cmd(
     console.print(f"  Reason:   {created.reason.value}")
 
 
+# ---------------------------------------------------------------------------
+# Validation Request Generator commands (PR #52)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("validation-requests")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+@click.option("--status", "status_str", default=None, help="Filter by status (pending, ready, blocked, completed, cancelled)")
+@click.option("--plan-id", "plan_id", default=None, help="Filter by plan ID")
+def validation_requests_cmd(
+    as_json: bool,
+    status_str: Optional[str],
+    plan_id: Optional[str],
+):
+    """List validation requests."""
+    from axiom_core.validation_requests import (
+        ValidationRequestGenerator,
+        ValidationRequestStatus,
+    )
+
+    generator = ValidationRequestGenerator()
+
+    status_filter = None
+    if status_str is not None:
+        try:
+            status_filter = ValidationRequestStatus(status_str)
+        except ValueError:
+            valid = ", ".join(s.value for s in ValidationRequestStatus)
+            console.print(f"[red]Invalid status:[/red] {status_str}. Valid: {valid}")
+            raise SystemExit(1)
+
+    requests = generator.list_requests(status_filter=status_filter, plan_id_filter=plan_id)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps([r.to_dict() for r in requests], indent=2, default=str))
+        return
+
+    if not requests:
+        console.print("[dim]No validation requests found.[/dim]")
+        return
+
+    table = Table(title="Validation Requests")
+    table.add_column("ID", style="cyan", no_wrap=True)
+    table.add_column("Plan ID")
+    table.add_column("Plan Name")
+    table.add_column("Status")
+    table.add_column("Steps")
+    table.add_column("Blockers")
+    for r in requests:
+        table.add_row(
+            r.request_id[:12],
+            r.plan_id[:16],
+            r.plan_name[:30],
+            r.status.value,
+            str(len(r.steps)),
+            str(len(r.blockers)),
+        )
+    console.print(table)
+
+
+@cli.command("validation-request")
+@click.option("--id", "request_id", required=True, help="Validation request ID")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+def validation_request_cmd(
+    request_id: str,
+    as_json: bool,
+):
+    """Show details for a specific validation request."""
+    from axiom_core.validation_requests import ValidationRequestGenerator
+
+    generator = ValidationRequestGenerator()
+    req = generator.get_request(request_id)
+
+    if req is None:
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps({"error": "not_found", "request_id": request_id}, indent=2))
+        else:
+            console.print(f"[red]Validation request not found:[/red] {request_id}")
+        raise SystemExit(2)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps(req.to_dict(), indent=2, default=str))
+        return
+
+    console.print(f"\n[bold]Validation Request: {req.request_id}[/bold]")
+    console.print(f"  Plan ID:    {req.plan_id}")
+    console.print(f"  Plan Name:  {req.plan_name}")
+    console.print(f"  Status:     {req.status.value}")
+    console.print(f"  Steps:      {len(req.steps)}")
+    console.print(f"  Blockers:   {len(req.blockers)}")
+    console.print(f"  Created:    {req.created_at}")
+
+    if req.required_capabilities:
+        console.print("\n  [bold]Required Capabilities:[/bold]")
+        for cap in req.required_capabilities:
+            console.print(f"    • {cap}")
+
+    if req.steps:
+        console.print("\n  [bold]Validation Steps:[/bold]")
+        for step in req.steps:
+            console.print(f"    {step.sequence}. {step.title} [{step.safety_level}]")
+
+    if req.blockers:
+        console.print("\n  [bold]Blockers:[/bold]")
+        for b in req.blockers:
+            console.print(f"    ⚠ [{b.blocker_type.value}] {b.description}")
+
+
+@cli.command("validation-request-create")
+@click.option("--plan-id", required=True, help="Plan ID to generate validation request from")
+@click.option("--plan-name", default=None, help="Plan name (defaults to plan-id)")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+def validation_request_create_cmd(
+    plan_id: str,
+    plan_name: Optional[str],
+    as_json: bool,
+):
+    """Generate a validation request from an approved plan."""
+    from axiom_core.plan_reviews import PlanReviewDecision, PlanReviewRegistry
+    from axiom_core.validation_requests import (
+        ValidationRequestGenerator,
+        ValidationRequestStep,
+    )
+
+    review_registry = PlanReviewRegistry()
+    history = review_registry.get_history(plan_id)
+
+    if not history.reviews:
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps({"error": "unknown_plan", "plan_id": plan_id}, indent=2))
+        else:
+            console.print(f"[red]Unknown plan ID:[/red] {plan_id}")
+        raise SystemExit(2)
+
+    latest = history.latest_decision
+    if latest == PlanReviewDecision.REJECTED:
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps({"error": "plan_rejected", "plan_id": plan_id}, indent=2))
+        else:
+            console.print(f"[red]Plan is rejected:[/red] {plan_id}")
+        raise SystemExit(1)
+
+    if latest != PlanReviewDecision.APPROVED:
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps({"error": "plan_not_approved", "plan_id": plan_id, "decision": latest.value if latest else None}, indent=2))
+        else:
+            console.print(f"[yellow]Plan not approved:[/yellow] {plan_id} (current: {latest.value if latest else 'none'})")
+        raise SystemExit(1)
+
+    effective_name = plan_name or plan_id
+    generator = ValidationRequestGenerator()
+
+    step = ValidationRequestStep(
+        sequence=1,
+        title=f"Validate plan: {effective_name}",
+        description=f"Execute validation procedures for approved plan {plan_id}",
+        validation_procedure="standard_validation",
+        safety_level="safe",
+    )
+
+    request = generator.generate_from_plan(
+        plan_id=plan_id,
+        plan_name=effective_name,
+        steps=[step],
+        expected_outputs=["pass_fail.json", "evidence_bundle"],
+    )
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps(request.to_dict(), indent=2, default=str))
+        return
+
+    console.print(f"[green]Validation request created:[/green] {request.request_id}")
+    console.print(f"  Plan:   {request.plan_id}")
+    console.print(f"  Status: {request.status.value}")
+    console.print(f"  Steps:  {len(request.steps)}")
+
+
 if __name__ == "__main__":
     cli()
