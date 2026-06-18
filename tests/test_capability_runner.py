@@ -244,6 +244,9 @@ def test_inventory_scan_refusal_oversized_or_invalid_limit():
     assert inventory_scan_refusal({"SummaryOnly": False, "limit": "all"}) is not None
     assert inventory_scan_refusal({"SummaryOnly": False, "max": 0}) is not None
     assert inventory_scan_refusal({"SummaryOnly": False, "max": -5}) is not None
+    # float('inf') must not crash with OverflowError — must be refused.
+    assert inventory_scan_refusal({"SummaryOnly": False, "limit": float("inf")}) is not None
+    assert inventory_scan_refusal({"SummaryOnly": False, "max": float("inf")}) is not None
     # A modest positive limit remains a valid bound.
     assert inventory_scan_refusal({"SummaryOnly": False, "limit": 100}) is None
     assert inventory_scan_refusal({"SummaryOnly": False, "max": 10_000}) is None

@@ -2624,7 +2624,7 @@ def parameter_registry_build(input_dir, output_dir, run_id, object_registry_dir)
               help="Base directory for evidence artifacts")
 @click.option("--model-name", "model_name", default="",
               help="Revit model name for evidence")
-@click.option("--simulate", is_flag=True, default=False,
+@click.option("--simulate/--no-simulate", default=True,
               help="Simulation mode (no live Revit connection)")
 def set_parameter_value(prompt_text, registry_path, registry_dir,
                         artifact_dir, model_name, simulate):

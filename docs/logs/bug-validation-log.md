@@ -7,7 +7,7 @@ For regression fixture files, see `tests/fixtures/behavior_regressions/`.
 
 ---
 
-## Live Revit 2027 Validation Results (2026-05-23 → 2026-05-06)
+## Live Revit 2027 Validation Results (2026-05-06 → 2026-05-23)
 
 Plan execution queue validated with structured dispatch. Full plan validated after export collision fix (PR #9).
 

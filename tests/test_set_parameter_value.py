@@ -274,6 +274,27 @@ class TestPromptParser:
         assert req.parse_errors
         assert "Cannot parse element count" in req.parse_errors[0]
 
+    def test_quoted_value_containing_for_keyword_ready_for_review(self):
+        """Regression: parser must match the LAST 'for <N> <Category>', not first."""
+        req = parse_set_parameter_prompt(
+            'Set Comments to "Ready for Review" for 3 Walls'
+        )
+        assert not req.parse_errors
+        assert req.parameter_name == "Comments"
+        assert req.value == "Ready for Review"
+        assert req.element_count == 3
+        assert req.category == "Walls"
+
+    def test_unquoted_value_containing_for_ready_for_review(self):
+        """Unquoted value with 'for' still resolves correctly."""
+        req = parse_set_parameter_prompt(
+            "Set Comments to Ready for Review for 3 Walls"
+        )
+        assert not req.parse_errors
+        assert req.value == "Ready for Review"
+        assert req.element_count == 3
+        assert req.category == "Walls"
+
 
 # =========================================================================
 # Registry validation tests

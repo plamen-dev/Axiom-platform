@@ -77,6 +77,8 @@ artifacts/validation_evidence/
 artifacts/capability_runs/
 # Promotion Eligibility Engine checks (generated decision records; keep curated evidence)
 artifacts/promotion_checks/
+# PR snapshot artifacts (generated CI evidence bundles)
+artifacts/pr_snapshots/
 
 # Visual Studio local state
 .vs/

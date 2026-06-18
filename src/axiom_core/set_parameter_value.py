@@ -155,8 +155,10 @@ def parse_set_parameter_prompt(prompt: str) -> SetParameterRequest:
 
     # Find trailing "for <N> <Category>" from the end.
     # <N> is a digit or word-number, <Category> is one or more words.
-    # Use greedy .* prefix so the regex engine finds the *last* "for".
-    trailing = re.search(
+    # Greedy `(.*)` prefix forces match of the LAST "for" so values
+    # containing "for" don't confuse the parser
+    # (e.g. "Set Comments to Ready for Review for 3 Walls").
+    trailing = re.match(
         r"^(.*)\bfor\s+(\w+)\s+(.+)$",
         text,
         re.IGNORECASE,

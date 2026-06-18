@@ -1235,7 +1235,7 @@ Level filter is **post-collector / pre-extraction**: C# iterates all elements, s
 | Mode | Result | Details |
 |------|--------|---------|
 | Full parameter schema plan | PASS | 278 successful exports, 1 skipped unsupported ((No Category)), 0 failed |
-| Export collision fix (PR #9) | PASS | 278 distinct export paths, 0 duplicates (was 26 before fix) |
+| Export collision fix (PR #9) | PASS | 278 distinct export paths, 0 duplicates (was 26 colliding paths before fix) |
 | inventory-import-batch | PASS | All 278 exports imported |
 | parameter-registry-build | PASS | 6,444 unique definitions, 1,878 parameter names, 1,748 runs, 5 models |
 | Priority coverage | PASS | 20/20 executed, 20/20 with definitions |
