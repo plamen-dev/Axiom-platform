@@ -1461,6 +1461,26 @@ _register(
 
 _register(
     CommandSpec(
+        name="discovery-loop",
+        command="axiom discovery-loop [--source <folder>] [--simulate] [--json-output]",
+        description=(
+            "Controlled Discovery Loop: first end-to-end loop chaining discovery, "
+            "candidate generation, state, validation, classification, and promotion "
+            "checks. No automatic promotion. No mutations. Evidence always written."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=("Loop result/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=120,
+        failure_modes=(FM_NONZERO,),
+        notes="Runs controlled loop. Mutations always refused. Promotions never applied.",
+    )
+)
+
+
+_register(
+    CommandSpec(
         name="trusted-capabilities",
         command="axiom trusted-capabilities [--json-output] [--status <status>]",
         description=(

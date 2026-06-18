@@ -5455,6 +5455,46 @@ def plan_review_create_cmd(
 
 
 # ---------------------------------------------------------------------------
+# Controlled Discovery Loop commands (PR #55)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("discovery-loop")
+@click.option("--source", default=None, help="Source folder or identifier for discovery")
+@click.option("--simulate/--no-simulate", default=False, help="Simulate mode (no real execution)")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+def discovery_loop_cmd(
+    source: Optional[str],
+    simulate: bool,
+    as_json: bool,
+):
+    """Run a controlled discovery loop."""
+    from axiom_core.controlled_discovery_loop import ControlledDiscoveryLoop
+
+    loop = ControlledDiscoveryLoop()
+    result = loop.run(source=source, simulate=simulate)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps(result.to_dict(), indent=2, default=str))
+        return
+
+    status_color = "green" if result.status.value in ("completed", "simulated") else "red"
+    console.print(f"\n[bold]Discovery Loop: {result.run_id}[/bold]")
+    console.print(f"  Status:     [{status_color}]{result.status.value}[/{status_color}]")
+    console.print(f"  Source:     {result.source or 'default'}")
+    console.print(f"  Simulate:   {result.simulate}")
+    console.print(f"  Steps:      {result.step_count}")
+    console.print(f"  Candidates: {result.candidates_generated}")
+    console.print(f"  Validated:  {result.validations_executed}")
+    console.print(f"  Promotions: checked={result.promotions_checked} applied={result.promotions_applied}")
+
+    if result.refusal_reason:
+        console.print(f"  [red]Refused:[/red] {result.refusal_reason}")
+
+
+# ---------------------------------------------------------------------------
 # Trusted Capability Registry commands (PR #54)
 # ---------------------------------------------------------------------------
 
