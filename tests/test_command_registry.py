@@ -62,7 +62,9 @@ EXPECTED_AXIOM_COMMANDS = {
     "parameter-registry-build", "plan", "plans", "pr-snapshot", "promotion-check",
     "prompt",
     "runner-commands", "set-parameter-value", "stats", "submit", "test-grids",
-    "test-levels", "tools", "validation-orchestrate", "validation-registry",
+    "test-levels", "tools", "trusted-capabilities", "trusted-capability",
+    "trusted-capability-promote", "trusted-capability-revoke",
+    "validation-orchestrate", "validation-registry",
     "validation-request", "validation-request-create", "validation-requests",
     "validation-run", "workflows",
 }

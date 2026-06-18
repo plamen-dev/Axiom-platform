@@ -5455,6 +5455,171 @@ def plan_review_create_cmd(
 
 
 # ---------------------------------------------------------------------------
+# Trusted Capability Registry commands (PR #54)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("trusted-capabilities")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+@click.option("--status", "status_str", default=None, help="Filter by trust status")
+def trusted_capabilities_cmd(
+    as_json: bool,
+    status_str: Optional[str],
+):
+    """List trusted capabilities."""
+    from axiom_core.trusted_capabilities import TrustedCapabilityRegistry, TrustStatus
+
+    registry = TrustedCapabilityRegistry()
+
+    status_filter = None
+    if status_str is not None:
+        try:
+            status_filter = TrustStatus(status_str)
+        except ValueError:
+            valid = ", ".join(s.value for s in TrustStatus)
+            console.print(f"[red]Invalid status:[/red] {status_str}. Valid: {valid}")
+            raise SystemExit(1)
+
+    capabilities = registry.list_capabilities(status_filter=status_filter)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps([c.to_dict() for c in capabilities], indent=2, default=str))
+        return
+
+    if not capabilities:
+        console.print("[dim]No trusted capabilities found.[/dim]")
+        return
+
+    table = Table(title="Trusted Capabilities")
+    table.add_column("Name", style="cyan")
+    table.add_column("Status")
+    table.add_column("Validations")
+    table.add_column("Failures")
+    table.add_column("Promoted By")
+    for c in capabilities:
+        table.add_row(
+            c.capability_name,
+            c.trust_status.value,
+            str(c.validation_count),
+            str(c.failure_count),
+            c.promoted_by or "-",
+        )
+    console.print(table)
+
+
+@cli.command("trusted-capability")
+@click.option("--name", required=True, help="Capability name")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+def trusted_capability_cmd(
+    name: str,
+    as_json: bool,
+):
+    """Show trust details for a specific capability."""
+    from axiom_core.trusted_capabilities import TrustedCapabilityRegistry
+
+    registry = TrustedCapabilityRegistry()
+    cap = registry.get_capability(name)
+
+    if cap is None:
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps({"error": "not_found", "capability": name}, indent=2))
+        else:
+            console.print(f"[red]Capability not found:[/red] {name}")
+        raise SystemExit(2)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps(cap.to_dict(), indent=2, default=str))
+        return
+
+    console.print(f"\n[bold]Trusted Capability: {cap.capability_name}[/bold]")
+    console.print(f"  Status:      {cap.trust_status.value}")
+    console.print(f"  Validations: {cap.validation_count}")
+    console.print(f"  Failures:    {cap.failure_count}")
+    if cap.promoted_by:
+        console.print(f"  Promoted by: {cap.promoted_by} at {cap.promoted_at}")
+    if cap.revoked_by:
+        console.print(f"  Revoked by:  {cap.revoked_by} at {cap.revoked_at}")
+        console.print(f"  Reason:      {cap.revocation_reason}")
+
+
+@cli.command("trusted-capability-promote")
+@click.option("--capability", required=True, help="Capability name to promote")
+@click.option("--by", "promoted_by", default="human", help="Who is promoting")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+def trusted_capability_promote_cmd(
+    capability: str,
+    promoted_by: str,
+    as_json: bool,
+):
+    """Explicitly promote a capability to trusted status."""
+    from axiom_core.trusted_capabilities import TrustedCapabilityRegistry
+
+    registry = TrustedCapabilityRegistry()
+    try:
+        cap = registry.promote(capability, promoted_by=promoted_by)
+    except ValueError as e:
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps({"error": "promotion_refused", "reason": str(e)}, indent=2))
+        else:
+            console.print(f"[red]Promotion refused:[/red] {e}")
+        raise SystemExit(1)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps(cap.to_dict(), indent=2, default=str))
+        return
+
+    console.print(f"[green]Promoted:[/green] {cap.capability_name} → trusted")
+    console.print(f"  By: {cap.promoted_by}")
+
+
+@cli.command("trusted-capability-revoke")
+@click.option("--capability", required=True, help="Capability name to revoke")
+@click.option("--by", "revoked_by", default="human", help="Who is revoking")
+@click.option("--reason", default="", help="Reason for revocation")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+def trusted_capability_revoke_cmd(
+    capability: str,
+    revoked_by: str,
+    reason: str,
+    as_json: bool,
+):
+    """Revoke trust from a capability."""
+    from axiom_core.trusted_capabilities import TrustedCapabilityRegistry
+
+    registry = TrustedCapabilityRegistry()
+    cap = registry.revoke(capability, revoked_by=revoked_by, reason=reason)
+
+    if cap is None:
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps({"error": "not_found", "capability": capability}, indent=2))
+        else:
+            console.print(f"[red]Capability not found:[/red] {capability}")
+        raise SystemExit(2)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps(cap.to_dict(), indent=2, default=str))
+        return
+
+    console.print(f"[yellow]Revoked:[/yellow] {cap.capability_name}")
+    console.print(f"  By:     {cap.revoked_by}")
+    console.print(f"  Reason: {cap.revocation_reason}")
+
+
+# ---------------------------------------------------------------------------
 # Validation Request Generator commands (PR #52)
 # ---------------------------------------------------------------------------
 

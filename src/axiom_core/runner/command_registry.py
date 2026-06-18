@@ -1461,6 +1461,80 @@ _register(
 
 _register(
     CommandSpec(
+        name="trusted-capabilities",
+        command="axiom trusted-capabilities [--json-output] [--status <status>]",
+        description=(
+            "Trusted Capability Registry: list capabilities with their trust status. "
+            "Separates eligible from trusted. No execution."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("Trusted capabilities table/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only registry query. No execution, no mutations.",
+    )
+)
+
+
+_register(
+    CommandSpec(
+        name="trusted-capability",
+        command="axiom trusted-capability --name <name> [--json-output]",
+        description=(
+            "Trusted Capability Registry: show trust details for a specific capability."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("Trust details/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only lookup. Returns exit 2 for unknown capabilities.",
+    )
+)
+
+
+_register(
+    CommandSpec(
+        name="trusted-capability-promote",
+        command="axiom trusted-capability-promote --capability <name> [--by <actor>] [--json-output]",
+        description=(
+            "Trusted Capability Registry: explicitly promote a capability to trusted. "
+            "Refuses blocked/mutation capabilities. Refuses capabilities with failures."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=("Promotion result/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Explicit promotion only. Never automatic. Blocked caps always refused.",
+    )
+)
+
+
+_register(
+    CommandSpec(
+        name="trusted-capability-revoke",
+        command="axiom trusted-capability-revoke --capability <name> [--by <actor>] [--reason <text>] [--json-output]",
+        description=(
+            "Trusted Capability Registry: revoke trust from a capability."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=("Revocation result/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Revokes trust. History preserved. Returns exit 2 for unknown capabilities.",
+    )
+)
+
+
+_register(
+    CommandSpec(
         name="validation-requests",
         command="axiom validation-requests [--json-output] [--status <status>] [--plan-id <id>]",
         description=(
