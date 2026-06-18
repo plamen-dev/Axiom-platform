@@ -1518,6 +1518,28 @@ _register(
 )
 
 
+_register(
+    CommandSpec(
+        name="validation-orchestrate",
+        command="axiom validation-orchestrate --request-id <id> [--simulate] [--json-output]",
+        description=(
+            "Controlled Validation Orchestrator: execute or simulate a "
+            "validation orchestration from an approved validation request. "
+            "Refuses mutation capabilities and unsafe procedures. "
+            "Evidence is always written."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=("Orchestration result/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=120,
+        failure_modes=(FM_NONZERO,),
+        notes="Executes safe validations only. Mutations always refused. Evidence always written.",
+    )
+)
+
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------

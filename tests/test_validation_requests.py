@@ -683,3 +683,31 @@ class TestCLI:
         assert "steps" in data
         assert "expected_outputs" in data
         assert data["expected_outputs"] == ["pass_fail.json", "evidence_bundle"]
+
+
+class TestGenerateFromPlanNoMutation:
+    """Regression: generate_from_plan must not mutate caller's lists."""
+
+    def test_empty_capabilities_not_mutated(self, tmp_path):
+        """Passing required_capabilities=[] must not modify the caller's list."""
+        db = str(tmp_path / "nomut.db")
+        os.environ["AXIOM_DB_PATH"] = db
+        try:
+            gen = ValidationRequestGenerator(db_path=db)
+            step = ValidationRequestStep(
+                sequence=1,
+                title="Check inventory",
+                required_capabilities=["InventoryModel"],
+            )
+            caller_caps: list[str] = []
+            gen.generate_from_plan(
+                plan_id="mut-plan",
+                plan_name="Mutation test",
+                steps=[step],
+                required_capabilities=caller_caps,
+            )
+            assert caller_caps == [], (
+                f"Caller's list was mutated: {caller_caps}"
+            )
+        finally:
+            os.environ.pop("AXIOM_DB_PATH", None)

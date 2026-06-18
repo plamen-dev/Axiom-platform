@@ -5645,5 +5645,101 @@ def validation_request_create_cmd(
     console.print(f"  Steps:  {len(request.steps)}")
 
 
+# ---------------------------------------------------------------------------
+# Controlled Validation Orchestrator commands (PR #53)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("validation-orchestrate")
+@click.option("--request-id", required=True, help="Validation request ID to orchestrate")
+@click.option("--simulate", is_flag=True, default=False, help="Simulate without actual execution")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+def validation_orchestrate_cmd(
+    request_id: str,
+    simulate: bool,
+    as_json: bool,
+):
+    """Execute or simulate a validation orchestration."""
+    from axiom_core.validation_orchestrator import (
+        ControlledValidationOrchestrator,
+        ValidationOrchestrationStep,
+    )
+    from axiom_core.validation_requests import (
+        ValidationRequestGenerator,
+        ValidationRequestStatus,
+    )
+
+    req_generator = ValidationRequestGenerator()
+    req = req_generator.get_request(request_id)
+
+    if req is None:
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps({"error": "not_found", "request_id": request_id}, indent=2))
+        else:
+            console.print(f"[red]Validation request not found:[/red] {request_id}")
+        raise SystemExit(2)
+
+    if req.status in (
+        ValidationRequestStatus.BLOCKED,
+        ValidationRequestStatus.CANCELLED,
+        ValidationRequestStatus.COMPLETED,
+    ):
+        if as_json:
+            import json as json_mod
+
+            payload: dict[str, object] = {
+                "error": f"request_{req.status.value}",
+                "request_id": request_id,
+            }
+            if req.status == ValidationRequestStatus.BLOCKED:
+                payload["blockers"] = len(req.blockers)
+            click.echo(json_mod.dumps(payload, indent=2))
+        else:
+            if req.status == ValidationRequestStatus.BLOCKED:
+                console.print(f"[red]Request is blocked:[/red] {request_id} ({len(req.blockers)} blockers)")
+            else:
+                console.print(f"[red]Request is {req.status.value}:[/red] {request_id}")
+        raise SystemExit(1)
+
+    orchestrator = ControlledValidationOrchestrator()
+
+    orch_steps = [
+        ValidationOrchestrationStep(
+            step_id=s.step_id,
+            sequence=s.sequence,
+            title=s.title,
+            procedure=s.validation_procedure,
+        )
+        for s in req.steps
+    ]
+
+    result = orchestrator.orchestrate(
+        request_id=request_id,
+        steps=orch_steps,
+        required_capabilities=req.required_capabilities,
+        simulate=simulate,
+    )
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps(result.to_dict(), indent=2, default=str))
+        if result.refusal_reason:
+            raise SystemExit(1)
+        return
+
+    if result.refusal_reason:
+        console.print(f"[red]Refused:[/red] {result.refusal_reason}")
+        raise SystemExit(1)
+
+    mode = "Simulated" if simulate else "Completed"
+    console.print(f"[green]{mode}:[/green] {result.run_id}")
+    console.print(f"  Request: {result.request_id}")
+    console.print(f"  Steps:   {result.step_count} ({result.passed_count} passed, {result.failed_count} failed)")
+    console.print(f"  Status:  {result.status.value}")
+
+
 if __name__ == "__main__":
     cli()

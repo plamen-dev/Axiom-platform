@@ -560,7 +560,7 @@ class ValidationRequestGenerator:
         status = ValidationRequestStatus.BLOCKED if effective_blockers else ValidationRequestStatus.READY
 
         # Collect required capabilities from steps if not explicit
-        effective_capabilities = required_capabilities if required_capabilities is not None else []
+        effective_capabilities = list(required_capabilities) if required_capabilities is not None else []
         if not effective_capabilities:
             seen: set[str] = set()
             for step in effective_steps:
