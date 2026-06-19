@@ -1633,6 +1633,80 @@ _register(
 )
 
 
+_register(
+    CommandSpec(
+        name="work-items",
+        command="axiom work-items [--json-output] [--status <status>] [--type <type>]",
+        description=(
+            "Autonomous Work Item Registry: list work items. "
+            "Supports filtering by status or type. No execution."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("Work items table/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only registry query. No execution, no mutations.",
+    )
+)
+
+
+_register(
+    CommandSpec(
+        name="work-item",
+        command="axiom work-item --id <id> [--json-output]",
+        description=(
+            "Autonomous Work Item Registry: show details for a specific work item."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("Work item details/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only lookup. Returns exit 2 for unknown item IDs.",
+    )
+)
+
+
+_register(
+    CommandSpec(
+        name="work-item-create",
+        command="axiom work-item-create --title <title> --type <type> [--description <text>] [--priority <level>] [--created-by <creator>] [--json-output]",
+        description=(
+            "Autonomous Work Item Registry: create a new work item. "
+            "No code generation. No execution."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=("Created work item confirmation/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Creates a work item record in SQLite. No code generation. No execution.",
+    )
+)
+
+
+_register(
+    CommandSpec(
+        name="work-item-update",
+        command="axiom work-item-update --id <id> [--status <status>] [--title <title>] [--description <text>] [--priority <level>] [--assigned-to <assignee>] [--by <actor>] [--reason <text>] [--json-output]",
+        description=(
+            "Autonomous Work Item Registry: update a work item's status or fields. "
+            "Status changes preserve history. No execution."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=("Updated work item confirmation/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Updates work item. Status changes are audited. No code generation. No execution.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object

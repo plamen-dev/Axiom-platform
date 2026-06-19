@@ -5946,5 +5946,298 @@ def validation_orchestrate_cmd(
     console.print(f"  Status:  {result.status.value}")
 
 
+# ---------------------------------------------------------------------------
+# Autonomous Work Item Registry commands (PR #56)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("work-items")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+@click.option("--status", "status_str", default=None, help="Filter by status")
+@click.option("--type", "type_str", default=None, help="Filter by work item type")
+def work_items_cmd(
+    as_json: bool,
+    status_str: Optional[str],
+    type_str: Optional[str],
+):
+    """List work items."""
+    from axiom_core.work_item_registry import (
+        WorkItemRegistry,
+    )
+    from axiom_core.work_item_registry import (
+        WorkItemStatus as WIStatus,
+    )
+    from axiom_core.work_item_registry import (
+        WorkItemType as WIType,
+    )
+
+    registry = WorkItemRegistry()
+
+    status_filter = None
+    if status_str is not None:
+        try:
+            status_filter = WIStatus(status_str)
+        except ValueError:
+            valid = ", ".join(s.value for s in WIStatus)
+            console.print(f"[red]Invalid status:[/red] {status_str}. Valid: {valid}")
+            raise SystemExit(1)
+
+    type_filter = None
+    if type_str is not None:
+        try:
+            type_filter = WIType(type_str)
+        except ValueError:
+            valid = ", ".join(t.value for t in WIType)
+            console.print(f"[red]Invalid type:[/red] {type_str}. Valid: {valid}")
+            raise SystemExit(1)
+
+    items = registry.list_items(status_filter=status_filter, type_filter=type_filter)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps([i.to_dict() for i in items], indent=2, default=str))
+        return
+
+    if not items:
+        console.print("[dim]No work items found.[/dim]")
+        return
+
+    table = Table(title="Work Items")
+    table.add_column("ID", style="cyan", no_wrap=True)
+    table.add_column("Title")
+    table.add_column("Type")
+    table.add_column("Status")
+    table.add_column("Priority")
+    table.add_column("Assigned")
+    for item in items:
+        table.add_row(
+            item.item_id[:12],
+            item.title[:40],
+            item.item_type.value,
+            item.status.value,
+            item.priority.value,
+            item.assigned_to or "-",
+        )
+    console.print(table)
+
+
+@cli.command("work-item")
+@click.option("--id", "item_id", required=True, help="Work item ID")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+def work_item_cmd(
+    item_id: str,
+    as_json: bool,
+):
+    """Show details for a specific work item."""
+    from axiom_core.work_item_registry import WorkItemRegistry
+
+    registry = WorkItemRegistry()
+    item = registry.get_item(item_id)
+
+    if item is None:
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps({"error": "not_found", "item_id": item_id}, indent=2))
+        else:
+            console.print(f"[red]Work item not found:[/red] {item_id}")
+        raise SystemExit(2)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps(item.to_dict(), indent=2, default=str))
+        return
+
+    console.print(f"\n[bold]Work Item: {item.item_id}[/bold]")
+    console.print(f"  Title:       {item.title}")
+    console.print(f"  Type:        {item.item_type.value}")
+    console.print(f"  Status:      {item.status.value}")
+    console.print(f"  Priority:    {item.priority.value}")
+    console.print(f"  Created by:  {item.created_by or '-'}")
+    console.print(f"  Assigned to: {item.assigned_to or '-'}")
+    console.print(f"  Created:     {item.created_at}")
+    console.print(f"  Updated:     {item.updated_at}")
+    if item.description:
+        console.print(f"  Description: {item.description}")
+    if item.evidence:
+        console.print(f"  Evidence:    {len(item.evidence)} item(s)")
+    if item.dependencies:
+        console.print(f"  Dependencies: {len(item.dependencies)}")
+        for dep in item.dependencies:
+            console.print(f"    -> {dep.depends_on_id} ({dep.dependency_type})")
+
+
+@cli.command("work-item-create")
+@click.option("--title", required=True, help="Work item title")
+@click.option("--type", "type_str", required=True, help="Work item type")
+@click.option("--description", default=None, help="Description")
+@click.option("--priority", "priority_str", default="unset", help="Priority level")
+@click.option("--created-by", default=None, help="Creator identifier")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+def work_item_create_cmd(
+    title: str,
+    type_str: str,
+    description: Optional[str],
+    priority_str: str,
+    created_by: Optional[str],
+    as_json: bool,
+):
+    """Create a new work item."""
+    from axiom_core.work_item_registry import (
+        WorkItemPriority as WIPriority,
+    )
+    from axiom_core.work_item_registry import (
+        WorkItemRegistry,
+    )
+    from axiom_core.work_item_registry import (
+        WorkItemType as WIType,
+    )
+
+    try:
+        item_type = WIType(type_str)
+    except ValueError:
+        valid = ", ".join(t.value for t in WIType)
+        console.print(f"[red]Invalid type:[/red] {type_str}. Valid: {valid}")
+        raise SystemExit(1)
+
+    try:
+        priority = WIPriority(priority_str)
+    except ValueError:
+        valid = ", ".join(p.value for p in WIPriority)
+        console.print(f"[red]Invalid priority:[/red] {priority_str}. Valid: {valid}")
+        raise SystemExit(1)
+
+    registry = WorkItemRegistry()
+    item = registry.create_item(
+        title=title,
+        item_type=item_type,
+        description=description,
+        priority=priority,
+        created_by=created_by,
+    )
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps(item.to_dict(), indent=2, default=str))
+        return
+
+    console.print(f"[green]Work item created:[/green] {item.item_id}")
+    console.print(f"  Title:    {item.title}")
+    console.print(f"  Type:     {item.item_type.value}")
+    console.print(f"  Status:   {item.status.value}")
+    console.print(f"  Priority: {item.priority.value}")
+
+
+@cli.command("work-item-update")
+@click.option("--id", "item_id", required=True, help="Work item ID")
+@click.option("--status", "status_str", default=None, help="New status")
+@click.option("--title", default=None, help="New title")
+@click.option("--description", default=None, help="New description")
+@click.option("--priority", "priority_str", default=None, help="New priority")
+@click.option("--assigned-to", default=None, help="Assign to")
+@click.option("--by", "actor", default=None, help="Actor making the change")
+@click.option("--reason", default=None, help="Reason for status change")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+def work_item_update_cmd(
+    item_id: str,
+    status_str: Optional[str],
+    title: Optional[str],
+    description: Optional[str],
+    priority_str: Optional[str],
+    assigned_to: Optional[str],
+    actor: Optional[str],
+    reason: Optional[str],
+    as_json: bool,
+):
+    """Update a work item (status, fields, or both)."""
+    from axiom_core.work_item_registry import (
+        WorkItemPriority as WIPriority,
+    )
+    from axiom_core.work_item_registry import (
+        WorkItemRegistry,
+    )
+    from axiom_core.work_item_registry import (
+        WorkItemStatus as WIStatus,
+    )
+
+    registry = WorkItemRegistry()
+    item = registry.get_item(item_id)
+    if item is None:
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps({"error": "not_found", "item_id": item_id}, indent=2))
+        else:
+            console.print(f"[red]Work item not found:[/red] {item_id}")
+        raise SystemExit(2)
+
+    new_status = None
+    if status_str is not None:
+        try:
+            new_status = WIStatus(status_str)
+        except ValueError:
+            valid = ", ".join(s.value for s in WIStatus)
+            console.print(f"[red]Invalid status:[/red] {status_str}. Valid: {valid}")
+            raise SystemExit(1)
+
+    priority = None
+    if priority_str is not None:
+        try:
+            priority = WIPriority(priority_str)
+        except ValueError:
+            valid = ", ".join(p.value for p in WIPriority)
+            console.print(f"[red]Invalid priority:[/red] {priority_str}. Valid: {valid}")
+            raise SystemExit(1)
+
+    has_status_change = new_status is not None
+    has_field_change = any(v is not None for v in (title, description, priority, assigned_to))
+
+    if not has_status_change and not has_field_change:
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps(item.to_dict(), indent=2, default=str))
+        else:
+            console.print(f"[dim]No changes specified for:[/dim] {item_id}")
+        return
+
+    try:
+        if has_status_change:
+            item = registry.update_status(
+                item_id, new_status, actor=actor, reason=reason
+            )
+        if has_field_change:
+            item = registry.update_fields(
+                item_id,
+                title=title,
+                description=description,
+                priority=priority,
+                assigned_to=assigned_to,
+                actor=actor,
+            )
+    except ValueError as exc:
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps({"error": "update_failed", "reason": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps(item.to_dict(), indent=2, default=str))
+        return
+
+    console.print(f"[green]Work item updated:[/green] {item.item_id}")
+    console.print(f"  Title:    {item.title}")
+    console.print(f"  Status:   {item.status.value}")
+    console.print(f"  Priority: {item.priority.value}")
+
+
 if __name__ == "__main__":
     cli()
