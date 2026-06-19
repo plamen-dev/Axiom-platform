@@ -1,6 +1,7 @@
 """Axiom CLI - Command-line interface for the Axiom platform."""
 
 import json
+import logging
 from enum import Enum
 from typing import Optional
 from uuid import UUID
@@ -17,6 +18,7 @@ from rich.table import Table
 from rich.tree import Tree
 
 console = Console()
+_logger = logging.getLogger(__name__)
 
 
 @click.group()
@@ -8248,6 +8250,342 @@ def _render_regression_candidate_rich(candidate: dict) -> None:
         console.print(f"  Finding ID:     {candidate['source_finding_id']}")
     if candidate.get("source_work_item_id"):
         console.print(f"  Work Item ID:   {candidate['source_work_item_id']}")
+
+
+# ---------------------------------------------------------------------------
+# Coding Session Orchestrator v1 (PR #71)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("orchestration-create")
+@click.option("--session-id", required=True, help="Session ID to orchestrate.")
+@click.option("--title", default="", help="Orchestration title.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def orchestration_create_cmd(
+    session_id: str, title: str, json_output: bool,
+):
+    """Create a new coding session orchestration."""
+    from axiom_core.coding_session_orchestrator import CodingSessionOrchestrator
+
+    try:
+        orch = CodingSessionOrchestrator()
+        plan = orch.create_orchestration(session_id=session_id, title=title)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    try:
+        orch.write_evidence(plan["plan_id"])
+    except Exception as exc:
+        _logger.warning("Evidence write failed: %s", exc)
+
+    if json_output:
+        click.echo(json.dumps(plan, indent=2, default=str))
+    else:
+        _render_orchestration_rich(plan)
+
+
+@cli.command("orchestrations")
+@click.option("--status", default="", help="Filter by status.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def orchestrations_cmd(status: str, json_output: bool):
+    """List all orchestration plans."""
+    from axiom_core.coding_session_orchestrator import CodingSessionOrchestrator
+
+    try:
+        orch = CodingSessionOrchestrator()
+        plans = orch.list_orchestrations(status=status)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(plans, indent=2, default=str))
+    else:
+        console.print(f"\n[bold]Orchestrations ({len(plans)})[/bold]\n")
+        for p in plans:
+            progress = p.get("stage_progress", {})
+            console.print(
+                f"  [{p['status']}] {p['plan_id'][:12]}… "
+                f"— stage: {p.get('current_stage', '')} "
+                f"({progress.get('percentage', 0)}%)",
+            )
+
+
+@cli.command("orchestration")
+@click.option("--plan-id", required=True, help="Plan ID.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def orchestration_cmd(plan_id: str, json_output: bool):
+    """Show a single orchestration plan."""
+    from axiom_core.coding_session_orchestrator import CodingSessionOrchestrator
+
+    try:
+        orch = CodingSessionOrchestrator()
+        plan = orch.get_orchestration(plan_id)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if plan is None:
+        msg = {"error": f"Orchestration not found: {plan_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Orchestration not found: {plan_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(plan, indent=2, default=str))
+    else:
+        _render_orchestration_rich(plan)
+
+
+@cli.command("orchestration-advance")
+@click.option("--plan-id", required=True, help="Plan ID.")
+@click.option("--reason", default="", help="Transition reason.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def orchestration_advance_cmd(
+    plan_id: str, reason: str, json_output: bool,
+):
+    """Advance orchestration to the next stage."""
+    from axiom_core.coding_session_orchestrator import CodingSessionOrchestrator
+
+    try:
+        orch = CodingSessionOrchestrator()
+        plan = orch.advance_stage(plan_id, reason=reason)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if plan is None:
+        msg = {"error": f"Orchestration not found: {plan_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Orchestration not found: {plan_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(plan, indent=2, default=str))
+    else:
+        console.print(
+            f"[green]Advanced to stage: {plan.get('current_stage', '')}[/green]",
+        )
+
+
+@cli.command("orchestration-block")
+@click.option("--plan-id", required=True, help="Plan ID.")
+@click.option("--reason", required=True, help="Block reason.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def orchestration_block_cmd(
+    plan_id: str, reason: str, json_output: bool,
+):
+    """Block the current orchestration stage."""
+    from axiom_core.coding_session_orchestrator import CodingSessionOrchestrator
+
+    try:
+        orch = CodingSessionOrchestrator()
+        plan = orch.block_stage(plan_id, reason=reason)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if plan is None:
+        msg = {"error": f"Orchestration not found: {plan_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Orchestration not found: {plan_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(plan, indent=2, default=str))
+    else:
+        console.print(f"[yellow]Stage blocked: {reason}[/yellow]")
+
+
+@cli.command("orchestration-complete")
+@click.option("--plan-id", required=True, help="Plan ID.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def orchestration_complete_cmd(plan_id: str, json_output: bool):
+    """Mark an orchestration as completed."""
+    from axiom_core.coding_session_orchestrator import CodingSessionOrchestrator
+
+    try:
+        orch = CodingSessionOrchestrator()
+        plan = orch.complete_session(plan_id)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if plan is None:
+        msg = {"error": f"Orchestration not found: {plan_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Orchestration not found: {plan_id}")
+        raise SystemExit(2)
+
+    try:
+        orch.write_evidence(plan["plan_id"])
+    except Exception as exc:
+        _logger.warning("Evidence write failed: %s", exc)
+
+    if json_output:
+        click.echo(json.dumps(plan, indent=2, default=str))
+    else:
+        console.print("[green]Orchestration completed[/green]")
+
+
+@cli.command("orchestration-summary")
+@click.option("--plan-id", required=True, help="Plan ID.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def orchestration_summary_cmd(plan_id: str, json_output: bool):
+    """Generate a summary for an orchestration plan."""
+    from axiom_core.coding_session_orchestrator import CodingSessionOrchestrator
+
+    try:
+        orch = CodingSessionOrchestrator()
+        summary = orch.generate_summary(plan_id)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if summary is None:
+        msg = {"error": f"Orchestration not found: {plan_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Orchestration not found: {plan_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(summary, indent=2, default=str))
+    else:
+        _render_orchestration_summary_rich(summary)
+
+
+def _render_orchestration_rich(plan: dict) -> None:
+    """Render orchestration plan in rich text."""
+    console.print("\n[bold]Coding Session Orchestration[/bold]\n")
+    console.print(f"  Plan ID:        {plan.get('plan_id', '')}")
+    console.print(f"  Session ID:     {plan.get('session_id', '')}")
+    console.print(f"  Status:         {plan.get('status', '')}")
+    console.print(f"  Current Stage:  {plan.get('current_stage', '')}")
+
+    progress = plan.get("stage_progress", {})
+    console.print(
+        f"  Progress:       {progress.get('completed_stages', 0)}"
+        f"/{progress.get('total_stages', 0)} "
+        f"({progress.get('percentage', 0)}%)",
+    )
+
+    completed = plan.get("completed_stages", [])
+    if completed:
+        console.print(f"\n[bold]Completed Stages ({len(completed)}):[/bold]")
+        for s in completed:
+            console.print(f"  - {s}")
+
+    blocked = plan.get("blocked_stages", [])
+    if blocked:
+        console.print(f"\n[bold]Blocked Stages ({len(blocked)}):[/bold]")
+        for s in blocked:
+            console.print(f"  - {s}")
+
+    observations = plan.get("observations", [])
+    if observations:
+        console.print(f"\n[bold]Observations ({len(observations)}):[/bold]")
+        for o in observations:
+            console.print(f"  [{o['severity']}] {o['message']}")
+
+
+def _render_orchestration_summary_rich(summary: dict) -> None:
+    """Render orchestration summary in rich text."""
+    console.print("\n[bold]Orchestration Summary[/bold]\n")
+    console.print(f"  Plan ID:            {summary.get('plan_id', '')}")
+    console.print(f"  Status:             {summary.get('status', '')}")
+    console.print(f"  Current Stage:      {summary.get('current_stage', '')}")
+    console.print(f"  Tasks:              {summary.get('total_tasks', 0)}")
+    console.print(f"  Observations:       {summary.get('total_observations', 0)}")
+    console.print(
+        f"  Checkpoints:        "
+        f"{summary.get('checkpoints_reached', 0)}"
+        f"/{summary.get('checkpoints_total', 0)}",
+    )
+
+    warnings = summary.get("warnings", [])
+    if warnings:
+        console.print(f"\n[bold]Warnings ({len(warnings)}):[/bold]")
+        for w in warnings:
+            console.print(f"  [{w['severity']}] {w['message']}")
+
+
+
+
+# ---------------------------------------------------------------------------
 
 
 # ---------------------------------------------------------------------------

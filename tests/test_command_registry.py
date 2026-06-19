@@ -89,6 +89,9 @@ EXPECTED_AXIOM_COMMANDS = {
     "coding-session-create", "coding-sessions", "coding-session",
     "coding-session-update", "coding-session-add-step",
     "coding-session-add-artifact", "coding-session-link",
+    "orchestration-create", "orchestrations", "orchestration",
+    "orchestration-advance", "orchestration-block",
+    "orchestration-complete", "orchestration-summary",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 

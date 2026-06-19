@@ -2488,6 +2488,141 @@ _register(
 
 
 # ---------------------------------------------------------------------------
+# Coding Session Orchestrator v1 (PR #71)
+# ---------------------------------------------------------------------------
+
+_register(
+    CommandSpec(
+        name="orchestration-create",
+        command=(
+            "axiom orchestration-create --session-id <id> "
+            "[--title <t>] [--json-output]"
+        ),
+        description="Create a new coding session orchestration plan.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=(
+            EvidenceOutput("orchestration_request.json", required=True),
+            EvidenceOutput("orchestration_result.json", required=True),
+            EvidenceOutput("orchestration_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Creates a deterministic orchestration plan with evidence.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="orchestrations",
+        command="axiom orchestrations [--status <s>] [--json-output]",
+        description="List all orchestration plans.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=EV_CONSOLE,
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only listing of orchestration plans.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="orchestration",
+        command="axiom orchestration --plan-id <id> [--json-output]",
+        description="Show a single orchestration plan by ID.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=(
+            EvidenceOutput("orchestration_result.json", required=True),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only orchestration detail.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="orchestration-advance",
+        command=(
+            "axiom orchestration-advance --plan-id <id> "
+            "[--reason <r>] [--json-output]"
+        ),
+        description="Advance orchestration to the next stage.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=(
+            EvidenceOutput("orchestration_result.json", required=True),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Deterministic stage advancement.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="orchestration-block",
+        command=(
+            "axiom orchestration-block --plan-id <id> "
+            "--reason <r> [--json-output]"
+        ),
+        description="Block the current orchestration stage.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=(
+            EvidenceOutput("orchestration_result.json", required=True),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Records blocker observation and marks stage blocked.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="orchestration-complete",
+        command="axiom orchestration-complete --plan-id <id> [--json-output]",
+        description="Mark an orchestration as completed.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=(
+            EvidenceOutput("orchestration_request.json", required=True),
+            EvidenceOutput("orchestration_result.json", required=True),
+            EvidenceOutput("orchestration_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Completes session orchestration with evidence.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="orchestration-summary",
+        command="axiom orchestration-summary --plan-id <id> [--json-output]",
+        description="Generate a summary for an orchestration plan.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=EV_CONSOLE,
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only orchestration summary generation.",
+    )
+)
+
+
+# ---------------------------------------------------------------------------
 # Code Review Policy Engine v1 (PR #69)
 # ---------------------------------------------------------------------------
 
