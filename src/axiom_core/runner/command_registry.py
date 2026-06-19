@@ -2188,6 +2188,89 @@ _register(
     )
 )
 
+# ---------------------------------------------------------------------------
+# Self-Improvement Loop v1 (PR #65)
+# ---------------------------------------------------------------------------
+
+_register(
+    CommandSpec(
+        name="self-improvement",
+        command="axiom self-improvement [--json-output]",
+        description=(
+            "Run the self-improvement analysis loop. Studies engineering "
+            "history from review findings and generates improvement "
+            "candidates. No automatic code changes, no self-modification."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=(
+            EvidenceOutput("improvement_request.json", required=True),
+            EvidenceOutput("improvement_result.json", required=True),
+            EvidenceOutput("improvement_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ) + EV_CONSOLE,
+        timeout_seconds=120,
+        failure_modes=(FM_NONZERO,),
+        notes=(
+            "Analyzes review findings for patterns, generates improvement "
+            "candidates. No code changes, no patches, no GitHub API, "
+            "no network dependency."
+        ),
+    )
+)
+
+_register(
+    CommandSpec(
+        name="improvement-candidates",
+        command=(
+            "axiom improvement-candidates [--category <cat>] "
+            "[--priority <pri>] [--status <status>] [--json-output]"
+        ),
+        description="List improvement candidates generated from analysis.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=("Improvement candidates listing (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only listing of improvement candidates with filters.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="improvement-candidate",
+        command="axiom improvement-candidate --id <id> [--json-output]",
+        description=(
+            "Show details of a specific improvement candidate. "
+            "Exit 2 if not found."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=("Improvement candidate detail (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only detail view of a single improvement candidate.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="improvement-patterns",
+        command="axiom improvement-patterns [--json-output]",
+        description="List detected improvement patterns from analysis.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=("Improvement patterns listing (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only listing of detected improvement patterns.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object

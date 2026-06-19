@@ -7572,5 +7572,231 @@ def _render_review_finding_rich(data: dict):
             console.print(f"  - {e}")
 
 
+# ---------------------------------------------------------------------------
+# Self-Improvement Loop v1 (PR #65)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("self-improvement")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def self_improvement_cmd(json_output: bool):
+    """Run the self-improvement analysis loop.
+
+    Studies engineering history from review findings and generates
+    improvement candidates. No automatic code changes.
+    """
+    from axiom_core.self_improvement_loop import SelfImprovementLoop
+
+    try:
+        loop = SelfImprovementLoop()
+        result = loop.run_analysis()
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+    else:
+        _render_improvement_result_rich(result)
+
+
+@cli.command("improvement-candidates")
+@click.option(
+    "--category",
+    type=click.Choice([
+        "repeated_bug_class", "missing_test", "duplicated_pattern",
+        "candidate_helper", "knowledge_update", "skill_update",
+        "playbook_update",
+    ]),
+    default=None,
+    help="Filter by category.",
+)
+@click.option(
+    "--priority",
+    type=click.Choice(["critical", "high", "medium", "low", "unset"]),
+    default=None,
+    help="Filter by priority.",
+)
+@click.option(
+    "--status",
+    type=click.Choice([
+        "proposed", "accepted", "rejected", "implemented", "deferred",
+    ]),
+    default=None,
+    help="Filter by status.",
+)
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def improvement_candidates_cmd(
+    category: str | None,
+    priority: str | None,
+    status: str | None,
+    json_output: bool,
+):
+    """List improvement candidates generated from analysis."""
+    from axiom_core.self_improvement_loop import SelfImprovementLoop
+
+    try:
+        loop = SelfImprovementLoop()
+        candidates = loop.list_candidates(
+            category=category or "",
+            priority=priority or "",
+            status=status or "",
+        )
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    data = [c.to_dict() for c in candidates]
+    if json_output:
+        click.echo(json.dumps(data, indent=2, default=str))
+    else:
+        console.print(f"\n[bold]Improvement Candidates[/bold] ({len(data)} total)\n")
+        for item in data:
+            _render_improvement_candidate_rich(item)
+
+
+@cli.command("improvement-candidate")
+@click.option("--id", "candidate_id", required=True, help="Candidate ID.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def improvement_candidate_cmd(candidate_id: str, json_output: bool):
+    """Show details of a specific improvement candidate."""
+    from axiom_core.self_improvement_loop import SelfImprovementLoop
+
+    try:
+        loop = SelfImprovementLoop()
+        candidate = loop.get_candidate(candidate_id)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if candidate is None:
+        msg = {"error": f"Candidate not found: {candidate_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Candidate not found: {candidate_id}")
+        raise SystemExit(2)
+
+    data = candidate.to_dict()
+    if json_output:
+        click.echo(json.dumps(data, indent=2, default=str))
+    else:
+        _render_improvement_candidate_rich(data)
+
+
+@cli.command("improvement-patterns")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def improvement_patterns_cmd(json_output: bool):
+    """List detected improvement patterns from analysis."""
+    from axiom_core.self_improvement_loop import SelfImprovementLoop
+
+    try:
+        loop = SelfImprovementLoop()
+        patterns = loop.list_patterns()
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    data = [p.to_dict() for p in patterns]
+    if json_output:
+        click.echo(json.dumps(data, indent=2, default=str))
+    else:
+        console.print(f"\n[bold]Improvement Patterns[/bold] ({len(data)} total)\n")
+        for item in data:
+            console.print(
+                f"  [{item['pattern_kind']}] "
+                f"{item['occurrence_count']} occurrence(s) - "
+                f"{item.get('description', '')}",
+            )
+
+
+def _render_improvement_result_rich(result: dict) -> None:
+    """Render self-improvement analysis result in rich text."""
+    console.print("\n[bold]Self-Improvement Analysis[/bold]\n")
+    console.print(f"  Run ID:            {result.get('run_id', '')}")
+    console.print(
+        f"  Findings analyzed: {result.get('total_findings_analyzed', 0)}",
+    )
+    console.print(
+        f"  Patterns detected: {result.get('patterns_detected', 0)}",
+    )
+    console.print(
+        f"  Candidates:        {result.get('candidates_generated', 0)}",
+    )
+
+    patterns = result.get("patterns", [])
+    if patterns:
+        console.print("\n[bold]Patterns:[/bold]")
+        for p in patterns:
+            console.print(
+                f"  - {p['pattern_kind']}: {p['occurrence_count']} occurrence(s)",
+            )
+
+    candidates = result.get("candidates", [])
+    if candidates:
+        console.print("\n[bold]Candidates:[/bold]")
+        for c in candidates:
+            console.print(
+                f"  [{c['priority']}] [{c['category']}] {c['title']}",
+            )
+
+    summary = result.get("summary", {})
+    top_rec = summary.get("top_recommendation", "")
+    if top_rec:
+        console.print(f"\n[bold]Top Recommendation:[/bold]\n  {top_rec}")
+
+
+def _render_improvement_candidate_rich(data: dict) -> None:
+    """Render a single improvement candidate in rich text."""
+    console.print(
+        f"\n[bold]Improvement Candidate ({data.get('status', '').upper()})[/bold]",
+    )
+    console.print(f"  ID:             {data.get('candidate_id', '')}")
+    console.print(f"  Title:          {data.get('title', '')}")
+    console.print(f"  Category:       {data.get('category', '')}")
+    console.print(f"  Priority:       {data.get('priority', '')}")
+    console.print(f"  Status:         {data.get('status', '')}")
+
+    if data.get("description"):
+        console.print(f"\n[bold]Description:[/bold]\n  {data['description']}")
+
+    if data.get("recommendation"):
+        console.print(
+            f"\n[bold]Recommendation:[/bold]\n  {data['recommendation']}",
+        )
+
+    source = data.get("source_findings", [])
+    if source:
+        console.print(
+            f"\n[bold]Source Findings:[/bold] ({len(source)} finding(s))",
+        )
+        for s in source:
+            console.print(f"  - {s}")
+
+    targets = data.get("target_files", [])
+    if targets:
+        console.print(
+            f"\n[bold]Target Files:[/bold] ({len(targets)} file(s))",
+        )
+        for t in targets:
+            console.print(f"  - {t}")
+
+
 if __name__ == "__main__":
     cli()

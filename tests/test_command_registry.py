@@ -78,6 +78,8 @@ EXPECTED_AXIOM_COMMANDS = {
     "pr-draft", "pr-drafts", "pr-draft-show",
     "review-findings", "review-finding", "review-finding-ingest",
     "review-finding-create", "review-finding-update", "review-patterns",
+    "self-improvement", "improvement-candidates", "improvement-candidate",
+    "improvement-patterns",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 
