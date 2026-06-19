@@ -1709,6 +1709,68 @@ _register(
 
 
 # ---------------------------------------------------------------------------
+# Codebase Inventory and Symbol Registry commands (PR #57)
+# ---------------------------------------------------------------------------
+
+
+_register(
+    CommandSpec(
+        name="code-inventory",
+        command="axiom code-inventory [--refresh] [--category <category>] [--json-output]",
+        description=(
+            "Codebase Inventory: list or refresh the file inventory. "
+            "Read-only scan — never modifies source files."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=("File inventory table/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=120,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only repo scan. --refresh rescans all files. No code modification.",
+    )
+)
+
+
+_register(
+    CommandSpec(
+        name="code-symbols",
+        command="axiom code-symbols [--kind <kind>] [--file <path>] [--json-output]",
+        description=(
+            "Codebase Symbol Registry: list code symbols. "
+            "Read-only query over persisted symbol inventory."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("Symbol list table/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only symbol query. Requires code-inventory --refresh first.",
+    )
+)
+
+
+_register(
+    CommandSpec(
+        name="code-symbol",
+        command="axiom code-symbol --name <symbol> [--json-output]",
+        description=(
+            "Codebase Symbol Registry: show details for a specific symbol "
+            "by name or qualified name."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("Symbol details/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only symbol lookup. Returns exit 2 for unknown symbols.",
+    )
+)
+
+
+# ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
 

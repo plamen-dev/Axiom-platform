@@ -69,6 +69,7 @@ EXPECTED_AXIOM_COMMANDS = {
     "validation-request", "validation-request-create", "validation-requests",
     "validation-run", "workflows",
     "work-item", "work-item-create", "work-item-update", "work-items",
+    "code-inventory", "code-symbols", "code-symbol",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 

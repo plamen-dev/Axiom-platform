@@ -6239,5 +6239,181 @@ def work_item_update_cmd(
     console.print(f"  Priority: {item.priority.value}")
 
 
+# ---------------------------------------------------------------------------
+# Codebase Inventory and Symbol Registry commands (PR #57)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("code-inventory")
+@click.option("--refresh", "do_refresh", is_flag=True, help="Rescan the repo")
+@click.option(
+    "--category",
+    "category_str",
+    default=None,
+    help="Filter by category (source, test, cli, architecture_doc, runbook, log_doc, config, artifact, other)",
+)
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+def code_inventory_cmd(
+    do_refresh: bool,
+    category_str: Optional[str],
+    as_json: bool,
+):
+    """Show codebase file inventory or rescan."""
+    from pathlib import Path
+
+    from axiom_core.codebase_inventory import (
+        CodebaseInventory,
+        CodeSymbolRegistry,
+        FileCategory,
+    )
+
+    repo_root = Path.cwd()
+    registry = CodeSymbolRegistry()
+
+    if do_refresh:
+        scanner = CodebaseInventory(repo_root)
+        files, symbols, coverage_refs = scanner.scan()
+        surface = registry.refresh(files, symbols, coverage_refs)
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps(surface.to_dict(), indent=2, default=str))
+            return
+        console.print(f"[green]Inventory refreshed:[/green] {surface.total_files} files, {surface.total_symbols} symbols")
+        for cat, count in sorted(surface.files_by_category.items()):
+            console.print(f"  {cat}: {count}")
+        return
+
+    category = None
+    if category_str is not None:
+        try:
+            category = FileCategory(category_str)
+        except ValueError:
+            valid = ", ".join(c.value for c in FileCategory)
+            console.print(f"[red]Invalid category:[/red] {category_str}. Valid: {valid}")
+            raise SystemExit(1)
+
+    files = registry.list_files(category=category)
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps([f.to_dict() for f in files], indent=2, default=str))
+        return
+
+    if not files:
+        console.print("[dim]No files in inventory. Run with --refresh first.[/dim]")
+        return
+
+    table = Table(title="Codebase Files")
+    table.add_column("Path", style="cyan")
+    table.add_column("Category")
+    table.add_column("Module")
+    table.add_column("Lines", justify="right")
+    for f in files:
+        table.add_row(
+            f.path[:60],
+            f.category.value,
+            (f.module_name or "-")[:40],
+            str(f.line_count),
+        )
+    console.print(table)
+
+
+@cli.command("code-symbols")
+@click.option("--kind", "kind_str", default=None, help="Filter by kind (class, function, cli_command, enum, constant, module)")
+@click.option("--file", "file_path", default=None, help="Filter by file path")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+def code_symbols_cmd(
+    kind_str: Optional[str],
+    file_path: Optional[str],
+    as_json: bool,
+):
+    """List code symbols in the inventory."""
+    from axiom_core.codebase_inventory import (
+        CodeSymbolRegistry,
+        SymbolKind,
+    )
+
+    registry = CodeSymbolRegistry()
+
+    kind = None
+    if kind_str is not None:
+        try:
+            kind = SymbolKind(kind_str)
+        except ValueError:
+            valid = ", ".join(k.value for k in SymbolKind)
+            console.print(f"[red]Invalid kind:[/red] {kind_str}. Valid: {valid}")
+            raise SystemExit(1)
+
+    symbols = registry.list_symbols(kind=kind, file_path=file_path)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps([s.to_dict() for s in symbols], indent=2, default=str))
+        return
+
+    if not symbols:
+        console.print("[dim]No symbols found. Run code-inventory --refresh first.[/dim]")
+        return
+
+    table = Table(title="Code Symbols")
+    table.add_column("Name", style="cyan")
+    table.add_column("Kind")
+    table.add_column("File")
+    table.add_column("Line", justify="right")
+    table.add_column("Parent")
+    for s in symbols:
+        table.add_row(
+            s.name[:40],
+            s.kind.value,
+            s.file_path[:40],
+            str(s.line_number),
+            (s.parent_symbol or "-")[:20],
+        )
+    console.print(table)
+
+
+@cli.command("code-symbol")
+@click.option("--name", required=True, help="Symbol name or qualified name")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+def code_symbol_cmd(
+    name: str,
+    as_json: bool,
+):
+    """Show details for a specific code symbol."""
+    from axiom_core.codebase_inventory import CodeSymbolRegistry
+
+    registry = CodeSymbolRegistry()
+    matches = registry.get_symbol(name)
+
+    if not matches:
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps({"error": "not_found", "name": name}, indent=2))
+        else:
+            console.print(f"[red]Symbol not found:[/red] {name}")
+        raise SystemExit(2)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps([s.to_dict() for s in matches], indent=2, default=str))
+        return
+
+    for s in matches:
+        console.print(f"\n[bold]{s.qualified_name}[/bold]")
+        console.print(f"  Kind:    {s.kind.value}")
+        console.print(f"  File:    {s.file_path}")
+        console.print(f"  Line:    {s.line_number}")
+        if s.parent_symbol:
+            console.print(f"  Parent:  {s.parent_symbol}")
+        if s.docstring:
+            console.print(f"  Doc:     {s.docstring[:100]}")
+        if s.metadata:
+            console.print(f"  Meta:    {s.metadata}")
+
+
 if __name__ == "__main__":
     cli()
