@@ -1771,6 +1771,30 @@ _register(
 
 
 # ---------------------------------------------------------------------------
+# Implementation Plan Generator commands (PR #58)
+# ---------------------------------------------------------------------------
+
+
+_register(
+    CommandSpec(
+        name="implementation-plan",
+        command="axiom implementation-plan --work-item <id> [--json-output]",
+        description=(
+            "Implementation Plan Generator: generate a structured implementation "
+            "plan from an approved work item. Read-only — never modifies files."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=("Implementation plan table/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=120,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only plan generation. Requires approved work item + code inventory.",
+    )
+)
+
+
+# ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
 

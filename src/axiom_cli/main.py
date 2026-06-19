@@ -6415,5 +6415,103 @@ def code_symbol_cmd(
             console.print(f"  Meta:    {s.metadata}")
 
 
+# ---------------------------------------------------------------------------
+# Implementation Plan Generator commands (PR #58)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("implementation-plan")
+@click.option("--work-item", "work_item_id", required=True, help="Work item ID to plan")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+def implementation_plan_cmd(
+    work_item_id: str,
+    as_json: bool,
+):
+    """Generate an implementation plan from an approved work item."""
+    from axiom_core.codebase_inventory import CodeSymbolRegistry
+    from axiom_core.implementation_planner import ImplementationPlanner
+    from axiom_core.work_item_registry import WorkItemRegistry
+
+    planner = ImplementationPlanner()
+    work_items = WorkItemRegistry()
+    code_reg = CodeSymbolRegistry()
+
+    knowledge_graph = None
+    try:
+        from axiom_core.knowledge_graph import KnowledgeGraph
+
+        knowledge_graph = KnowledgeGraph()
+    except Exception:
+        pass
+
+    try:
+        plan = planner.generate(
+            work_item_id=work_item_id,
+            work_item_registry=work_items,
+            code_registry=code_reg,
+            knowledge_graph=knowledge_graph,
+        )
+    except ValueError as exc:
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps(plan.to_dict(), indent=2, default=str))
+        return
+
+    console.print(f"\n[bold]{plan.title}[/bold]")
+    console.print(f"  Plan ID:     {plan.plan_id}")
+    console.print(f"  Work Item:   {plan.work_item_id}")
+    console.print(f"  Status:      {plan.status.value}")
+    console.print(f"  Summary:     {plan.summary}")
+
+    if plan.steps:
+        console.print("\n[bold]Steps:[/bold]")
+        for step in plan.steps:
+            console.print(f"  {step.step_number}. {step.description}")
+            if step.target_files:
+                for tf in step.target_files:
+                    console.print(f"     → {tf}")
+
+    if plan.file_changes:
+        console.print("\n[bold]File Changes:[/bold]")
+        table = Table()
+        table.add_column("File", style="cyan")
+        table.add_column("Change")
+        table.add_column("Description")
+        for fc in plan.file_changes:
+            table.add_row(fc.file_path[:50], fc.change_type.value, fc.description[:50])
+        console.print(table)
+
+    if plan.test_plan.test_files:
+        console.print("\n[bold]Test Files:[/bold]")
+        for tf in plan.test_plan.test_files:
+            console.print(f"  • {tf}")
+
+    if plan.risks:
+        console.print("\n[bold]Risks:[/bold]")
+        for r in plan.risks:
+            console.print(f"  [{r.level.value.upper()}] {r.description}")
+            if r.mitigation:
+                console.print(f"         Mitigation: {r.mitigation}")
+
+    if plan.non_goals:
+        console.print("\n[bold]Non-Goals:[/bold]")
+        for ng in plan.non_goals:
+            console.print(f"  • {ng}")
+
+    if plan.evidence_requirements:
+        console.print("\n[bold]Evidence Requirements:[/bold]")
+        for er in plan.evidence_requirements:
+            console.print(f"  • {er}")
+
+
 if __name__ == "__main__":
     cli()
