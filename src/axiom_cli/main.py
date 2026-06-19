@@ -8251,6 +8251,307 @@ def _render_regression_candidate_rich(candidate: dict) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Autonomous Coding Session Registry v1 (PR #70)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("coding-session-create")
+@click.option("--title", required=True, help="Session title.")
+@click.option("--description", default="", help="Session description.")
+@click.option("--work-item-id", default="", help="Linked work item ID.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def coding_session_create_cmd(
+    title: str,
+    description: str,
+    work_item_id: str,
+    json_output: bool,
+):
+    """Create a new coding session."""
+    from axiom_core.coding_session_registry import CodingSessionRegistry
+
+    try:
+        registry = CodingSessionRegistry()
+        session = registry.create_session(
+            title=title,
+            description=description,
+            work_item_id=work_item_id,
+        )
+        registry.write_evidence(session["session_id"])
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(session, indent=2, default=str))
+    else:
+        _render_session_rich(session)
+
+
+@cli.command("coding-sessions")
+@click.option("--status", default="", help="Filter by status.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def coding_sessions_cmd(status: str, json_output: bool):
+    """List all coding sessions."""
+    from axiom_core.coding_session_registry import CodingSessionRegistry
+
+    try:
+        registry = CodingSessionRegistry()
+        sessions = registry.list_sessions(status=status)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(sessions, indent=2, default=str))
+    else:
+        console.print(f"\n[bold]Coding Sessions ({len(sessions)})[/bold]\n")
+        for s in sessions:
+            console.print(
+                f"  [{s['status']}] {s['session_id'][:12]}… "
+                f"— {s['title']}",
+            )
+
+
+@cli.command("coding-session")
+@click.option("--session-id", required=True, help="Session ID.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def coding_session_cmd(session_id: str, json_output: bool):
+    """Show a single coding session."""
+    from axiom_core.coding_session_registry import CodingSessionRegistry
+
+    try:
+        registry = CodingSessionRegistry()
+        session = registry.get_session(session_id)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if session is None:
+        msg = {"error": f"Session not found: {session_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Session not found: {session_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(session, indent=2, default=str))
+    else:
+        _render_session_rich(session)
+
+
+@cli.command("coding-session-update")
+@click.option("--session-id", required=True, help="Session ID.")
+@click.option("--status", required=True, help="New status.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def coding_session_update_cmd(
+    session_id: str, status: str, json_output: bool,
+):
+    """Update a coding session status."""
+    from axiom_core.coding_session_registry import CodingSessionRegistry
+
+    try:
+        registry = CodingSessionRegistry()
+        session = registry.update_status(session_id, status)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if session is None:
+        msg = {"error": f"Session not found: {session_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Session not found: {session_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(session, indent=2, default=str))
+    else:
+        _render_session_rich(session)
+
+
+@cli.command("coding-session-add-step")
+@click.option("--session-id", required=True, help="Session ID.")
+@click.option("--kind", required=True, help="Step kind.")
+@click.option("--description", required=True, help="Step description.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def coding_session_add_step_cmd(
+    session_id: str, kind: str, description: str, json_output: bool,
+):
+    """Add a step to a coding session."""
+    from axiom_core.coding_session_registry import CodingSessionRegistry
+
+    try:
+        registry = CodingSessionRegistry()
+        session = registry.add_step(session_id, kind, description)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if session is None:
+        msg = {"error": f"Session not found: {session_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Session not found: {session_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(session, indent=2, default=str))
+    else:
+        console.print(f"[green]Step added to session {session_id}[/green]")
+
+
+@cli.command("coding-session-add-artifact")
+@click.option("--session-id", required=True, help="Session ID.")
+@click.option("--kind", required=True, help="Artifact kind.")
+@click.option("--reference-id", default="", help="Reference ID.")
+@click.option("--path", "artifact_path", default="", help="Artifact path.")
+@click.option("--description", default="", help="Description.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def coding_session_add_artifact_cmd(
+    session_id: str,
+    kind: str,
+    reference_id: str,
+    artifact_path: str,
+    description: str,
+    json_output: bool,
+):
+    """Add an artifact to a coding session."""
+    from axiom_core.coding_session_registry import CodingSessionRegistry
+
+    try:
+        registry = CodingSessionRegistry()
+        session = registry.add_artifact(
+            session_id, kind, reference_id, artifact_path, description,
+        )
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if session is None:
+        msg = {"error": f"Session not found: {session_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Session not found: {session_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(session, indent=2, default=str))
+    else:
+        console.print(f"[green]Artifact added to session {session_id}[/green]")
+
+
+@cli.command("coding-session-link")
+@click.option("--session-id", required=True, help="Session ID.")
+@click.option("--field", "field_name", required=True, help="Field to link.")
+@click.option("--id", "linked_id", required=True, help="ID to link.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def coding_session_link_cmd(
+    session_id: str,
+    field_name: str,
+    linked_id: str,
+    json_output: bool,
+):
+    """Link an ID to a coding session field."""
+    from axiom_core.coding_session_registry import CodingSessionRegistry
+
+    try:
+        registry = CodingSessionRegistry()
+        session = registry.link_id(session_id, field_name, linked_id)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if session is None:
+        msg = {"error": f"Session not found: {session_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Session not found: {session_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(session, indent=2, default=str))
+    else:
+        console.print(
+            f"[green]Linked {field_name}={linked_id} to session {session_id}[/green]",
+        )
+
+
+def _render_session_rich(session: dict) -> None:
+    """Render session details in rich text."""
+    console.print("\n[bold]Coding Session[/bold]\n")
+    console.print(f"  Session ID:     {session.get('session_id', '')}")
+    console.print(f"  Title:          {session.get('title', '')}")
+    console.print(f"  Status:         {session.get('status', '')}")
+    if session.get("work_item_id"):
+        console.print(f"  Work Item:      {session['work_item_id']}")
+    if session.get("patch_proposal_id"):
+        console.print(f"  Patch Proposal: {session['patch_proposal_id']}")
+    if session.get("validation_run_id"):
+        console.print(f"  Validation Run: {session['validation_run_id']}")
+
+    steps = session.get("steps", [])
+    if steps:
+        console.print(f"\n[bold]Steps ({len(steps)}):[/bold]")
+        for s in steps:
+            console.print(
+                f"  [{s['status']}] {s['kind']}: {s['description']}",
+            )
+
+    artifacts = session.get("artifacts", [])
+    if artifacts:
+        console.print(f"\n[bold]Artifacts ({len(artifacts)}):[/bold]")
+        for a in artifacts:
+            console.print(f"  [{a['kind']}] {a['description'] or a['path']}")
+
+    blockers = session.get("blockers", [])
+    if blockers:
+        console.print("\n[bold]Blockers:[/bold]")
+        for b in blockers:
+            console.print(f"  - {b}")
+
+    cost = session.get("cost_estimate", {})
+    if cost:
+        console.print("\n[bold]Cost Estimate:[/bold]")
+        console.print(f"  Total steps:    {cost.get('total_steps', 0)}")
+        console.print(f"  Completed:      {cost.get('completed_steps', 0)}")
+        console.print(f"  Remaining:      {cost.get('estimated_remaining', 0)}")
+
+
+
+# ---------------------------------------------------------------------------
 # Code Review Policy Engine v1 (PR #69)
 # ---------------------------------------------------------------------------
 

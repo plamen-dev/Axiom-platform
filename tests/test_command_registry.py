@@ -86,6 +86,9 @@ EXPECTED_AXIOM_COMMANDS = {
     "regression-test-update", "regression-test-patterns",
     "impact-analyze", "impact-analyze-files",
     "policy-evaluate", "policy-evaluate-files", "policy-list",
+    "coding-session-create", "coding-sessions", "coding-session",
+    "coding-session-update", "coding-session-add-step",
+    "coding-session-add-artifact", "coding-session-link",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 

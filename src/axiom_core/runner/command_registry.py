@@ -2548,6 +2548,149 @@ _register(
 
 
 # ---------------------------------------------------------------------------
+# Autonomous Coding Session Registry v1 (PR #70)
+# ---------------------------------------------------------------------------
+
+_register(
+    CommandSpec(
+        name="coding-session-create",
+        command=(
+            "axiom coding-session-create --title <t> "
+            "[--description <d>] [--work-item-id <id>] [--json-output]"
+        ),
+        description="Create a new autonomous coding session.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=(
+            EvidenceOutput("session_request.json", required=True),
+            EvidenceOutput("session_result.json", required=True),
+            EvidenceOutput("session_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Creates a durable coding session with evidence bundle.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="coding-sessions",
+        command="axiom coding-sessions [--status <s>] [--json-output]",
+        description="List all coding sessions.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=(
+            EvidenceOutput("session_list.json", required=True),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only listing of coding sessions.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="coding-session",
+        command="axiom coding-session --session-id <id> [--json-output]",
+        description="Show a single coding session by ID.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=(
+            EvidenceOutput("session_result.json", required=True),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only session detail.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="coding-session-update",
+        command=(
+            "axiom coding-session-update --session-id <id> "
+            "--status <s> [--json-output]"
+        ),
+        description="Update a coding session status.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=(
+            EvidenceOutput("session_result.json", required=True),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Status update for session lifecycle.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="coding-session-add-step",
+        command=(
+            "axiom coding-session-add-step --session-id <id> "
+            "--kind <k> --description <d> [--json-output]"
+        ),
+        description="Add a step to a coding session.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=(
+            EvidenceOutput("session_result.json", required=True),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Append a step to session history.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="coding-session-add-artifact",
+        command=(
+            "axiom coding-session-add-artifact --session-id <id> "
+            "--kind <k> [--reference-id <r>] [--path <p>] "
+            "[--description <d>] [--json-output]"
+        ),
+        description="Add an artifact to a coding session.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=(
+            EvidenceOutput("session_result.json", required=True),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Append an artifact reference to session.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="coding-session-link",
+        command=(
+            "axiom coding-session-link --session-id <id> "
+            "--field <f> --id <linked_id> [--json-output]"
+        ),
+        description="Link an ID to a coding session field.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=(
+            EvidenceOutput("session_result.json", required=True),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Link work item, patch, or validation IDs to session.",
+    )
+)
+
+
+# ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
 
