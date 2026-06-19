@@ -2082,6 +2082,114 @@ _register(
 
 
 # ---------------------------------------------------------------------------
+# Review Finding Ingestion commands (PR #64)
+# ---------------------------------------------------------------------------
+
+
+_register(
+    CommandSpec(
+        name="review-findings",
+        command="axiom review-findings [--category <cat>] [--severity <sev>] [--status <status>] [--pattern <kind>] [--json-output]",
+        description="List review findings with optional filters.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=("Review findings listing (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only listing of review findings.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="review-finding",
+        command="axiom review-finding --id <id> [--json-output]",
+        description="Show details of a specific review finding.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=("Review finding details/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only detail view. Returns exit 2 for unknown finding IDs.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="review-finding-ingest",
+        command="axiom review-finding-ingest [--draft-id <id>] [--source-dir <dir>] [--json-output]",
+        description=(
+            "Ingest review findings from evidence bundles. Scans PR draft "
+            "artifacts and validation runs for findings. No automatic "
+            "repair, no code modification."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=(
+            "review_request.json",
+            "review_result.json",
+            "review_summary.md",
+            "pass_fail.json",
+        ) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes=(
+            "Ingests findings from evidence bundles. No automatic repair, "
+            "no code modification, no GitHub API, no network dependency."
+        ),
+    )
+)
+
+_register(
+    CommandSpec(
+        name="review-finding-create",
+        command="axiom review-finding-create --title <title> [--category <cat>] [--severity <sev>] [--source-pr <pr>] [--source-file <file>] [--draft-id <id>] [--json-output]",
+        description="Create a new review finding manually.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=("Review finding details/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Creates a finding record in SQLite. No code modification.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="review-finding-update",
+        command="axiom review-finding-update --id <id> [--status <status>] [--resolution <text>] [--json-output]",
+        description="Update a review finding's status or resolution.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=("Review finding details/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Updates finding status/resolution. No code modification.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="review-patterns",
+        command="axiom review-patterns [--kind <kind>] [--json-output]",
+        description="List detected review finding patterns.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=("Review patterns listing (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only listing of detected review patterns.",
+    )
+)
+
+
+# ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
 

@@ -7263,5 +7263,314 @@ def _render_pr_draft_rich(data: dict):
         console.print(f"\n[red]Error:[/red] {data['error']}")
 
 
+# ---------------------------------------------------------------------------
+# Review Finding Ingestion commands (PR #64)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("review-findings")
+@click.option("--category", default="", help="Filter by category.")
+@click.option("--severity", default="", help="Filter by severity.")
+@click.option("--status", default="", help="Filter by status.")
+@click.option("--pattern", default="", help="Filter by pattern kind.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def review_findings_cmd(
+    category: str, severity: str, status: str, pattern: str, json_output: bool,
+):
+    """List review findings with optional filters."""
+    from axiom_core.review_finding_registry import ReviewFindingRegistry
+
+    registry = ReviewFindingRegistry()
+    findings = registry.list_findings(
+        category=category, severity=severity, status=status, pattern=pattern,
+    )
+
+    if json_output:
+        click.echo(json.dumps(
+            [f.to_dict() for f in findings], indent=2, default=str,
+        ))
+    else:
+        if not findings:
+            console.print("[dim]No review findings found.[/dim]")
+            return
+        console.print(f"\n[bold]Review Findings[/bold] ({len(findings)} total)\n")
+        for f in findings:
+            sev_color = {
+                "critical": "red", "high": "red", "medium": "yellow",
+                "low": "dim", "informational": "dim",
+            }.get(f.severity, "white")
+            status_marker = {
+                "open": "[yellow]OPEN[/yellow]",
+                "acknowledged": "[blue]ACK[/blue]",
+                "resolved": "[green]RESOLVED[/green]",
+                "wont_fix": "[dim]WONT_FIX[/dim]",
+                "duplicate": "[dim]DUPLICATE[/dim]",
+            }.get(f.status, f.status)
+            console.print(
+                f"  {status_marker}  [{sev_color}]{f.severity}[/{sev_color}]"
+                f"  [{f.category}]  {f.title}  ({f.finding_id[:12]}...)",
+            )
+
+
+@cli.command("review-finding")
+@click.option("--id", "finding_id", required=True, help="Finding ID.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def review_finding_cmd(finding_id: str, json_output: bool):
+    """Show details of a specific review finding."""
+    from axiom_core.review_finding_registry import ReviewFindingRegistry
+
+    try:
+        registry = ReviewFindingRegistry()
+        finding = registry.get_finding(finding_id)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if finding is None:
+        msg = {"error": f"Finding not found: {finding_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Finding not found: {finding_id}")
+        raise SystemExit(2)
+
+    data = finding.to_dict()
+    if json_output:
+        click.echo(json.dumps(data, indent=2, default=str))
+    else:
+        _render_review_finding_rich(data)
+
+    # Show history
+    history = registry.get_history(finding_id)
+    if history and not json_output:
+        console.print("\n[bold]History:[/bold]")
+        for h in history:
+            console.print(
+                f"  {h.timestamp}  {h.action}"
+                f"  {h.old_value or ''} -> {h.new_value or ''}"
+                f"  ({h.actor or 'system'})",
+            )
+
+
+@cli.command("review-finding-ingest")
+@click.option("--draft-id", default="", help="PR draft ID to ingest from.")
+@click.option("--source-dir", default="", help="Directory with finding JSON files.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def review_finding_ingest_cmd(
+    draft_id: str, source_dir: str, json_output: bool,
+):
+    """Ingest review findings from evidence bundles."""
+    from axiom_core.review_finding_registry import ReviewFindingRegistry
+
+    if not draft_id and not source_dir:
+        msg = {"error": "At least one of --draft-id or --source-dir required"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(
+                "[red]Error:[/red] At least one of --draft-id or --source-dir required",
+            )
+        raise SystemExit(1)
+
+    try:
+        registry = ReviewFindingRegistry()
+        findings = registry.ingest_from_evidence(
+            source_dir=source_dir, draft_id=draft_id,
+        )
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(
+            [f.to_dict() for f in findings], indent=2, default=str,
+        ))
+    else:
+        if not findings:
+            console.print("[dim]No findings ingested.[/dim]")
+        else:
+            console.print(
+                f"\n[bold]Ingested {len(findings)} finding(s)[/bold]\n",
+            )
+            for f in findings:
+                console.print(
+                    f"  [{f.severity}] [{f.category}] {f.title}"
+                    f"  ({f.finding_id[:12]}...)",
+                )
+
+
+@cli.command("review-finding-create")
+@click.option("--title", required=True, help="Finding title.")
+@click.option("--description", default="", help="Finding description.")
+@click.option(
+    "--category", default="informational",
+    type=click.Choice(
+        ["bug", "flag", "security", "architecture", "performance",
+         "style", "informational"],
+        case_sensitive=False,
+    ),
+    help="Finding category.",
+)
+@click.option(
+    "--severity", default="informational",
+    type=click.Choice(
+        ["critical", "high", "medium", "low", "informational"],
+        case_sensitive=False,
+    ),
+    help="Finding severity.",
+)
+@click.option("--source-pr", default="", help="Source PR reference.")
+@click.option("--source-file", default="", help="Source file path.")
+@click.option("--draft-id", default="", help="Related PR draft ID.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def review_finding_create_cmd(
+    title: str,
+    description: str,
+    category: str,
+    severity: str,
+    source_pr: str,
+    source_file: str,
+    draft_id: str,
+    json_output: bool,
+):
+    """Create a new review finding manually."""
+    from axiom_core.review_finding_registry import ReviewFindingRegistry
+
+    try:
+        registry = ReviewFindingRegistry()
+        finding = registry.create_finding(
+            title=title,
+            description=description,
+            category=category,
+            severity=severity,
+            source_pr=source_pr,
+            source_file=source_file,
+            draft_id=draft_id,
+        )
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    data = finding.to_dict()
+    if json_output:
+        click.echo(json.dumps(data, indent=2, default=str))
+    else:
+        console.print("\n[bold]Created review finding[/bold]")
+        _render_review_finding_rich(data)
+
+
+@cli.command("review-finding-update")
+@click.option("--id", "finding_id", required=True, help="Finding ID.")
+@click.option(
+    "--status", default="",
+    type=click.Choice(
+        ["", "open", "acknowledged", "resolved", "wont_fix"],
+        case_sensitive=False,
+    ),
+    help="New status.",
+)
+@click.option("--resolution", default="", help="Resolution description.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def review_finding_update_cmd(
+    finding_id: str, status: str, resolution: str, json_output: bool,
+):
+    """Update a review finding's status or resolution."""
+    from axiom_core.review_finding_registry import ReviewFindingRegistry
+
+    try:
+        registry = ReviewFindingRegistry()
+        finding = registry.update_finding(
+            finding_id=finding_id, status=status, resolution=resolution,
+        )
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    data = finding.to_dict()
+    if json_output:
+        click.echo(json.dumps(data, indent=2, default=str))
+    else:
+        console.print("\n[bold]Updated review finding[/bold]")
+        _render_review_finding_rich(data)
+
+
+@cli.command("review-patterns")
+@click.option("--kind", default="", help="Filter by pattern kind.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def review_patterns_cmd(kind: str, json_output: bool):
+    """List detected review finding patterns."""
+    from axiom_core.review_finding_registry import ReviewFindingRegistry
+
+    registry = ReviewFindingRegistry()
+    patterns = registry.list_patterns(kind=kind)
+
+    if json_output:
+        click.echo(json.dumps(
+            [p.to_dict() for p in patterns], indent=2, default=str,
+        ))
+    else:
+        if not patterns:
+            console.print("[dim]No review patterns found.[/dim]")
+            return
+        console.print(f"\n[bold]Review Patterns[/bold] ({len(patterns)} total)\n")
+        for p in patterns:
+            console.print(
+                f"  [{p.kind}]  {p.description}  "
+                f"(finding: {p.finding_id[:12]}...)",
+            )
+
+
+def _render_review_finding_rich(data: dict):
+    """Render a review finding in rich text format."""
+    sev = data.get("severity", "?")
+    cat = data.get("category", "?")
+    status = data.get("status", "?")
+    console.print(f"\n[bold]Review Finding[/bold] ({status.upper()})")
+    console.print(f"  ID:          {data.get('finding_id', '?')}")
+    console.print(f"  Title:       {data.get('title', '?')}")
+    console.print(f"  Category:    {cat}")
+    console.print(f"  Severity:    {sev}")
+    console.print(f"  Status:      {status}")
+    console.print(f"  Pattern:     {data.get('pattern', '?')}")
+
+    if data.get("source_pr"):
+        console.print(f"  Source PR:   {data['source_pr']}")
+    if data.get("source_file"):
+        console.print(f"  Source file: {data['source_file']}")
+    if data.get("draft_id"):
+        console.print(f"  Draft ID:    {data['draft_id']}")
+
+    desc = data.get("description", "")
+    if desc:
+        console.print("\n[bold]Description:[/bold]")
+        for line in desc.split("\n"):
+            console.print(f"  {line}")
+
+    if data.get("resolution"):
+        console.print(f"\n[bold]Resolution:[/bold] {data['resolution']}")
+
+    evidence = data.get("evidence", [])
+    if evidence:
+        console.print(f"\n[bold]Evidence:[/bold] ({len(evidence)} item(s))")
+        for e in evidence:
+            console.print(f"  - {e}")
+
+
 if __name__ == "__main__":
     cli()
