@@ -81,6 +81,9 @@ EXPECTED_AXIOM_COMMANDS = {
     "self-improvement", "improvement-candidates", "improvement-candidate",
     "improvement-patterns",
     "test-selection", "test-selection-files",
+    "regression-test-generate", "regression-test-create",
+    "regression-test-candidates", "regression-test-candidate",
+    "regression-test-update", "regression-test-patterns",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 

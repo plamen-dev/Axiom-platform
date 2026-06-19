@@ -2324,6 +2324,127 @@ _register(
 
 
 # ---------------------------------------------------------------------------
+# Regression Test Generator v1 (PR #67)
+# ---------------------------------------------------------------------------
+
+_register(
+    CommandSpec(
+        name="regression-test-generate",
+        command="axiom regression-test-generate [--json-output]",
+        description=(
+            "Generate regression test candidates from review findings. "
+            "Advisory-only — does not modify test files."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=(
+            EvidenceOutput("regression_request.json", required=True),
+            EvidenceOutput("regression_result.json", required=True),
+            EvidenceOutput("regression_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes=(
+            "Reads review findings from DB, generates test recommendations. "
+            "No test file modification, no code generation, no network."
+        ),
+    )
+)
+
+_register(
+    CommandSpec(
+        name="regression-test-create",
+        command=(
+            "axiom regression-test-create --title <t> "
+            "--failure-origin <origin> [--bug-class <c>] "
+            "[--target-file <f>] [--finding-id <id>] "
+            "[--work-item-id <id>] [--json-output]"
+        ),
+        description=(
+            "Create a single regression test candidate from explicit input."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Creates and persists one regression test candidate.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="regression-test-candidates",
+        command=(
+            "axiom regression-test-candidates [--bug-class <c>] "
+            "[--status <s>] [--priority <p>] [--json-output]"
+        ),
+        description="List regression test candidates with optional filters.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only listing of regression test candidates.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="regression-test-candidate",
+        command=(
+            "axiom regression-test-candidate --id <id> [--json-output]"
+        ),
+        description="Show a single regression test candidate by ID.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only retrieval of a single regression test candidate.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="regression-test-update",
+        command=(
+            "axiom regression-test-update --id <id> --status <s> "
+            "[--json-output]"
+        ),
+        description="Update a regression test candidate status.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Updates candidate status (proposed/accepted/rejected/etc).",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="regression-test-patterns",
+        command="axiom regression-test-patterns [--json-output]",
+        description="List detected bug patterns from regression analysis.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only listing of detected bug patterns.",
+    )
+)
+
+
+# ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
 

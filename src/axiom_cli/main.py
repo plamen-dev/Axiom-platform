@@ -7918,5 +7918,337 @@ def _render_test_selection_rich(plan) -> None:
             console.print(f"  - {r}")
 
 
+# ---------------------------------------------------------------------------
+# Regression Test Generator v1 (PR #67)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("regression-test-generate")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def regression_test_generate_cmd(json_output: bool):
+    """Generate regression test candidates from review findings.
+
+    Analyzes review findings and generates structured test
+    recommendations. Advisory-only — does not modify test files.
+    """
+    from axiom_core.regression_test_generator import RegressionTestGenerator
+
+    try:
+        generator = RegressionTestGenerator()
+        result = generator.generate_from_findings()
+        generator.write_evidence(result)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+    else:
+        _render_regression_result_rich(result)
+
+
+@cli.command("regression-test-create")
+@click.option("--title", required=True, help="Bug/failure title.")
+@click.option(
+    "--description", default="", help="Detailed description.",
+)
+@click.option(
+    "--failure-origin",
+    type=click.Choice([
+        "review_finding", "runtime_failure", "policy_violation",
+        "human_review", "external_review", "security",
+    ]),
+    required=True,
+    help="Origin of the failure.",
+)
+@click.option(
+    "--bug-class",
+    type=click.Choice([
+        "truthiness_bug", "enum_serialization", "persistence_defect",
+        "evidence_failure", "cli_exit_code", "refusal_path",
+        "malformed_input", "path_traversal", "command_injection",
+        "silent_exception", "stage_ordering", "duplicated_logic", "other",
+    ]),
+    default=None,
+    help="Bug classification (auto-detected if omitted).",
+)
+@click.option("--target-file", default="", help="Affected source file.")
+@click.option("--finding-id", default="", help="Source review finding ID.")
+@click.option("--work-item-id", default="", help="Source work item ID.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def regression_test_create_cmd(
+    title: str,
+    description: str,
+    failure_origin: str,
+    bug_class: str | None,
+    target_file: str,
+    finding_id: str,
+    work_item_id: str,
+    json_output: bool,
+):
+    """Create a single regression test candidate."""
+    from axiom_core.regression_test_generator import RegressionTestGenerator
+
+    try:
+        generator = RegressionTestGenerator()
+        candidate = generator.generate_from_input(
+            title=title,
+            description=description,
+            failure_origin=failure_origin,
+            bug_class=bug_class or "",
+            target_file=target_file,
+            source_finding_id=finding_id,
+            source_work_item_id=work_item_id,
+        )
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(candidate.to_dict(), indent=2, default=str))
+    else:
+        _render_regression_candidate_rich(candidate.to_dict())
+
+
+@cli.command("regression-test-candidates")
+@click.option(
+    "--bug-class",
+    type=click.Choice([
+        "truthiness_bug", "enum_serialization", "persistence_defect",
+        "evidence_failure", "cli_exit_code", "refusal_path",
+        "malformed_input", "path_traversal", "command_injection",
+        "silent_exception", "stage_ordering", "duplicated_logic", "other",
+    ]),
+    default=None,
+    help="Filter by bug class.",
+)
+@click.option(
+    "--status",
+    type=click.Choice([
+        "proposed", "accepted", "rejected", "implemented", "deferred",
+    ]),
+    default=None,
+    help="Filter by status.",
+)
+@click.option(
+    "--priority",
+    type=click.Choice(["critical", "high", "medium", "low", "unset"]),
+    default=None,
+    help="Filter by priority.",
+)
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def regression_test_candidates_cmd(
+    bug_class: str | None,
+    status: str | None,
+    priority: str | None,
+    json_output: bool,
+):
+    """List regression test candidates."""
+    from axiom_core.regression_test_generator import RegressionTestGenerator
+
+    try:
+        generator = RegressionTestGenerator()
+        candidates = generator.list_candidates(
+            bug_class=bug_class or "",
+            status=status or "",
+            priority=priority or "",
+        )
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(candidates, indent=2, default=str))
+    else:
+        console.print(f"\n[bold]Regression Test Candidates[/bold] ({len(candidates)})\n")
+        for c in candidates:
+            console.print(
+                f"  [{c.get('priority', 'unset')}] "
+                f"{c.get('title', 'untitled')} "
+                f"({c.get('bug_class', 'other')}) "
+                f"— {c.get('status', 'proposed')}"
+            )
+
+
+@cli.command("regression-test-candidate")
+@click.option("--id", "candidate_id", required=True, help="Candidate ID.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def regression_test_candidate_cmd(candidate_id: str, json_output: bool):
+    """Show a single regression test candidate."""
+    from axiom_core.regression_test_generator import RegressionTestGenerator
+
+    try:
+        generator = RegressionTestGenerator()
+        candidate = generator.get_candidate(candidate_id)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if candidate is None:
+        msg = {"error": "not_found", "candidate_id": candidate_id}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Candidate not found:[/red] {candidate_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(candidate, indent=2, default=str))
+    else:
+        _render_regression_candidate_rich(candidate)
+
+
+@cli.command("regression-test-update")
+@click.option("--id", "candidate_id", required=True, help="Candidate ID.")
+@click.option(
+    "--status",
+    type=click.Choice([
+        "proposed", "accepted", "rejected", "implemented", "deferred",
+    ]),
+    required=True,
+    help="New status.",
+)
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def regression_test_update_cmd(
+    candidate_id: str, status: str, json_output: bool,
+):
+    """Update a regression test candidate status."""
+    from axiom_core.regression_test_generator import RegressionTestGenerator
+
+    try:
+        generator = RegressionTestGenerator()
+        result = generator.update_candidate_status(candidate_id, status)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if result is None:
+        msg = {"error": "not_found", "candidate_id": candidate_id}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Candidate not found:[/red] {candidate_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+    else:
+        console.print(f"[green]Updated[/green] {candidate_id} -> {status}")
+
+
+@cli.command("regression-test-patterns")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def regression_test_patterns_cmd(json_output: bool):
+    """List detected bug patterns from regression analysis."""
+    from axiom_core.regression_test_generator import RegressionTestGenerator
+
+    try:
+        generator = RegressionTestGenerator()
+        patterns = generator.list_patterns()
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(patterns, indent=2, default=str))
+    else:
+        console.print(f"\n[bold]Bug Patterns[/bold] ({len(patterns)})\n")
+        for p in patterns:
+            console.print(
+                f"  - {p.get('bug_class', 'other')}: "
+                f"{p.get('occurrence_count', 0)} occurrences"
+            )
+
+
+def _render_regression_result_rich(result: dict) -> None:
+    """Render regression generation result in rich text."""
+    console.print("\n[bold]Regression Test Generator[/bold]\n")
+    console.print(f"  Run ID:             {result.get('run_id', '')}")
+    console.print(f"  Findings analyzed:  {result.get('total_findings_analyzed', 0)}")
+    console.print(f"  Candidates:         {result.get('total_candidates', 0)}")
+    console.print(f"  Patterns:           {result.get('total_patterns', 0)}")
+
+    candidates = result.get("candidates", [])
+    if candidates:
+        console.print("\n[bold]Candidates:[/bold]")
+        for c in candidates:
+            console.print(
+                f"  [{c.get('priority', 'unset')}] "
+                f"{c.get('title', 'untitled')} "
+                f"({c.get('bug_class', 'other')})"
+            )
+            if c.get("assertion_hint"):
+                console.print(f"    Hint: {c['assertion_hint']}")
+
+    patterns = result.get("patterns", [])
+    if patterns:
+        console.print("\n[bold]Bug Patterns:[/bold]")
+        for p in patterns:
+            console.print(
+                f"  - {p.get('bug_class', 'other')}: "
+                f"{p.get('occurrence_count', 0)} occurrences"
+            )
+
+
+def _render_regression_candidate_rich(candidate: dict) -> None:
+    """Render a single regression test candidate in rich text."""
+    console.print("\n[bold]Regression Test Candidate[/bold]\n")
+    console.print(f"  ID:             {candidate.get('candidate_id', '')}")
+    console.print(f"  Title:          {candidate.get('title', '')}")
+    console.print(f"  Bug Class:      {candidate.get('bug_class', '')}")
+    console.print(f"  Origin:         {candidate.get('failure_origin', '')}")
+    console.print(f"  Test Intent:    {candidate.get('test_intent', '')}")
+    console.print(f"  Priority:       {candidate.get('priority', '')}")
+    console.print(f"  Status:         {candidate.get('status', '')}")
+    if candidate.get("target_file"):
+        console.print(f"  Target File:    {candidate['target_file']}")
+    if candidate.get("target_test_file"):
+        console.print(f"  Target Test:    {candidate['target_test_file']}")
+    if candidate.get("assertion_hint"):
+        console.print(f"  Assertion Hint: {candidate['assertion_hint']}")
+    if candidate.get("source_finding_id"):
+        console.print(f"  Finding ID:     {candidate['source_finding_id']}")
+    if candidate.get("source_work_item_id"):
+        console.print(f"  Work Item ID:   {candidate['source_work_item_id']}")
+
+
 if __name__ == "__main__":
     cli()
