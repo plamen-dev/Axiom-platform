@@ -2488,6 +2488,66 @@ _register(
 
 
 # ---------------------------------------------------------------------------
+# Code Review Policy Engine v1 (PR #69)
+# ---------------------------------------------------------------------------
+
+_register(
+    CommandSpec(
+        name="policy-evaluate",
+        command="axiom policy-evaluate --files <f1> [--files <f2>] [--json-output]",
+        description="Evaluate code review policies against changed files.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("policy_request.json", required=True),
+            EvidenceOutput("policy_result.json", required=True),
+            EvidenceOutput("policy_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=120,
+        failure_modes=(FM_NONZERO,),
+        notes="Deterministic policy evaluation for proposed changes.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="policy-evaluate-files",
+        command="axiom policy-evaluate-files <file1> <file2> ... [--json-output]",
+        description="Evaluate policies against specific changed files.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("policy_request.json", required=True),
+            EvidenceOutput("policy_result.json", required=True),
+            EvidenceOutput("policy_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=120,
+        failure_modes=(FM_NONZERO,),
+        notes="Positional-arg variant for policy evaluation.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="policy-list",
+        command="axiom policy-list [--json-output]",
+        description="List all registered code review policies.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=EV_CONSOLE,
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only listing of registered review policies.",
+    )
+)
+
+
+# ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
 

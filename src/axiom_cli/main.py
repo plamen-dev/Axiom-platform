@@ -8251,6 +8251,118 @@ def _render_regression_candidate_rich(candidate: dict) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Code Review Policy Engine v1 (PR #69)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("policy-evaluate")
+@click.option(
+    "--files", multiple=True, help="File paths to evaluate (repeatable).",
+)
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def policy_evaluate_cmd(files: tuple[str, ...], json_output: bool):
+    """Evaluate code review policies against changed files."""
+    from axiom_core.code_review_policy import CodeReviewPolicyEngine
+
+    if not files:
+        msg = {"error": "At least one --files argument is required."}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print("[red]Error:[/red] At least one --files argument is required.")
+        raise SystemExit(1)
+
+    try:
+        engine = CodeReviewPolicyEngine()
+        result = engine.evaluate_files(changed_files=list(files))
+        engine.write_evidence(result)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+    else:
+        _render_policy_result_rich(result)
+
+
+@cli.command("policy-evaluate-files")
+@click.argument("files", nargs=-1, required=True)
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def policy_evaluate_files_cmd(files: tuple[str, ...], json_output: bool):
+    """Evaluate policies against specific files (positional args)."""
+    from axiom_core.code_review_policy import CodeReviewPolicyEngine
+
+    try:
+        engine = CodeReviewPolicyEngine()
+        result = engine.evaluate_files(changed_files=list(files))
+        engine.write_evidence(result)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+    else:
+        _render_policy_result_rich(result)
+
+
+@cli.command("policy-list")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def policy_list_cmd(json_output: bool):
+    """List all registered review policies."""
+    from axiom_core.code_review_policy import CodeReviewPolicyEngine
+
+    engine = CodeReviewPolicyEngine()
+    policies = engine.list_policies()
+
+    if json_output:
+        click.echo(json.dumps(policies, indent=2, default=str))
+    else:
+        console.print("\n[bold]Registered Review Policies[/bold]\n")
+        for p in policies:
+            console.print(
+                f"  [{p['severity']}] {p['name']} ({p['category']}) "
+                f"— origin: {p['origin']}",
+            )
+
+
+def _render_policy_result_rich(result: dict) -> None:
+    """Render policy evaluation result in rich text."""
+    console.print("\n[bold]Code Review Policy Evaluation[/bold]\n")
+    console.print(f"  Run ID:       {result.get('run_id', '')}")
+    console.print(f"  Files:        {len(result.get('files_evaluated', []))}")
+    console.print(f"  Policies:     {result.get('policies_checked', 0)}")
+    console.print(f"  Violations:   {result.get('total_violations', 0)}")
+    console.print(f"  Passed:       {result.get('passed', True)}")
+
+    by_sev = result.get("violations_by_severity", {})
+    if by_sev:
+        console.print("\n[bold]By Severity:[/bold]")
+        for sev, count in sorted(by_sev.items()):
+            console.print(f"  {sev}: {count}")
+
+    violations = result.get("violations", [])
+    if violations:
+        console.print("\n[bold]Violations:[/bold]")
+        for v in violations:
+            console.print(
+                f"  [{v['severity']}] {v['policy_name']} "
+                f"at {v['file_path']}:{v['line_number']}",
+            )
+            console.print(f"    {v['description']}")
+
+
+
+# ---------------------------------------------------------------------------
 # Patch Impact Analyzer v1 (PR #68)
 # ---------------------------------------------------------------------------
 
