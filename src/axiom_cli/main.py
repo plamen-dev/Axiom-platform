@@ -6935,5 +6935,170 @@ def patch_apply_cmd(proposal_id: str, simulate: bool, as_json: bool):
             console.print(f"  [{ev.artifact_type}] {ev.artifact_path}")
 
 
+# ---------------------------------------------------------------------------
+# Code Validation commands (PR #62)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("code-validate")
+@click.option("--patch-run-id", required=True, help="Patch application run ID to validate")
+@click.option("--simulate", is_flag=True, help="Simulate without executing commands")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+def code_validate_cmd(patch_run_id: str, simulate: bool, as_json: bool):
+    """Validate a patch application run."""
+    from axiom_core.code_validation import CodeValidationOrchestrator
+
+    orchestrator = CodeValidationOrchestrator()
+
+    try:
+        run = orchestrator.validate(patch_run_id=patch_run_id, simulate=simulate)
+    except ValueError as exc:
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps(run.to_dict(), indent=2, default=str))
+        return
+
+    mode = "SIMULATE" if simulate else "VALIDATE"
+    console.print(f"\n[bold]Code Validation ({mode})[/bold]")
+    console.print(f"  Run ID:      {run.run_id}")
+    console.print(f"  Patch Run:   {run.patch_run_id}")
+    console.print(f"  Proposal:    {run.proposal_id}")
+    console.print(f"  Status:      {run.status.value}")
+
+    if run.stages:
+        console.print("\n[bold]Stages:[/bold]")
+        for stage in run.stages:
+            marker = {
+                "passed": "[green]PASSED[/green]",
+                "failed": "[red]FAILED[/red]",
+                "skipped": "[dim]SKIPPED[/dim]",
+                "simulated": "[yellow]SIMULATED[/yellow]",
+                "refused": "[red]REFUSED[/red]",
+                "blocked": "[yellow]BLOCKED[/yellow]",
+            }.get(stage.status.value, stage.status.value)
+            console.print(f"  {marker}  {stage.kind.value}: {stage.description}")
+            if stage.error:
+                console.print(f"         Error: {stage.error}")
+
+    if run.summary:
+        console.print("\n[bold]Summary:[/bold]")
+        console.print(f"  Overall:   {'PASSED' if run.summary.overall_passed else 'FAILED'}")
+        console.print(f"  Passed:    {run.summary.stages_passed}")
+        console.print(f"  Failed:    {run.summary.stages_failed}")
+        console.print(f"  Skipped:   {run.summary.stages_skipped}")
+        if run.summary.error:
+            console.print(f"  Error:     {run.summary.error}")
+
+    if run.evidence:
+        console.print("\n[bold]Evidence:[/bold]")
+        for ev in run.evidence:
+            console.print(f"  [{ev.artifact_type}] {ev.artifact_path}")
+
+
+@cli.command("code-validation-runs")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+def code_validation_runs_cmd(as_json: bool):
+    """List all code validation runs."""
+    from axiom_core.code_validation import CodeValidationOrchestrator
+
+    orchestrator = CodeValidationOrchestrator()
+    runs = orchestrator.list_runs()
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps(runs, indent=2, default=str))
+        return
+
+    if not runs:
+        console.print("[dim]No validation runs found.[/dim]")
+        return
+
+    console.print(f"\n[bold]Code Validation Runs ({len(runs)})[/bold]\n")
+    for r in runs:
+        status = r.get("status", "unknown")
+        marker = {
+            "passed": "[green]PASSED[/green]",
+            "failed": "[red]FAILED[/red]",
+            "simulated": "[yellow]SIMULATED[/yellow]",
+            "refused": "[red]REFUSED[/red]",
+        }.get(status, status)
+        console.print(
+            f"  {marker}  {r.get('run_id', '?')[:12]}  "
+            f"patch={r.get('patch_run_id', '?')[:12]}  "
+            f"{r.get('started_at', '?')}"
+        )
+
+
+@cli.command("code-validation-run")
+@click.option("--run-id", required=True, help="Validation run ID")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+def code_validation_run_cmd(run_id: str, as_json: bool):
+    """Show details of a specific code validation run."""
+    from axiom_core.code_validation import CodeValidationOrchestrator
+
+    orchestrator = CodeValidationOrchestrator()
+    data = orchestrator.get_run(run_id)
+
+    if data is None:
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps({"error": f"Validation run not found: {run_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Validation run not found: {run_id}")
+        raise SystemExit(2)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps(data, indent=2, default=str))
+        return
+
+    console.print("\n[bold]Code Validation Run[/bold]")
+    console.print(f"  Run ID:      {data.get('run_id', '?')}")
+    console.print(f"  Patch Run:   {data.get('patch_run_id', '?')}")
+    console.print(f"  Proposal:    {data.get('proposal_id', '?')}")
+    console.print(f"  Status:      {data.get('status', '?')}")
+    console.print(f"  Simulate:    {data.get('simulate', '?')}")
+    console.print(f"  Started:     {data.get('started_at', '?')}")
+    console.print(f"  Completed:   {data.get('completed_at', '?')}")
+
+    stages = data.get("stages", [])
+    if stages:
+        console.print(f"\n[bold]Stages ({len(stages)}):[/bold]")
+        for s in stages:
+            status = s.get("status", "?")
+            marker = {
+                "passed": "[green]PASSED[/green]",
+                "failed": "[red]FAILED[/red]",
+                "skipped": "[dim]SKIPPED[/dim]",
+                "simulated": "[yellow]SIMULATED[/yellow]",
+                "refused": "[red]REFUSED[/red]",
+                "blocked": "[yellow]BLOCKED[/yellow]",
+            }.get(status, status)
+            console.print(f"  {marker}  {s.get('kind', '?')}: {s.get('description', '?')}")
+            if s.get("error"):
+                console.print(f"         Error: {s['error']}")
+
+    summary = data.get("summary", {})
+    if summary:
+        console.print("\n[bold]Summary:[/bold]")
+        overall = "PASSED" if summary.get("overall_passed") else "FAILED"
+        console.print(f"  Overall:   {overall}")
+        console.print(f"  Passed:    {summary.get('stages_passed', 0)}")
+        console.print(f"  Failed:    {summary.get('stages_failed', 0)}")
+        console.print(f"  Skipped:   {summary.get('stages_skipped', 0)}")
+
+
 if __name__ == "__main__":
     cli()

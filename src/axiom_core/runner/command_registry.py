@@ -1950,6 +1950,73 @@ _register(
 
 
 # ---------------------------------------------------------------------------
+# Code Validation commands (PR #62)
+# ---------------------------------------------------------------------------
+
+
+_register(
+    CommandSpec(
+        name="code-validate",
+        command="axiom code-validate --patch-run-id <id> [--simulate] [--json-output]",
+        description=(
+            "Validate a patch application run. Runs targeted tests, full pytest, "
+            "ruff, and placeholder stages. Refuses unknown or unsuccessful patch runs. "
+            "Writes evidence to artifacts/code_validation_runs/<run_id>/."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=(
+            "validation_request.json",
+            "validation_result.json",
+            "validation_summary.md",
+            "pass_fail.json",
+            "test_outputs/",
+            "ruff_output/",
+            "walkthroughs/",
+        ) + EV_CONSOLE,
+        timeout_seconds=300,
+        failure_modes=(FM_NONZERO,),
+        notes=(
+            "Validates patch application results. Executes only allowlisted "
+            "commands (pytest, ruff). Simulate mode writes evidence without "
+            "executing commands. No git operations, no network dependency."
+        ),
+    )
+)
+
+_register(
+    CommandSpec(
+        name="code-validation-runs",
+        command="axiom code-validation-runs [--json-output]",
+        description="List all code validation runs from evidence artifacts.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("Validation run listing (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only listing of validation runs.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="code-validation-run",
+        command="axiom code-validation-run --run-id <id> [--json-output]",
+        description="Show details of a specific code validation run.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("Validation run details/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only detail view. Returns exit 2 for unknown run IDs.",
+    )
+)
+
+
+# ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
 
