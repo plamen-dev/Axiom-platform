@@ -6868,5 +6868,72 @@ def patch_review_cmd(proposal_id: str, as_json: bool):
         console.print(table)
 
 
+# ---------------------------------------------------------------------------
+# Patch Application commands (PR #61)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("patch-apply")
+@click.option("--proposal-id", required=True, help="Approved patch proposal ID to apply")
+@click.option("--simulate", is_flag=True, help="Simulate without writing files")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+def patch_apply_cmd(proposal_id: str, simulate: bool, as_json: bool):
+    """Apply an approved patch proposal."""
+    from axiom_core.patch_application import PatchApplicationRunner
+
+    runner = PatchApplicationRunner()
+
+    try:
+        run = runner.apply(proposal_id=proposal_id, simulate=simulate)
+    except ValueError as exc:
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps(run.to_dict(), indent=2, default=str))
+        return
+
+    mode = "SIMULATE" if simulate else "APPLY"
+    console.print(f"\n[bold]Patch Application ({mode})[/bold]")
+    console.print(f"  Run ID:      {run.run_id}")
+    console.print(f"  Proposal:    {run.proposal_id}")
+    console.print(f"  Plan:        {run.plan_id}")
+    console.print(f"  Status:      {run.status.value}")
+
+    if run.steps:
+        console.print("\n[bold]Steps:[/bold]")
+        for step in run.steps:
+            marker = {
+                "applied": "[green]APPLIED[/green]",
+                "simulated": "[yellow]SIMULATED[/yellow]",
+                "failed": "[red]FAILED[/red]",
+                "skipped": "[dim]SKIPPED[/dim]",
+            }.get(step.status.value, step.status.value)
+            console.print(f"  {marker}  {step.edit_type} {step.file_path}")
+            if step.error:
+                console.print(f"         Error: {step.error}")
+
+    if run.result:
+        console.print("\n[bold]Result:[/bold]")
+        console.print(f"  Success:   {run.result.success}")
+        console.print(f"  Applied:   {run.result.steps_applied}")
+        console.print(f"  Simulated: {run.result.steps_simulated}")
+        console.print(f"  Failed:    {run.result.steps_failed}")
+        if run.result.error:
+            console.print(f"  Error:     {run.result.error}")
+
+    if run.evidence:
+        console.print("\n[bold]Evidence:[/bold]")
+        for ev in run.evidence:
+            console.print(f"  [{ev.artifact_type}] {ev.artifact_path}")
+
+
 if __name__ == "__main__":
     cli()

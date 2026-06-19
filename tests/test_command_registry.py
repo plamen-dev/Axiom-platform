@@ -73,6 +73,7 @@ EXPECTED_AXIOM_COMMANDS = {
     "implementation-plan",
     "patch-proposal-create", "patch-proposals", "patch-proposal",
     "patch-review-create", "patch-reviews", "patch-review",
+    "patch-apply",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 

@@ -1914,6 +1914,42 @@ _register(
 
 
 # ---------------------------------------------------------------------------
+# Patch Application commands (PR #61)
+# ---------------------------------------------------------------------------
+
+
+_register(
+    CommandSpec(
+        name="patch-apply",
+        command="axiom patch-apply --proposal-id <id> [--simulate] [--json-output]",
+        description=(
+            "Apply an approved patch proposal. Refuses rejected, unknown, "
+            "deprecated, superseded, and unapproved proposals. "
+            "Writes evidence to artifacts/patch_runs/<run_id>/."
+        ),
+        classification=CommandClass.MUTATION,
+        safety_level=SafetyLevel.HIGH_RISK,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=(
+            "patch_request.json",
+            "patch_result.json",
+            "patch_summary.md",
+            "pass_fail.json",
+            "applied_changes/",
+            "rollback_info/",
+        ) + EV_CONSOLE,
+        timeout_seconds=120,
+        failure_modes=(FM_NONZERO,),
+        notes=(
+            "First MUTATION command in Axiom. Modifies source files. "
+            "Simulate mode (--simulate) performs all steps without writing. "
+            "Requires explicit proposal approval via patch-review-create."
+        ),
+    )
+)
+
+
+# ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
 
