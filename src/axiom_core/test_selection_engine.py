@@ -174,6 +174,7 @@ _FILE_TO_TEST: dict[str, str] = {
     "src/axiom_core/work_item_registry.py": "tests/test_work_item_registry.py",
     "src/axiom_core/test_selection_engine.py": "tests/test_test_selection_engine.py",
     "src/axiom_core/regression_test_generator.py": "tests/test_regression_test_generator.py",
+    "src/axiom_core/patch_impact_analyzer.py": "tests/test_patch_impact_analyzer.py",
     "src/axiom_cli/main.py": "tests/test_command_registry.py",
 }
 

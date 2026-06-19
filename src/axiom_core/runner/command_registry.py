@@ -2444,6 +2444,49 @@ _register(
 )
 
 
+# -- PR #68: Patch Impact Analyzer v1 commands ---------------------------------
+
+_register(
+    CommandSpec(
+        name="impact-analyze",
+        command="axiom impact-analyze --proposal-id <id> [--files <f>] [--json-output]",
+        description="Analyze impact of a patch proposal or file set before application.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=(
+            EvidenceOutput("impact_request.json", required=True),
+            EvidenceOutput("impact_result.json", required=True),
+            EvidenceOutput("impact_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=120,
+        failure_modes=(FM_NONZERO,),
+        notes="Deterministic impact analysis for proposed changes.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="impact-analyze-files",
+        command="axiom impact-analyze-files <file1> <file2> ... [--json-output]",
+        description="Analyze impact of specific changed files.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=(
+            EvidenceOutput("impact_request.json", required=True),
+            EvidenceOutput("impact_result.json", required=True),
+            EvidenceOutput("impact_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=120,
+        failure_modes=(FM_NONZERO,),
+        notes="Positional-arg variant for analyzing file lists.",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------

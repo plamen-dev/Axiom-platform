@@ -8250,5 +8250,122 @@ def _render_regression_candidate_rich(candidate: dict) -> None:
         console.print(f"  Work Item ID:   {candidate['source_work_item_id']}")
 
 
+# ---------------------------------------------------------------------------
+# Patch Impact Analyzer v1 (PR #68)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("impact-analyze")
+@click.option(
+    "--proposal-id", default="", help="Patch proposal ID to analyze.",
+)
+@click.option(
+    "--files", multiple=True, help="File paths to analyze (repeatable).",
+)
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def impact_analyze_cmd(
+    proposal_id: str,
+    files: tuple[str, ...],
+    json_output: bool,
+):
+    """Analyze impact of proposed changes before patch application."""
+    from axiom_core.patch_impact_analyzer import PatchImpactAnalyzer
+
+    if not proposal_id and not files:
+        msg = {"error": "At least one of --proposal-id or --files is required."}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print("[red]Error:[/red] At least one of --proposal-id or --files is required.")
+        raise SystemExit(1)
+
+    try:
+        analyzer = PatchImpactAnalyzer()
+        if proposal_id:
+            result = analyzer.analyze_proposal(proposal_id)
+        else:
+            result = analyzer.analyze_files(changed_files=list(files))
+        analyzer.write_evidence(result)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+    else:
+        _render_impact_result_rich(result)
+
+
+@cli.command("impact-analyze-files")
+@click.argument("files", nargs=-1, required=True)
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def impact_analyze_files_cmd(files: tuple[str, ...], json_output: bool):
+    """Analyze impact of specific files (positional args)."""
+    from axiom_core.patch_impact_analyzer import PatchImpactAnalyzer
+
+    try:
+        analyzer = PatchImpactAnalyzer()
+        result = analyzer.analyze_files(changed_files=list(files))
+        analyzer.write_evidence(result)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+    else:
+        _render_impact_result_rich(result)
+
+
+def _render_impact_result_rich(result: dict) -> None:
+    """Render impact analysis result in rich text."""
+    scope = result.get("scope", {})
+    console.print("\n[bold]Patch Impact Analysis[/bold]\n")
+    console.print(f"  Run ID:           {result.get('run_id', '')}")
+    console.print(f"  Proposal:         {result.get('proposal_id', 'N/A') or 'N/A'}")
+    console.print(f"  Files changed:    {scope.get('total_files', 0)}")
+    console.print(f"  Symbols affected: {scope.get('total_symbols', 0)}")
+    console.print(f"  Commands:         {scope.get('total_commands', 0)}")
+    console.print(f"  Tests:            {scope.get('total_tests', 0)}")
+    console.print(f"  Docs:             {scope.get('total_docs', 0)}")
+    console.print(f"  Evidence:         {scope.get('total_evidence', 0)}")
+    console.print(f"  Risk flags:       {scope.get('total_risk_flags', 0)}")
+    console.print(f"  Overall impact:   {scope.get('overall_impact', '')}")
+    console.print(f"  Full suite:       {scope.get('requires_full_suite', False)}")
+
+    if scope.get("high_risk_flags"):
+        console.print("\n[bold]High-Risk Flags:[/bold]")
+        for flag in scope["high_risk_flags"]:
+            console.print(
+                f"  [{flag['impact_level']}] {flag['risk_area']}: "
+                f"{flag['reason']} ({flag['file_path']})",
+            )
+
+    if scope.get("affected_tests"):
+        console.print("\n[bold]Affected Tests:[/bold]")
+        for test in scope["affected_tests"]:
+            console.print(f"  - {test['test_path']} ({test['reason']})")
+
+    if scope.get("affected_commands"):
+        console.print("\n[bold]Affected Commands:[/bold]")
+        for cmd in scope["affected_commands"]:
+            console.print(f"  - {cmd['command_name']}")
+
+
 if __name__ == "__main__":
     cli()
