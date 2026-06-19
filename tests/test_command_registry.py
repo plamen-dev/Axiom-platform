@@ -75,6 +75,7 @@ EXPECTED_AXIOM_COMMANDS = {
     "patch-review-create", "patch-reviews", "patch-review",
     "patch-apply",
     "code-validate", "code-validation-runs", "code-validation-run",
+    "pr-draft", "pr-drafts", "pr-draft-show",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 

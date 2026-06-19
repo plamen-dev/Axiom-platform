@@ -7100,5 +7100,168 @@ def code_validation_run_cmd(run_id: str, as_json: bool):
         console.print(f"  Skipped:   {summary.get('stages_skipped', 0)}")
 
 
+# ---------------------------------------------------------------------------
+# PR Draft Generator commands (PR #63)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("pr-draft")
+@click.option("--work-item", default="", help="Work item ID to generate draft from.")
+@click.option("--validation-run-id", default="", help="Validation run ID to generate draft from.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def pr_draft_cmd(work_item: str, validation_run_id: str, json_output: bool):
+    """Generate a PR draft from a work item or validation run."""
+    from axiom_core.pr_draft_generator import PRDraftGenerator
+
+    if not work_item and not validation_run_id:
+        msg = {"error": "At least one of --work-item or --validation-run-id required"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print("[red]Error:[/red] At least one of --work-item or --validation-run-id required")
+        raise SystemExit(1)
+
+    try:
+        generator = PRDraftGenerator()
+        draft = generator.generate(
+            work_item_id=work_item,
+            validation_run_id=validation_run_id,
+        )
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    data = draft.to_dict()
+    if json_output:
+        click.echo(json.dumps(data, indent=2, default=str))
+    else:
+        _render_pr_draft_rich(data)
+
+
+@cli.command("pr-drafts")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def pr_drafts_cmd(json_output: bool):
+    """List all PR drafts from artifact directories."""
+    from axiom_core.pr_draft_generator import PRDraftGenerator
+
+    generator = PRDraftGenerator()
+    drafts = generator.list_drafts()
+
+    if json_output:
+        click.echo(json.dumps(drafts, indent=2, default=str))
+    else:
+        if not drafts:
+            console.print("[dim]No PR drafts found.[/dim]")
+            return
+        console.print(f"\n[bold]PR Drafts[/bold] ({len(drafts)} total)\n")
+        for d in drafts:
+            status = d.get("status", "?")
+            draft_id = d.get("draft_id", "?")
+            wi = d.get("work_item_id", "")
+            title = ""
+            summary = d.get("summary")
+            if summary:
+                title = summary.get("commit_title", "")
+            marker = {
+                "generated": "[green]GENERATED[/green]",
+                "failed": "[red]FAILED[/red]",
+                "refused": "[red]REFUSED[/red]",
+                "pending": "[yellow]PENDING[/yellow]",
+            }.get(status, status)
+            line = f"  {marker}  {draft_id[:12]}..."
+            if wi:
+                line += f"  (work-item: {wi[:12]}...)"
+            if title:
+                line += f"  {title}"
+            console.print(line)
+
+
+@cli.command("pr-draft-show")
+@click.option("--draft-id", required=True, help="PR draft ID.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def pr_draft_show_cmd(draft_id: str, json_output: bool):
+    """Show details of a specific PR draft."""
+    from axiom_core.pr_draft_generator import PRDraftGenerator
+
+    generator = PRDraftGenerator()
+    data = generator.get_draft(draft_id)
+
+    if data is None:
+        msg = {"error": f"PR draft not found: {draft_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] PR draft not found: {draft_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(data, indent=2, default=str))
+    else:
+        _render_pr_draft_rich(data)
+
+
+def _render_pr_draft_rich(data: dict):
+    """Render a PR draft in rich text format."""
+    status = data.get("status", "?")
+    console.print(f"\n[bold]PR Draft[/bold] ({status.upper()})")
+    console.print(f"  Draft ID:       {data.get('draft_id', '?')}")
+    console.print(f"  Work Item:      {data.get('work_item_id') or '(none)'}")
+    console.print(f"  Validation Run: {data.get('validation_run_id') or '(none)'}")
+    console.print(f"  Proposal:       {data.get('proposal_id') or '(none)'}")
+    console.print(f"  Patch Run:      {data.get('patch_run_id') or '(none)'}")
+    console.print(f"  Status:         {status}")
+
+    summary = data.get("summary")
+    if summary:
+        console.print("\n[bold]Commit:[/bold]")
+        console.print(f"  Title: {summary.get('commit_title', '?')}")
+        console.print(f"  Files changed: {summary.get('files_changed', 0)}")
+        console.print(f"  Tests affected: {summary.get('tests_affected', 0)}")
+        desc = summary.get("extended_description", "")
+        if desc:
+            console.print("\n[bold]Description:[/bold]")
+            for line in desc.split("\n"):
+                console.print(f"  {line}")
+
+    vs = data.get("validation_section")
+    if vs:
+        console.print("\n[bold]Validation:[/bold]")
+        passed = "PASSED" if vs.get("overall_passed") else "FAILED"
+        console.print(f"  Run: {vs.get('validation_run_id', '?')}")
+        console.print(f"  Overall: {passed}")
+        console.print(f"  Passed: {vs.get('stages_passed', 0)}")
+        console.print(f"  Failed: {vs.get('stages_failed', 0)}")
+        console.print(f"  Skipped: {vs.get('stages_skipped', 0)}")
+
+    ss = data.get("strategic_section")
+    if ss:
+        console.print("\n[bold]Strategic Significance:[/bold]")
+        console.print(f"  {ss.get('significance', '?')}")
+        console.print(f"  Next step: {ss.get('next_recommended_step', '?')}")
+        wdnc = ss.get("what_did_not_change", [])
+        if wdnc:
+            console.print("\n  [bold]What did not change:[/bold]")
+            for item in wdnc:
+                console.print(f"    - {item}")
+        ng = ss.get("non_goals", [])
+        if ng:
+            console.print("\n  [bold]Non-goals:[/bold]")
+            for item in ng:
+                console.print(f"    - {item}")
+
+    limitations = data.get("known_limitations", [])
+    if limitations:
+        console.print("\n[bold]Known Limitations:[/bold]")
+        for lim in limitations:
+            console.print(f"  - {lim}")
+
+    if data.get("error"):
+        console.print(f"\n[red]Error:[/red] {data['error']}")
+
+
 if __name__ == "__main__":
     cli()

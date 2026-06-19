@@ -2017,6 +2017,71 @@ _register(
 
 
 # ---------------------------------------------------------------------------
+# PR Draft Generator commands (PR #63)
+# ---------------------------------------------------------------------------
+
+
+_register(
+    CommandSpec(
+        name="pr-draft",
+        command="axiom pr-draft --work-item <id> | --validation-run-id <id> [--json-output]",
+        description=(
+            "Generate a PR draft from a work item or validation run. Produces "
+            "commit title, extended description, validation section, strategic "
+            "significance, and evidence bundles. No GitHub API, no PR creation, "
+            "no merge behavior."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=(
+            "pr_request.json",
+            "pr_result.json",
+            "pr_summary.md",
+            "pass_fail.json",
+        ) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes=(
+            "Generates PR draft artifacts from validation evidence. "
+            "No GitHub API, no PR creation, no merge, no network dependency, "
+            "no Git operations."
+        ),
+    )
+)
+
+_register(
+    CommandSpec(
+        name="pr-drafts",
+        command="axiom pr-drafts [--json-output]",
+        description="List all PR drafts from artifact directories.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("PR draft listing (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only listing of PR drafts.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="pr-draft-show",
+        command="axiom pr-draft-show --draft-id <id> [--json-output]",
+        description="Show details of a specific PR draft.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("PR draft details/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only detail view. Returns exit 2 for unknown draft IDs.",
+    )
+)
+
+
+# ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
 
