@@ -1855,6 +1855,65 @@ _register(
 
 
 # ---------------------------------------------------------------------------
+# Patch Review commands (PR #60)
+# ---------------------------------------------------------------------------
+
+
+_register(
+    CommandSpec(
+        name="patch-review-create",
+        command="axiom patch-review-create --proposal-id <id> --decision <decision> [--reason <text>] [--reviewer <name>] [--json-output]",
+        description=(
+            "Create a review for a patch proposal. "
+            "Read-only — never edits files or runs git."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=("Review confirmation/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Creates a review record. Syncs proposal status on approve/reject.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="patch-reviews",
+        command="axiom patch-reviews [--proposal-id <id>] [--decision <decision>] [--json-output]",
+        description=(
+            "List patch reviews, optionally filtered by proposal or decision. "
+            "Read-only governance view."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=("Patch reviews table/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only listing. No file modifications.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="patch-review",
+        command="axiom patch-review --proposal-id <id> [--json-output]",
+        description=(
+            "Show the latest review and full history for a patch proposal."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=("Review details + history/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only detail view. Returns exit 2 for unknown proposals.",
+    )
+)
+
+
+# ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
 

@@ -6681,5 +6681,192 @@ def patch_proposal_cmd(proposal_id: str, as_json: bool):
         console.print(f"\n[bold]Rollback Notes:[/bold]\n  {proposal.rollback_notes}")
 
 
+# ---------------------------------------------------------------------------
+# Patch Review commands (PR #60)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("patch-review-create")
+@click.option("--proposal-id", required=True, help="Patch proposal ID to review")
+@click.option("--decision", required=True, help="Review decision (approved, rejected, needs_more_evidence, deprecated)")
+@click.option("--reason", default="", help="Reason for the decision")
+@click.option("--reviewer", default="", help="Name of the reviewer")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+def patch_review_create_cmd(
+    proposal_id: str,
+    decision: str,
+    reason: str,
+    reviewer: str,
+    as_json: bool,
+):
+    """Create a review for a patch proposal."""
+    from axiom_core.patch_review import PatchReviewRegistry, ReviewDecision
+
+    registry = PatchReviewRegistry()
+
+    try:
+        dec = ReviewDecision(decision)
+    except ValueError:
+        dec = None
+
+    disallowed = {ReviewDecision.PROPOSED, ReviewDecision.SUPERSEDED}
+    if dec is None or dec in disallowed:
+        valid = ", ".join(d.value for d in ReviewDecision if d not in disallowed)
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps({"error": f"Invalid decision. Valid: {valid}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Invalid decision '{decision}'. Valid: {valid}")
+        raise SystemExit(1)
+
+    try:
+        review = registry.create_review(
+            proposal_id=proposal_id,
+            decision=dec,
+            reason=reason,
+            reviewer=reviewer,
+        )
+    except ValueError as exc:
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps(review.to_dict(), indent=2, default=str))
+        return
+
+    console.print("\n[bold]Review Created[/bold]")
+    console.print(f"  Review ID:    {review.review_id}")
+    console.print(f"  Proposal ID:  {review.proposal_id}")
+    console.print(f"  Decision:     {review.decision.value}")
+    console.print(f"  Reason:       {review.reason or '(none)'}")
+    console.print(f"  Reviewer:     {review.reviewer or '(none)'}")
+
+
+@cli.command("patch-reviews")
+@click.option("--proposal-id", default=None, help="Filter by proposal ID")
+@click.option("--decision", "decision_filter", default=None, help="Filter by decision")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+def patch_reviews_cmd(
+    proposal_id: str | None,
+    decision_filter: str | None,
+    as_json: bool,
+):
+    """List patch reviews."""
+    from axiom_core.patch_review import PatchReviewRegistry, ReviewDecision
+
+    registry = PatchReviewRegistry()
+
+    decision = None
+    if decision_filter:
+        try:
+            decision = ReviewDecision(decision_filter)
+        except ValueError:
+            valid = ", ".join(d.value for d in ReviewDecision)
+            if as_json:
+                import json as json_mod
+
+                click.echo(json_mod.dumps({"error": f"Invalid decision. Valid: {valid}"}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] Invalid decision '{decision_filter}'. Valid: {valid}")
+            raise SystemExit(1)
+
+    reviews = registry.list_reviews(proposal_id=proposal_id, decision=decision)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps([r.to_dict() for r in reviews], indent=2, default=str))
+        return
+
+    if not reviews:
+        console.print("No patch reviews found.")
+        return
+
+    table = Table(title="Patch Reviews")
+    table.add_column("Review ID", style="cyan", max_width=36)
+    table.add_column("Proposal ID", max_width=36)
+    table.add_column("Decision")
+    table.add_column("Reviewer")
+    table.add_column("Created")
+    for r in reviews:
+        table.add_row(
+            r.review_id[:36],
+            r.proposal_id[:36],
+            r.decision.value,
+            r.reviewer or "(none)",
+            r.created_at[:19],
+        )
+    console.print(table)
+
+
+@cli.command("patch-review")
+@click.option("--proposal-id", required=True, help="Proposal ID to show review for")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+def patch_review_cmd(proposal_id: str, as_json: bool):
+    """Show the latest review and full history for a patch proposal."""
+    from axiom_core.patch_review import PatchReviewRegistry
+
+    registry = PatchReviewRegistry()
+    latest = registry.get_latest_review(proposal_id)
+
+    if latest is None:
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps({"error": f"No reviews found for proposal: {proposal_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] No reviews found for proposal: {proposal_id}")
+        raise SystemExit(2)
+
+    history = registry.get_history(proposal_id)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps({
+            "latest_review": latest.to_dict(),
+            "history": [h.to_dict() for h in history],
+        }, indent=2, default=str))
+        return
+
+    console.print(f"\n[bold]Latest Review for Proposal {proposal_id[:36]}[/bold]")
+    console.print(f"  Review ID:  {latest.review_id}")
+    console.print(f"  Decision:   {latest.decision.value}")
+    console.print(f"  Reason:     {latest.reason or '(none)'}")
+    console.print(f"  Reviewer:   {latest.reviewer or '(none)'}")
+    console.print(f"  Created:    {latest.created_at}")
+
+    if latest.evidence:
+        console.print("\n[bold]Evidence:[/bold]")
+        for e in latest.evidence:
+            console.print(f"  • [{e.evidence_type}] {e.description}")
+            if e.artifact_path:
+                console.print(f"    Path: {e.artifact_path}")
+
+    if len(history) > 1:
+        console.print(f"\n[bold]Review History ({len(history)} entries):[/bold]")
+        table = Table()
+        table.add_column("Decision")
+        table.add_column("Reason")
+        table.add_column("Reviewer")
+        table.add_column("Created")
+        for h in history:
+            table.add_row(
+                h.decision.value,
+                (h.reason or "(none)")[:40],
+                h.reviewer or "(none)",
+                h.created_at[:19],
+            )
+        console.print(table)
+
+
 if __name__ == "__main__":
     cli()
