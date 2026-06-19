@@ -1795,6 +1795,66 @@ _register(
 
 
 # ---------------------------------------------------------------------------
+# Patch Proposal commands (PR #59)
+# ---------------------------------------------------------------------------
+
+
+_register(
+    CommandSpec(
+        name="patch-proposal-create",
+        command="axiom patch-proposal-create --plan-id <id> [--json-output]",
+        description=(
+            "Create a patch proposal from an implementation plan. "
+            "Read-only — never edits files or runs git."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=("Patch proposal summary/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Creates a durable patch record. Requires existing implementation plan.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="patch-proposals",
+        command="axiom patch-proposals [--status <status>] [--json-output]",
+        description=(
+            "List patch proposals, optionally filtered by status. "
+            "Read-only governance view."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=("Patch proposals table/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only listing. No file modifications.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="patch-proposal",
+        command="axiom patch-proposal --id <id> [--json-output]",
+        description=(
+            "Show details for a specific patch proposal including "
+            "file changes, test commands, risks, and evidence requirements."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=("Patch proposal details/JSON (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only detail view. Returns exit 2 for unknown proposals.",
+    )
+)
+
+
+# ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
 

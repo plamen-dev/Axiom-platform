@@ -71,6 +71,7 @@ EXPECTED_AXIOM_COMMANDS = {
     "work-item", "work-item-create", "work-item-update", "work-items",
     "code-inventory", "code-symbols", "code-symbol",
     "implementation-plan",
+    "patch-proposal-create", "patch-proposals", "patch-proposal",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 

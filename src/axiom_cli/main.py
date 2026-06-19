@@ -6513,5 +6513,173 @@ def implementation_plan_cmd(
             console.print(f"  • {er}")
 
 
+# ---------------------------------------------------------------------------
+# Patch Proposal commands (PR #59)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("patch-proposal-create")
+@click.option("--plan-id", required=True, help="Implementation plan ID")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+def patch_proposal_create_cmd(plan_id: str, as_json: bool):
+    """Create a patch proposal from an implementation plan."""
+    from axiom_core.implementation_planner import ImplementationPlanner
+    from axiom_core.patch_proposal import PatchProposalRegistry
+
+    registry = PatchProposalRegistry()
+    planner = ImplementationPlanner()
+
+    try:
+        proposal = registry.create_from_plan(plan_id, planner)
+    except ValueError as exc:
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps(proposal.to_dict(), indent=2, default=str))
+        return
+
+    console.print(f"\n[bold]Created: {proposal.title}[/bold]")
+    console.print(f"  Proposal ID:  {proposal.proposal_id}")
+    console.print(f"  Plan ID:      {proposal.plan_id}")
+    console.print(f"  Status:       {proposal.status.value}")
+    console.print(f"  Risk Level:   {proposal.overall_risk_level.value}")
+    console.print(f"  Files:        {len(proposal.file_changes)}")
+    console.print(f"  Tests:        {len(proposal.test_commands)}")
+    console.print(f"  Validations:  {len(proposal.validation_commands)}")
+
+
+@cli.command("patch-proposals")
+@click.option("--status", "status_filter", default=None, help="Filter by status")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+def patch_proposals_cmd(status_filter: str | None, as_json: bool):
+    """List patch proposals."""
+    from axiom_core.patch_proposal import PatchProposalRegistry, PatchStatus
+
+    registry = PatchProposalRegistry()
+
+    status = None
+    if status_filter:
+        try:
+            status = PatchStatus(status_filter)
+        except ValueError:
+            valid = ", ".join(s.value for s in PatchStatus)
+            if as_json:
+                import json as json_mod
+
+                click.echo(json_mod.dumps({"error": f"Invalid status. Valid: {valid}"}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] Invalid status '{status_filter}'. Valid: {valid}")
+            raise SystemExit(1)
+
+    proposals = registry.list_proposals(status=status)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps([p.to_dict() for p in proposals], indent=2, default=str))
+        return
+
+    if not proposals:
+        console.print("No patch proposals found.")
+        return
+
+    table = Table(title="Patch Proposals")
+    table.add_column("ID", style="cyan", max_width=36)
+    table.add_column("Title")
+    table.add_column("Status")
+    table.add_column("Risk")
+    table.add_column("Files")
+    for p in proposals:
+        table.add_row(
+            p.proposal_id[:36],
+            p.title[:50],
+            p.status.value,
+            p.overall_risk_level.value,
+            str(len(p.file_changes)),
+        )
+    console.print(table)
+
+
+@cli.command("patch-proposal")
+@click.option("--id", "proposal_id", required=True, help="Proposal ID")
+@click.option("--json-output", "as_json", is_flag=True, help="Machine-readable JSON output")
+def patch_proposal_cmd(proposal_id: str, as_json: bool):
+    """Show details for a specific patch proposal."""
+    from axiom_core.patch_proposal import PatchProposalRegistry
+
+    registry = PatchProposalRegistry()
+    proposal = registry.get_proposal(proposal_id)
+
+    if proposal is None:
+        if as_json:
+            import json as json_mod
+
+            click.echo(json_mod.dumps({"error": f"Patch proposal not found: {proposal_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Patch proposal not found: {proposal_id}")
+        raise SystemExit(2)
+
+    if as_json:
+        import json as json_mod
+
+        click.echo(json_mod.dumps(proposal.to_dict(), indent=2, default=str))
+        return
+
+    console.print(f"\n[bold]{proposal.title}[/bold]")
+    console.print(f"  Proposal ID:  {proposal.proposal_id}")
+    console.print(f"  Plan ID:      {proposal.plan_id}")
+    console.print(f"  Status:       {proposal.status.value}")
+    console.print(f"  Risk Level:   {proposal.overall_risk_level.value}")
+    console.print(f"  Summary:      {proposal.summary}")
+
+    if proposal.file_changes:
+        console.print("\n[bold]Proposed File Changes:[/bold]")
+        table = Table()
+        table.add_column("File", style="cyan")
+        table.add_column("Edit")
+        table.add_column("Description")
+        for fc in proposal.file_changes:
+            table.add_row(fc.file_path[:50], fc.edit_type.value, fc.description[:50])
+        console.print(table)
+
+    if proposal.test_commands:
+        console.print("\n[bold]Test Commands:[/bold]")
+        for tc in proposal.test_commands:
+            console.print(f"  $ {tc.command}")
+            if tc.description:
+                console.print(f"    {tc.description}")
+
+    if proposal.validation_commands:
+        console.print("\n[bold]Validation Commands:[/bold]")
+        for vc in proposal.validation_commands:
+            console.print(f"  $ {vc.command}")
+            if vc.description:
+                console.print(f"    {vc.description}")
+
+    if proposal.risks:
+        console.print("\n[bold]Risks:[/bold]")
+        for r in proposal.risks:
+            console.print(f"  [{r.level.value.upper()}] {r.description}")
+            if r.mitigation:
+                console.print(f"         Mitigation: {r.mitigation}")
+
+    if proposal.evidence_requirements:
+        console.print("\n[bold]Evidence Requirements:[/bold]")
+        for er in proposal.evidence_requirements:
+            marker = "required" if er.required else "optional"
+            console.print(f"  • [{marker}] {er.description}")
+
+    if proposal.rollback_notes:
+        console.print(f"\n[bold]Rollback Notes:[/bold]\n  {proposal.rollback_notes}")
+
+
 if __name__ == "__main__":
     cli()
