@@ -80,6 +80,7 @@ EXPECTED_AXIOM_COMMANDS = {
     "review-finding-create", "review-finding-update", "review-patterns",
     "self-improvement", "improvement-candidates", "improvement-candidate",
     "improvement-patterns",
+    "test-selection", "test-selection-files",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 

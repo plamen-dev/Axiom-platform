@@ -7798,5 +7798,125 @@ def _render_improvement_candidate_rich(data: dict) -> None:
             console.print(f"  - {t}")
 
 
+# ---------------------------------------------------------------------------
+# Test Selection Engine v1 (PR #66)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("test-selection")
+@click.option(
+    "--changed-files",
+    multiple=True,
+    help="Changed file path(s) to select tests for.",
+)
+@click.option("--work-item", default=None, help="Work item ID.")
+@click.option("--plan-id", default=None, help="Implementation plan ID.")
+@click.option("--proposal-id", default=None, help="Patch proposal ID.")
+@click.option("--full-suite", is_flag=True, help="Force full test suite.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def test_selection_cmd(
+    changed_files: tuple[str, ...],
+    work_item: str | None,
+    plan_id: str | None,
+    proposal_id: str | None,
+    full_suite: bool,
+    json_output: bool,
+):
+    """Select targeted tests based on changed files or context."""
+    from axiom_core.test_selection_engine import (
+        TestSelectionEngine,
+        TestSelectionRequest,
+    )
+
+    if not changed_files and not work_item and not plan_id and not proposal_id and not full_suite:
+        msg = {"error": "At least one of --changed-files, --work-item, --plan-id, --proposal-id, or --full-suite is required."}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {msg['error']}")
+        raise SystemExit(1)
+
+    try:
+        engine = TestSelectionEngine()
+        request = TestSelectionRequest(
+            changed_files=list(changed_files),
+            work_item_id=work_item or "",
+            plan_id=plan_id or "",
+            proposal_id=proposal_id or "",
+            force_full_suite=full_suite,
+        )
+        plan = engine.select_tests(request)
+        engine.write_evidence(plan, request)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(plan.to_dict(), indent=2, default=str))
+    else:
+        _render_test_selection_rich(plan)
+
+
+@cli.command("test-selection-files")
+@click.argument("files", nargs=-1, required=True)
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def test_selection_files_cmd(files: tuple[str, ...], json_output: bool):
+    """Select tests from a list of changed files (positional args)."""
+    from axiom_core.test_selection_engine import (
+        TestSelectionEngine,
+        TestSelectionRequest,
+    )
+
+    try:
+        engine = TestSelectionEngine()
+        file_list = list(files)
+        request = TestSelectionRequest(changed_files=file_list)
+        plan = engine.select_tests(request)
+        engine.write_evidence(plan, request)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(plan.to_dict(), indent=2, default=str))
+    else:
+        _render_test_selection_rich(plan)
+
+
+def _render_test_selection_rich(plan) -> None:
+    """Render test selection plan in rich text."""
+    data = plan.to_dict()
+    strategy = data["strategy"].upper()
+    console.print(f"\n[bold]Test Selection ({strategy})[/bold]\n")
+    console.print(f"  Plan ID:    {data['plan_id']}")
+    console.print(f"  Strategy:   {data['strategy']}")
+    console.print(f"  Tests:      {data['test_count']}")
+    console.print(f"  Ruff:       {data['include_ruff']}")
+
+    if data.get("full_suite_reason"):
+        console.print(f"\n  [yellow]Reason:[/yellow] {data['full_suite_reason']}")
+
+    tests = data.get("selected_tests", [])
+    if tests:
+        console.print("\n[bold]Selected Tests:[/bold]")
+        for t in tests:
+            src = f" ← {t['source_file']}" if t.get("source_file") else ""
+            console.print(f"  - {t['test_path']} ({t['reason']}){src}")
+
+    ruff = data.get("ruff_targets", [])
+    if ruff:
+        console.print("\n[bold]Ruff Targets:[/bold]")
+        for r in ruff:
+            console.print(f"  - {r}")
+
+
 if __name__ == "__main__":
     cli()

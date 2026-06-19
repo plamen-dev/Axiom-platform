@@ -2271,6 +2271,57 @@ _register(
     )
 )
 
+# ---------------------------------------------------------------------------
+# Test Selection Engine v1 (PR #66)
+# ---------------------------------------------------------------------------
+
+_register(
+    CommandSpec(
+        name="test-selection",
+        command=(
+            "axiom test-selection [--changed-files <f>] [--work-item <id>] "
+            "[--plan-id <id>] [--proposal-id <id>] [--full-suite] [--json-output]"
+        ),
+        description=(
+            "Select targeted tests based on changed files, work items, "
+            "implementation plans, or patch proposals. No test execution."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV, Prerequisite.DB_PATH_AVAILABLE),
+        evidence_outputs=(
+            EvidenceOutput("selection_request.json", required=True),
+            EvidenceOutput("selection_result.json", required=True),
+            EvidenceOutput("selection_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes=(
+            "Deterministic test selection. No test execution, no code "
+            "modification, no GitHub API, no network dependency."
+        ),
+    )
+)
+
+_register(
+    CommandSpec(
+        name="test-selection-files",
+        command="axiom test-selection-files <files...> [--json-output]",
+        description=(
+            "Select tests from a list of changed files. "
+            "Convenience command for quick file-based selection."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=("Test selection output (console)",) + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only test selection from changed file paths.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
