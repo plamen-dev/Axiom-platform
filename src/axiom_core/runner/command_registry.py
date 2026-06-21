@@ -3263,6 +3263,89 @@ _register(
 )
 
 
+# -- Escalation Framework v1 ------------------------------------------------
+
+_register(
+    CommandSpec(
+        name="escalation-create",
+        command=(
+            "axiom escalation-create --title <t> "
+            "[--description <d>] [--reason <r>] "
+            "[--severity <sev>] [--category <cat>] "
+            "[--source <s>] [--json-output]"
+        ),
+        description="Create a new escalation.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("escalation_request.json", required=True),
+            EvidenceOutput("escalation_result.json", required=True),
+            EvidenceOutput("escalation_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Create durable escalation artifact.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="escalations",
+        command=(
+            "axiom escalations [--status <s>] "
+            "[--severity <sev>] [--category <cat>] "
+            "[--json-output]"
+        ),
+        description="List all escalations.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List escalations with optional filters.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="escalation-show",
+        command="axiom escalation-show <escalation_id> [--json-output]",
+        description="Show details of an escalation.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Inspect an escalation by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="escalation-export",
+        command="axiom escalation-export <escalation_id> [--json-output]",
+        description="Export an escalation as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export escalation to markdown.",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------

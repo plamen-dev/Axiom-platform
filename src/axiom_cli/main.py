@@ -10286,5 +10286,217 @@ def _render_review_rich(review: dict) -> None:
             console.print(f"    [{sev}/{st}] {f.get('summary', '')}")
 
 
+# ---------------------------------------------------------------------------
+# Escalation Framework CLI
+# ---------------------------------------------------------------------------
+
+
+@cli.command("escalation-create")
+@click.option("--title", required=True, help="Escalation title")
+@click.option("--description", default="", help="Escalation description")
+@click.option("--reason", default="", help="Escalation reason")
+@click.option("--severity", default="", help="Severity (none/info/warning/blocker/human_required)")
+@click.option("--category", default="", help="Category (evidence_gap/architecture/validation/repeated_failure/dependency/conflict/other)")
+@click.option("--source", default="", help="Escalation source")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def escalation_create_cmd(
+    title: str,
+    description: str,
+    reason: str,
+    severity: str,
+    category: str,
+    source: str,
+    json_output: bool,
+) -> None:
+    """Create a new escalation."""
+    from axiom_core.escalation_registry import EscalationRegistry
+
+    try:
+        registry = EscalationRegistry()
+        escalation = registry.create_escalation(
+            title=title,
+            description=description,
+            reason=reason,
+            severity=severity,
+            category=category,
+            source=source,
+        )
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    try:
+        registry.write_evidence(escalation["escalation_id"])
+    except Exception as exc:
+        _logger.warning("Evidence write failed: %s", exc)
+
+    if json_output:
+        click.echo(json.dumps(escalation, indent=2, default=str))
+    else:
+        _render_escalation_rich(escalation)
+
+
+@cli.command("escalations")
+@click.option("--status", default="", help="Filter by status")
+@click.option("--severity", default="", help="Filter by severity")
+@click.option("--category", default="", help="Filter by category")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def escalations_cmd(
+    status: str,
+    severity: str,
+    category: str,
+    json_output: bool,
+) -> None:
+    """List escalations."""
+    from axiom_core.escalation_registry import EscalationRegistry
+
+    try:
+        registry = EscalationRegistry()
+        escalations = registry.list_escalations(
+            status=status, severity=severity, category=category,
+        )
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(escalations, indent=2, default=str))
+    else:
+        if not escalations:
+            console.print("[dim]No escalations found.[/dim]")
+            return
+        console.print(f"\n[bold]Escalations ({len(escalations)})[/bold]\n")
+        for e in escalations:
+            sev = e.get("severity", "info").upper()
+            console.print(
+                f"  [{e.get('status', '')}] {e.get('escalation_id', '')[:12]}… "
+                f"— [{sev}] {e.get('title', '')}",
+            )
+
+
+@cli.command("escalation-show")
+@click.argument("escalation_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def escalation_show_cmd(
+    escalation_id: str,
+    json_output: bool,
+) -> None:
+    """Show details of an escalation."""
+    from axiom_core.escalation_registry import EscalationRegistry
+
+    try:
+        registry = EscalationRegistry()
+        escalation = registry.get_escalation(escalation_id)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if escalation is None:
+        msg = {"error": f"Escalation not found: {escalation_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(
+                f"[red]Error:[/red] Escalation not found: {escalation_id}",
+            )
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(escalation, indent=2, default=str))
+    else:
+        _render_escalation_rich(escalation)
+
+
+@cli.command("escalation-export")
+@click.argument("escalation_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def escalation_export_cmd(
+    escalation_id: str,
+    json_output: bool,
+) -> None:
+    """Export an escalation as markdown."""
+    from axiom_core.escalation_registry import EscalationRegistry
+
+    try:
+        registry = EscalationRegistry()
+        escalation = registry.get_escalation(escalation_id)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if escalation is None:
+        msg = {"error": f"Escalation not found: {escalation_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(
+                f"[red]Error:[/red] Escalation not found: {escalation_id}",
+            )
+        raise SystemExit(2)
+
+    md = registry.export_escalation(escalation_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"escalation_id": escalation_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_escalation_rich(escalation: dict) -> None:
+    """Rich text rendering for an escalation."""
+    status = escalation.get("status", "").upper()
+    sev = escalation.get("severity", "").upper()
+    console.print(f"\n[bold]Escalation ({status})[/bold]\n")
+    console.print(f"  Escalation ID: {escalation.get('escalation_id', '')}")
+    console.print(f"  Title:         {escalation.get('title', '')}")
+    console.print(f"  Severity:      {sev}")
+    console.print(f"  Category:      {escalation.get('category', '')}")
+    console.print(f"  Status:        {escalation.get('status', '')}")
+    if escalation.get("source"):
+        console.print(f"  Source:        {escalation['source']}")
+    if escalation.get("reason"):
+        console.print(f"  Reason:        {escalation['reason']}")
+    if escalation.get("description"):
+        console.print(f"  Description:   {escalation['description']}")
+    if escalation.get("resolution_notes"):
+        console.print(f"  Resolution:    {escalation['resolution_notes']}")
+
+
 if __name__ == "__main__":
     cli()

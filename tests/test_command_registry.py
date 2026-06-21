@@ -101,6 +101,7 @@ EXPECTED_AXIOM_COMMANDS = {
     "session-report-show", "session-report-export",
     "review-create", "review-add-finding", "review-resolve",
     "reviews", "review-show", "review-export",
+    "escalation-create", "escalations", "escalation-show", "escalation-export",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 
