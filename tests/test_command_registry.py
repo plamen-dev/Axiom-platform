@@ -94,6 +94,8 @@ EXPECTED_AXIOM_COMMANDS = {
     "orchestration-complete", "orchestration-summary",
     "session-plan-create", "session-plans",
     "session-plan-show", "session-plan-export",
+    "question-create", "questions",
+    "question-show", "question-resolve",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 

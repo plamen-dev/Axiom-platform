@@ -2906,6 +2906,94 @@ _register(
 
 
 # ---------------------------------------------------------------------------
+# Session Question Registry v1 (PR #73)
+# ---------------------------------------------------------------------------
+
+_register(
+    CommandSpec(
+        name="question-create",
+        command=(
+            "axiom question-create --text <t> "
+            "[--context <c>] [--priority <p>] "
+            "[--plan-id <id>] [--work-item-id <id>] "
+            "[--rationale <r>] [--json-output]"
+        ),
+        description="Create a new session question.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("question_request.json", required=True),
+            EvidenceOutput("question_result.json", required=True),
+            EvidenceOutput("question_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Create durable session question artifact.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="questions",
+        command="axiom questions [--status <s>] [--plan-id <id>] [--json-output]",
+        description="List all session questions.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List session questions with optional status/plan filter.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="question-show",
+        command="axiom question-show --question-id <id> [--json-output]",
+        description="Show a single session question.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Inspect a session question by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="question-resolve",
+        command=(
+            "axiom question-resolve --question-id <id> "
+            "--answer <a> [--source <s>] "
+            "[--rationale <r>] [--json-output]"
+        ),
+        description="Resolve a session question with an answer.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("question_request.json", required=True),
+            EvidenceOutput("question_result.json", required=True),
+            EvidenceOutput("question_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Resolve a session question with evidence bundle.",
+    )
+)
+
+
+# ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
 

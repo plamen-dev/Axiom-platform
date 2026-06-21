@@ -9324,5 +9324,225 @@ def _render_session_plan_rich(plan: dict) -> None:
             )
 
 
+# ---------------------------------------------------------------------------
+# Session Question Registry v1 (PR #73)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("question-create")
+@click.option("--text", required=True, help="Question text.")
+@click.option("--context", default="", help="Additional context.")
+@click.option("--priority", default="medium", help="Priority (critical/high/medium/low).")
+@click.option("--plan-id", default="", help="Linked plan ID.")
+@click.option("--work-item-id", default="", help="Linked work item ID.")
+@click.option("--rationale", default="", help="Why this question matters.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def question_create_cmd(
+    text: str,
+    context: str,
+    priority: str,
+    plan_id: str,
+    work_item_id: str,
+    rationale: str,
+    json_output: bool,
+):
+    """Create a new session question."""
+    from axiom_core.session_question_registry import SessionQuestionRegistry
+
+    try:
+        registry = SessionQuestionRegistry()
+        question = registry.create_question(
+            text=text,
+            context=context,
+            priority=priority,
+            plan_id=plan_id,
+            work_item_id=work_item_id,
+            rationale=rationale,
+        )
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    try:
+        registry.write_evidence(question["question_id"])
+    except Exception as exc:
+        _logger.warning("Evidence write failed: %s", exc)
+
+    if json_output:
+        click.echo(json.dumps(question, indent=2, default=str))
+    else:
+        _render_question_rich(question)
+
+
+@cli.command("questions")
+@click.option("--status", default="", help="Filter by status.")
+@click.option("--plan-id", default="", help="Filter by plan ID.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def questions_cmd(status: str, plan_id: str, json_output: bool):
+    """List all session questions."""
+    from axiom_core.session_question_registry import SessionQuestionRegistry
+
+    try:
+        registry = SessionQuestionRegistry()
+        questions = registry.list_questions(status=status, plan_id=plan_id)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(questions, indent=2, default=str))
+    else:
+        console.print(f"\n[bold]Session Questions ({len(questions)})[/bold]\n")
+        for q in questions:
+            summary = q.get("question_summary", {})
+            ans = summary.get("total_answers", 0)
+            console.print(
+                f"  [{q.get('status', '')}] {q.get('question_id', '')[:12]}… "
+                f"— {q.get('text', '')[:60]} "
+                f"({ans} answers)",
+            )
+
+
+@cli.command("question-show")
+@click.option("--question-id", required=True, help="Question ID.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def question_show_cmd(question_id: str, json_output: bool):
+    """Show a single session question."""
+    from axiom_core.session_question_registry import SessionQuestionRegistry
+
+    try:
+        registry = SessionQuestionRegistry()
+        question = registry.get_question(question_id)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if question is None:
+        msg = {"error": f"Question not found: {question_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Question not found: {question_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(question, indent=2, default=str))
+    else:
+        _render_question_rich(question)
+
+
+@cli.command("question-resolve")
+@click.option("--question-id", required=True, help="Question ID.")
+@click.option("--answer", required=True, help="Resolution answer.")
+@click.option("--source", default="", help="Answer source.")
+@click.option("--rationale", default="", help="Resolution rationale.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def question_resolve_cmd(
+    question_id: str,
+    answer: str,
+    source: str,
+    rationale: str,
+    json_output: bool,
+):
+    """Resolve a session question with an answer."""
+    from axiom_core.session_question_registry import SessionQuestionRegistry
+
+    try:
+        registry = SessionQuestionRegistry()
+        question = registry.resolve_question(
+            question_id=question_id,
+            answer=answer,
+            source=source,
+            rationale=rationale,
+        )
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if question is None:
+        msg = {"error": f"Question not found: {question_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Question not found: {question_id}")
+        raise SystemExit(2)
+
+    try:
+        registry.write_evidence(question["question_id"])
+    except Exception as exc:
+        _logger.warning("Evidence write failed: %s", exc)
+
+    if json_output:
+        click.echo(json.dumps(question, indent=2, default=str))
+    else:
+        _render_question_rich(question)
+
+
+def _render_question_rich(question: dict) -> None:
+    """Rich text rendering for a session question."""
+    status = question.get("status", "").upper()
+    console.print(f"\n[bold]Session Question ({status})[/bold]\n")
+    console.print(f"  Question ID: {question.get('question_id', '')}")
+    console.print(f"  Text:        {question.get('text', '')}")
+    console.print(f"  Status:      {question.get('status', '')}")
+    console.print(f"  Priority:    {question.get('priority', '')}")
+    if question.get("plan_id"):
+        console.print(f"  Plan ID:     {question['plan_id']}")
+    if question.get("work_item_id"):
+        console.print(f"  Work Item:   {question['work_item_id']}")
+    if question.get("context"):
+        console.print(f"  Context:     {question['context']}")
+    if question.get("rationale"):
+        console.print(f"  Rationale:   {question['rationale']}")
+
+    summary = question.get("question_summary", {})
+    console.print(
+        f"\n  Answers: {summary.get('total_answers', 0)} total, "
+        f"resolved: {summary.get('is_resolved', False)}",
+    )
+
+    answers = question.get("answers", [])
+    if answers:
+        resolved_id = question.get("resolved_answer_id", "")
+        console.print(f"\n[bold]Answers ({len(answers)}):[/bold]")
+        for a in answers:
+            marker = " [green][ACCEPTED][/green]" if a.get("answer_id") == resolved_id else ""
+            src = f" (source: {a['source']})" if a.get("source") else ""
+            console.print(f"  - {a.get('content', '')}{src}{marker}")
+
+    if question.get("resolution_rationale"):
+        console.print(f"\n[bold]Resolution:[/bold] {question['resolution_rationale']}")
+
+
 if __name__ == "__main__":
     cli()
