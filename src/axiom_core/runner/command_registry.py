@@ -3514,6 +3514,91 @@ _register(
 )
 
 
+# -- Conflict Resolution Framework v1 ---------------------------------------
+
+_register(
+    CommandSpec(
+        name="conflict-create",
+        command=(
+            "axiom conflict-create --title <t> "
+            "[--description <d>] [--conflict-type <ct>] "
+            "[--severity <s>] [--source <src>] "
+            "[--left-ref <l>] [--right-ref <r>] "
+            "[--rationale <rat>] [--recommendation <rec>] "
+            "[--json-output]"
+        ),
+        description="Create a new conflict.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("conflict_request.json", required=True),
+            EvidenceOutput("conflict_result.json", required=True),
+            EvidenceOutput("conflict_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Create durable conflict artifact.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="conflicts",
+        command=(
+            "axiom conflicts [--status <s>] "
+            "[--severity <sev>] [--conflict-type <ct>] "
+            "[--source <src>] [--json-output]"
+        ),
+        description="List all conflicts.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List conflicts with optional filters.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="conflict-show",
+        command="axiom conflict-show <conflict_id> [--json-output]",
+        description="Show details of a conflict.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Inspect a conflict by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="conflict-export",
+        command="axiom conflict-export <conflict_id> [--json-output]",
+        description="Export a conflict as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export conflict to markdown.",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------

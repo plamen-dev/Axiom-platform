@@ -10931,5 +10931,234 @@ def _render_repair_decision_rich(decision: dict) -> None:
         console.print(f"  Notes:         {decision['notes']}")
 
 
+# ---------------------------------------------------------------------------
+# Conflict Resolution Framework CLI
+# ---------------------------------------------------------------------------
+
+
+@cli.command("conflict-create")
+@click.option("--title", required=True, help="Conflict title")
+@click.option("--description", default="", help="Conflict description")
+@click.option("--conflict-type", default="", help="Type (proposal_conflict/decision_conflict/assertion_conflict/validation_conflict/review_finding_conflict/escalation_conflict/other)")
+@click.option("--severity", default="", help="Severity (none/info/warning/blocker/human_required)")
+@click.option("--source", default="", help="Source (repair_decision/repair_proposal/escalation/assertion/review_finding/validation/other)")
+@click.option("--left-ref", default="", help="Left reference ID")
+@click.option("--right-ref", default="", help="Right reference ID")
+@click.option("--rationale", default="", help="Rationale")
+@click.option("--recommendation", default="", help="Recommendation")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def conflict_create_cmd(
+    title: str,
+    description: str,
+    conflict_type: str,
+    severity: str,
+    source: str,
+    left_ref: str,
+    right_ref: str,
+    rationale: str,
+    recommendation: str,
+    json_output: bool,
+) -> None:
+    """Create a new conflict."""
+    from axiom_core.conflict_registry import ConflictRegistry
+
+    try:
+        registry = ConflictRegistry()
+        conflict = registry.create_conflict(
+            title=title,
+            description=description,
+            conflict_type=conflict_type,
+            severity=severity,
+            source=source,
+            left_ref=left_ref,
+            right_ref=right_ref,
+            rationale=rationale,
+            recommendation=recommendation,
+        )
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    try:
+        registry.write_evidence(conflict["conflict_id"])
+    except Exception as exc:
+        _logger.warning("Evidence write failed: %s", exc)
+
+    if json_output:
+        click.echo(json.dumps(conflict, indent=2, default=str))
+    else:
+        _render_conflict_rich(conflict)
+
+
+@cli.command("conflicts")
+@click.option("--status", default="", help="Filter by status")
+@click.option("--severity", default="", help="Filter by severity")
+@click.option("--conflict-type", default="", help="Filter by conflict type")
+@click.option("--source", default="", help="Filter by source")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def conflicts_cmd(
+    status: str,
+    severity: str,
+    conflict_type: str,
+    source: str,
+    json_output: bool,
+) -> None:
+    """List conflicts."""
+    from axiom_core.conflict_registry import ConflictRegistry
+
+    try:
+        registry = ConflictRegistry()
+        conflicts = registry.list_conflicts(
+            status=status, severity=severity,
+            conflict_type=conflict_type, source=source,
+        )
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(conflicts, indent=2, default=str))
+    else:
+        if not conflicts:
+            console.print("[dim]No conflicts found.[/dim]")
+            return
+        console.print(f"\n[bold]Conflicts ({len(conflicts)})[/bold]\n")
+        for c in conflicts:
+            sev = c.get("severity", "info").upper()
+            console.print(
+                f"  [{c.get('status', '')}] {c.get('conflict_id', '')[:12]}… "
+                f"— [{sev}] {c.get('title', '')}",
+            )
+
+
+@cli.command("conflict-show")
+@click.argument("conflict_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def conflict_show_cmd(
+    conflict_id: str,
+    json_output: bool,
+) -> None:
+    """Show details of a conflict."""
+    from axiom_core.conflict_registry import ConflictRegistry
+
+    try:
+        registry = ConflictRegistry()
+        conflict = registry.get_conflict(conflict_id)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if conflict is None:
+        msg = {"error": f"Conflict not found: {conflict_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(
+                f"[red]Error:[/red] Conflict not found: {conflict_id}",
+            )
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(conflict, indent=2, default=str))
+    else:
+        _render_conflict_rich(conflict)
+
+
+@cli.command("conflict-export")
+@click.argument("conflict_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def conflict_export_cmd(
+    conflict_id: str,
+    json_output: bool,
+) -> None:
+    """Export a conflict as markdown."""
+    from axiom_core.conflict_registry import ConflictRegistry
+
+    try:
+        registry = ConflictRegistry()
+        conflict = registry.get_conflict(conflict_id)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if conflict is None:
+        msg = {"error": f"Conflict not found: {conflict_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(
+                f"[red]Error:[/red] Conflict not found: {conflict_id}",
+            )
+        raise SystemExit(2)
+
+    md = registry.export_conflict(conflict_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"conflict_id": conflict_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_conflict_rich(conflict: dict) -> None:
+    """Rich text rendering for a conflict."""
+    status = conflict.get("status", "").upper()
+    sev = conflict.get("severity", "").upper()
+    console.print(f"\n[bold]Conflict ({status})[/bold]\n")
+    console.print(f"  Conflict ID:   {conflict.get('conflict_id', '')}")
+    console.print(f"  Title:         {conflict.get('title', '')}")
+    console.print(f"  Severity:      {sev}")
+    console.print(f"  Type:          {conflict.get('conflict_type', '')}")
+    console.print(f"  Source:        {conflict.get('source', '')}")
+    console.print(f"  Status:        {conflict.get('status', '')}")
+    if conflict.get("left_ref"):
+        console.print(f"  Left Ref:      {conflict['left_ref']}")
+    if conflict.get("right_ref"):
+        console.print(f"  Right Ref:     {conflict['right_ref']}")
+    if conflict.get("rationale"):
+        console.print(f"  Rationale:     {conflict['rationale']}")
+    if conflict.get("description"):
+        console.print(f"  Description:   {conflict['description']}")
+    if conflict.get("recommendation"):
+        console.print(f"  Recommendation: {conflict['recommendation']}")
+    if conflict.get("resolution_notes"):
+        console.print(f"  Resolution:    {conflict['resolution_notes']}")
+
+
 if __name__ == "__main__":
     cli()
