@@ -9544,5 +9544,190 @@ def _render_question_rich(question: dict) -> None:
         console.print(f"\n[bold]Resolution:[/bold] {question['resolution_rationale']}")
 
 
+# ---------------------------------------------------------------------------
+# Assertion Registry v1 (PR #74)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("assertion-create")
+@click.option("--type", "assertion_type", required=True, help="Assertion type.")
+@click.option("--description", required=True, help="Assertion description.")
+@click.option("--expected-value", default="", help="Expected value.")
+@click.option("--severity", default="medium", help="Severity (critical/high/medium/low).")
+@click.option("--plan-id", default="", help="Linked plan ID.")
+@click.option("--question-id", default="", help="Linked question ID.")
+@click.option("--work-item-id", default="", help="Linked work item ID.")
+@click.option("--capability", default="", help="Target capability.")
+@click.option("--rationale", default="", help="Why this assertion matters.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def assertion_create_cmd(
+    assertion_type: str,
+    description: str,
+    expected_value: str,
+    severity: str,
+    plan_id: str,
+    question_id: str,
+    work_item_id: str,
+    capability: str,
+    rationale: str,
+    json_output: bool,
+):
+    """Create a new assertion."""
+    from axiom_core.assertion_registry import AssertionRegistry
+
+    try:
+        registry = AssertionRegistry()
+        assertion = registry.create_assertion(
+            assertion_type=assertion_type,
+            description=description,
+            expected_value=expected_value,
+            severity=severity,
+            plan_id=plan_id,
+            question_id=question_id,
+            work_item_id=work_item_id,
+            capability=capability,
+            rationale=rationale,
+        )
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    try:
+        registry.write_evidence(assertion["assertion_id"])
+    except Exception as exc:
+        _logger.warning("Evidence write failed: %s", exc)
+
+    if json_output:
+        click.echo(json.dumps(assertion, indent=2, default=str))
+    else:
+        _render_assertion_rich(assertion)
+
+
+@cli.command("assertions")
+@click.option("--status", default="", help="Filter by status.")
+@click.option("--type", "assertion_type", default="", help="Filter by type.")
+@click.option("--capability", default="", help="Filter by capability.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def assertions_cmd(
+    status: str, assertion_type: str, capability: str, json_output: bool,
+):
+    """List all assertions."""
+    from axiom_core.assertion_registry import AssertionRegistry
+
+    try:
+        registry = AssertionRegistry()
+        assertions = registry.list_assertions(
+            status=status,
+            assertion_type=assertion_type,
+            capability=capability,
+        )
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(assertions, indent=2, default=str))
+    else:
+        console.print(f"\n[bold]Assertions ({len(assertions)})[/bold]\n")
+        for a in assertions:
+            summary = a.get("assertion_summary", {})
+            console.print(
+                f"  [{a.get('status', '')}] {a.get('assertion_id', '')[:12]}… "
+                f"— [{a.get('assertion_type', '')}] {a.get('description', '')[:50]} "
+                f"(results: {summary.get('total_results', 0)})",
+            )
+
+
+@cli.command("assertion-results")
+@click.option("--assertion-id", required=True, help="Assertion ID.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def assertion_results_cmd(assertion_id: str, json_output: bool):
+    """List results for an assertion."""
+    from axiom_core.assertion_registry import AssertionRegistry
+
+    try:
+        registry = AssertionRegistry()
+        assertion = registry.get_assertion(assertion_id)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if assertion is None:
+        msg = {"error": f"Assertion not found: {assertion_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Assertion not found: {assertion_id}")
+        raise SystemExit(2)
+
+    results = assertion.get("results", [])
+    if json_output:
+        click.echo(json.dumps(results, indent=2, default=str))
+    else:
+        console.print(
+            f"\n[bold]Assertion Results ({len(results)})[/bold]\n",
+        )
+        console.print(f"  Assertion: {assertion.get('description', '')}")
+        console.print(f"  Type: {assertion.get('assertion_type', '')}")
+        console.print(f"  Expected: {assertion.get('expected_value', '')}")
+        console.print(f"  Status: {assertion.get('status', '')}\n")
+        for r in results:
+            src = f" (source: {r['source']})" if r.get("source") else ""
+            console.print(
+                f"  [{r.get('status', '')}] "
+                f"actual={r.get('actual_value', '')}{src}",
+            )
+            if r.get("message"):
+                console.print(f"    {r['message']}")
+
+
+def _render_assertion_rich(assertion: dict) -> None:
+    """Rich text rendering for an assertion."""
+    status = assertion.get("status", "").upper()
+    console.print(f"\n[bold]Assertion ({status})[/bold]\n")
+    console.print(f"  Assertion ID: {assertion.get('assertion_id', '')}")
+    console.print(f"  Type:         {assertion.get('assertion_type', '')}")
+    console.print(f"  Description:  {assertion.get('description', '')}")
+    console.print(f"  Expected:     {assertion.get('expected_value', '')}")
+    console.print(f"  Severity:     {assertion.get('severity', '')}")
+    console.print(f"  Status:       {assertion.get('status', '')}")
+    if assertion.get("capability"):
+        console.print(f"  Capability:   {assertion['capability']}")
+    if assertion.get("plan_id"):
+        console.print(f"  Plan ID:      {assertion['plan_id']}")
+    if assertion.get("question_id"):
+        console.print(f"  Question ID:  {assertion['question_id']}")
+    if assertion.get("work_item_id"):
+        console.print(f"  Work Item:    {assertion['work_item_id']}")
+    if assertion.get("rationale"):
+        console.print(f"  Rationale:    {assertion['rationale']}")
+
+    summary = assertion.get("assertion_summary", {})
+    console.print(
+        f"\n  Results: {summary.get('total_results', 0)} total, "
+        f"{summary.get('passed', 0)} passed, "
+        f"{summary.get('failed', 0)} failed",
+    )
+
+
 if __name__ == "__main__":
     cli()

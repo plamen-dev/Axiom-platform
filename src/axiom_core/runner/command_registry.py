@@ -2994,6 +2994,74 @@ _register(
 
 
 # ---------------------------------------------------------------------------
+# Assertion Registry v1 (PR #74)
+# ---------------------------------------------------------------------------
+
+_register(
+    CommandSpec(
+        name="assertion-create",
+        command=(
+            "axiom assertion-create --type <t> --description <d> "
+            "[--expected-value <v>] [--severity <s>] "
+            "[--plan-id <id>] [--question-id <id>] "
+            "[--work-item-id <id>] [--capability <c>] "
+            "[--rationale <r>] [--json-output]"
+        ),
+        description="Create a new assertion.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("assertion_request.json", required=True),
+            EvidenceOutput("assertion_result.json", required=True),
+            EvidenceOutput("assertion_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Create durable assertion artifact.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="assertions",
+        command=(
+            "axiom assertions [--status <s>] [--type <t>] "
+            "[--capability <c>] [--json-output]"
+        ),
+        description="List all assertions.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List assertions with optional filters.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="assertion-results",
+        command="axiom assertion-results --assertion-id <id> [--json-output]",
+        description="List results for an assertion.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Inspect assertion evaluation results.",
+    )
+)
+
+
+# ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
 
