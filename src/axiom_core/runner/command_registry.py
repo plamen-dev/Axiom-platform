@@ -3817,6 +3817,33 @@ _register(
 )
 
 
+# -- Parser Coding Trial v1 -------------------------------------------------
+
+_register(
+    CommandSpec(
+        name="parser-coding-trial",
+        command=(
+            "axiom parser-coding-trial [--code-file <cf>] "
+            "[--test-file <tf>] [--function-name <fn>] "
+            "[--description <d>] [--json-output]"
+        ),
+        description="Run a minimal parser coding trial.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("parser_coding_trial_request.json", required=True),
+            EvidenceOutput("parser_coding_trial_result.json", required=True),
+            EvidenceOutput("parser_coding_trial_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=180,
+        failure_modes=(FM_NONZERO,),
+        notes="Run minimal parser coding trial with evidence generation.",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
