@@ -11605,5 +11605,60 @@ def _render_session_task_rich(task: dict) -> None:
         console.print(f"  Description: {task['description']}")
 
 
+# ---------------------------------------------------------------------------
+# Live Coding Trial CLI
+# ---------------------------------------------------------------------------
+
+
+@cli.command("live-coding-trial")
+@click.option("--code-file", default="src/axiom_core/text_utils.py", help="Code file to validate")
+@click.option("--test-file", default="tests/test_text_utils.py", help="Test file to run")
+@click.option("--function-name", default="safe_slug", help="Function being tested")
+@click.option("--description", default="", help="Trial description")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def live_coding_trial_cmd(
+    code_file: str,
+    test_file: str,
+    function_name: str,
+    description: str,
+    json_output: bool,
+) -> None:
+    """Run a minimal live coding trial."""
+    from axiom_core.live_coding_trial import LiveCodingTrialRunner
+
+    try:
+        runner = LiveCodingTrialRunner()
+        trial = runner.run_trial(
+            code_file=code_file,
+            test_file=test_file,
+            function_name=function_name,
+            description=description,
+        )
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(trial, indent=2, default=str))
+    else:
+        status = "PASSED" if trial["all_passed"] else "FAILED"
+        console.print(f"\n[bold]Live Coding Trial ({status})[/bold]\n")
+        console.print(f"  Trial ID:  {trial['trial_id']}")
+        console.print(f"  Function:  {trial['function_name']}")
+        console.print(f"  Code:      {trial['code_file']}")
+        console.print(f"  Tests:     {trial['test_file']}")
+        console.print(f"  Status:    {status}")
+        for vr in trial.get("validation_results", []):
+            vr_status = "PASS" if vr["exit_code"] == 0 else "FAIL"
+            console.print(f"  {vr['label']}: {vr_status}")
+        if trial["escalation_needed"]:
+            console.print("  [red]Escalation needed[/red]")
+        else:
+            console.print("  No escalation or repair needed")
+
+
 if __name__ == "__main__":
     cli()

@@ -113,6 +113,7 @@ EXPECTED_AXIOM_COMMANDS = {
     "session-state-export",
     "session-task-create", "session-tasks",
     "session-task-show", "session-task-export",
+    "live-coding-trial",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 
