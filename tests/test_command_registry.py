@@ -108,6 +108,9 @@ EXPECTED_AXIOM_COMMANDS = {
     "repair-decision-show", "repair-decision-export",
     "conflict-create", "conflicts",
     "conflict-show", "conflict-export",
+    "session-state-create", "session-states",
+    "session-state-show", "session-state-transition",
+    "session-state-export",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 

@@ -3599,6 +3599,114 @@ _register(
 )
 
 
+# -- Session State Machine v1 -----------------------------------------------
+
+_register(
+    CommandSpec(
+        name="session-state-create",
+        command=(
+            "axiom session-state-create --session-id <sid> "
+            "[--current-state <cs>] [--reason <r>] "
+            "[--source <src>] [--rationale <rat>] "
+            "[--json-output]"
+        ),
+        description="Create a new session state.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("session_state_request.json", required=True),
+            EvidenceOutput("session_state_result.json", required=True),
+            EvidenceOutput("session_state_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Create durable session state artifact.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="session-states",
+        command=(
+            "axiom session-states [--session-id <sid>] "
+            "[--current-state <cs>] [--source <src>] "
+            "[--json-output]"
+        ),
+        description="List all session states.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List session states with optional filters.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="session-state-show",
+        command="axiom session-state-show <state_id> [--json-output]",
+        description="Show details of a session state.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Inspect a session state by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="session-state-transition",
+        command=(
+            "axiom session-state-transition <state_id> "
+            "--to-state <ts> [--reason <r>] "
+            "[--source <src>] [--rationale <rat>] "
+            "[--json-output]"
+        ),
+        description="Transition a session state.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("session_state_request.json", required=True),
+            EvidenceOutput("session_state_result.json", required=True),
+            EvidenceOutput("session_state_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Transition session state with validation.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="session-state-export",
+        command="axiom session-state-export <state_id> [--json-output]",
+        description="Export a session state as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export session state to markdown.",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------

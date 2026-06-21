@@ -11160,5 +11160,258 @@ def _render_conflict_rich(conflict: dict) -> None:
         console.print(f"  Resolution:    {conflict['resolution_notes']}")
 
 
+# ---------------------------------------------------------------------------
+# Session State Machine CLI
+# ---------------------------------------------------------------------------
+
+
+@cli.command("session-state-create")
+@click.option("--session-id", required=True, help="Session ID")
+@click.option("--current-state", default="", help="Initial state (created/planning/executing/validating/repairing/reviewing/reporting/completed/failed)")
+@click.option("--reason", default="", help="Reason")
+@click.option("--source", default="", help="Source")
+@click.option("--rationale", default="", help="Rationale")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def session_state_create_cmd(
+    session_id: str,
+    current_state: str,
+    reason: str,
+    source: str,
+    rationale: str,
+    json_output: bool,
+) -> None:
+    """Create a new session state."""
+    from axiom_core.session_state_machine import SessionStateMachineRegistry
+
+    try:
+        registry = SessionStateMachineRegistry()
+        state = registry.create_state(
+            session_id=session_id,
+            current_state=current_state,
+            reason=reason,
+            source=source,
+            rationale=rationale,
+        )
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    try:
+        registry.write_evidence(state["state_id"])
+    except Exception as exc:
+        _logger.warning("Evidence write failed: %s", exc)
+
+    if json_output:
+        click.echo(json.dumps(state, indent=2, default=str))
+    else:
+        _render_session_state_rich(state)
+
+
+@cli.command("session-states")
+@click.option("--session-id", default="", help="Filter by session ID")
+@click.option("--current-state", default="", help="Filter by current state")
+@click.option("--source", default="", help="Filter by source")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def session_states_cmd(
+    session_id: str,
+    current_state: str,
+    source: str,
+    json_output: bool,
+) -> None:
+    """List session states."""
+    from axiom_core.session_state_machine import SessionStateMachineRegistry
+
+    try:
+        registry = SessionStateMachineRegistry()
+        states = registry.list_states(
+            session_id=session_id,
+            current_state=current_state,
+            source=source,
+        )
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(states, indent=2, default=str))
+    else:
+        if not states:
+            console.print("[dim]No session states found.[/dim]")
+            return
+        console.print(f"\n[bold]Session States ({len(states)})[/bold]\n")
+        for s in states:
+            console.print(
+                f"  [{s.get('current_state', '').upper()}] "
+                f"{s.get('state_id', '')[:12]}… — {s.get('session_id', '')}",
+            )
+
+
+@cli.command("session-state-show")
+@click.argument("state_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def session_state_show_cmd(
+    state_id: str,
+    json_output: bool,
+) -> None:
+    """Show details of a session state."""
+    from axiom_core.session_state_machine import SessionStateMachineRegistry
+
+    try:
+        registry = SessionStateMachineRegistry()
+        state = registry.get_state(state_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if state is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Session state not found: {state_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Session state not found: {state_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(state, indent=2, default=str))
+    else:
+        _render_session_state_rich(state)
+
+
+@cli.command("session-state-transition")
+@click.argument("state_id")
+@click.option("--to-state", required=True, help="Target state")
+@click.option("--reason", default="", help="Reason")
+@click.option("--source", default="", help="Source")
+@click.option("--rationale", default="", help="Rationale")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def session_state_transition_cmd(
+    state_id: str,
+    to_state: str,
+    reason: str,
+    source: str,
+    rationale: str,
+    json_output: bool,
+) -> None:
+    """Transition a session state."""
+    from axiom_core.session_state_machine import SessionStateMachineRegistry
+
+    try:
+        registry = SessionStateMachineRegistry()
+        transition = registry.transition_state(
+            state_id=state_id,
+            to_state=to_state,
+            reason=reason,
+            source=source,
+            rationale=rationale,
+        )
+    except ValueError as exc:
+        err_msg = str(exc)
+        if json_output:
+            click.echo(json.dumps({"error": err_msg}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        if "not found" in err_msg:
+            raise SystemExit(2)
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    try:
+        registry.write_evidence(state_id)
+    except Exception as exc:
+        _logger.warning("Evidence write failed: %s", exc)
+
+    if json_output:
+        click.echo(json.dumps(transition, indent=2, default=str))
+    else:
+        console.print(f"\n[bold]Transition: {transition['from_state']} → {transition['to_state']}[/bold]\n")
+        console.print(f"  Transition ID: {transition['transition_id']}")
+        console.print(f"  Session ID:    {transition['session_id']}")
+        console.print(f"  Reason:        {transition['reason']}")
+        console.print(f"  Source:        {transition['source']}")
+        if transition.get("rationale"):
+            console.print(f"  Rationale:     {transition['rationale']}")
+
+
+@cli.command("session-state-export")
+@click.argument("state_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def session_state_export_cmd(
+    state_id: str,
+    json_output: bool,
+) -> None:
+    """Export a session state as markdown."""
+    from axiom_core.session_state_machine import SessionStateMachineRegistry
+
+    try:
+        registry = SessionStateMachineRegistry()
+        state = registry.get_state(state_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if state is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Session state not found: {state_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Session state not found: {state_id}")
+        raise SystemExit(2)
+
+    md = registry.export_state(state_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"state_id": state_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_session_state_rich(state: dict) -> None:
+    """Rich text rendering for a session state."""
+    cur = state.get("current_state", "").upper()
+    console.print(f"\n[bold]Session State ({cur})[/bold]\n")
+    console.print(f"  State ID:      {state.get('state_id', '')}")
+    console.print(f"  Session ID:    {state.get('session_id', '')}")
+    console.print(f"  Current:       {state.get('current_state', '')}")
+    if state.get("previous_state"):
+        console.print(f"  Previous:      {state['previous_state']}")
+    console.print(f"  Reason:        {state.get('reason', '')}")
+    console.print(f"  Source:        {state.get('source', '')}")
+    if state.get("rationale"):
+        console.print(f"  Rationale:     {state['rationale']}")
+
+
 if __name__ == "__main__":
     cli()
