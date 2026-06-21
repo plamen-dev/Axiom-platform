@@ -10713,5 +10713,223 @@ def _render_repair_proposal_rich(proposal: dict) -> None:
         console.print(f"  Recommendations: {proposal['recommendations']}")
 
 
+# ---------------------------------------------------------------------------
+# Repair Decision Framework CLI
+# ---------------------------------------------------------------------------
+
+
+@cli.command("repair-decision-create")
+@click.option("--title", required=True, help="Decision title")
+@click.option("--proposal-id", default="", help="Linked proposal ID")
+@click.option("--description", default="", help="Decision description")
+@click.option("--source", default="", help="Source (repair_proposal/escalation/review_finding/validation)")
+@click.option("--status", default="", help="Status (accepted/rejected/deferred/superseded)")
+@click.option("--reason", default="", help="Reason (technical/policy/risk/duplicate/human_judgment/other)")
+@click.option("--rationale", default="", help="Rationale for the decision")
+@click.option("--notes", default="", help="Additional notes")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def repair_decision_create_cmd(
+    title: str,
+    proposal_id: str,
+    description: str,
+    source: str,
+    status: str,
+    reason: str,
+    rationale: str,
+    notes: str,
+    json_output: bool,
+) -> None:
+    """Create a new repair decision."""
+    from axiom_core.repair_decision_registry import RepairDecisionRegistry
+
+    try:
+        registry = RepairDecisionRegistry()
+        decision = registry.create_decision(
+            title=title,
+            proposal_id=proposal_id,
+            description=description,
+            source=source,
+            status=status,
+            reason=reason,
+            rationale=rationale,
+            notes=notes,
+        )
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    try:
+        registry.write_evidence(decision["decision_id"])
+    except Exception as exc:
+        _logger.warning("Evidence write failed: %s", exc)
+
+    if json_output:
+        click.echo(json.dumps(decision, indent=2, default=str))
+    else:
+        _render_repair_decision_rich(decision)
+
+
+@cli.command("repair-decisions")
+@click.option("--status", default="", help="Filter by status")
+@click.option("--reason", default="", help="Filter by reason")
+@click.option("--source", default="", help="Filter by source")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def repair_decisions_cmd(
+    status: str,
+    reason: str,
+    source: str,
+    json_output: bool,
+) -> None:
+    """List repair decisions."""
+    from axiom_core.repair_decision_registry import RepairDecisionRegistry
+
+    try:
+        registry = RepairDecisionRegistry()
+        decisions = registry.list_decisions(
+            status=status, reason=reason, source=source,
+        )
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(decisions, indent=2, default=str))
+    else:
+        if not decisions:
+            console.print("[dim]No repair decisions found.[/dim]")
+            return
+        console.print(f"\n[bold]Repair Decisions ({len(decisions)})[/bold]\n")
+        for d in decisions:
+            reason_str = d.get("reason", "other").upper()
+            console.print(
+                f"  [{d.get('status', '')}] {d.get('decision_id', '')[:12]}… "
+                f"— [{reason_str}] {d.get('title', '')}",
+            )
+
+
+@cli.command("repair-decision-show")
+@click.argument("decision_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def repair_decision_show_cmd(
+    decision_id: str,
+    json_output: bool,
+) -> None:
+    """Show details of a repair decision."""
+    from axiom_core.repair_decision_registry import RepairDecisionRegistry
+
+    try:
+        registry = RepairDecisionRegistry()
+        decision = registry.get_decision(decision_id)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if decision is None:
+        msg = {"error": f"Repair decision not found: {decision_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(
+                f"[red]Error:[/red] Repair decision not found: {decision_id}",
+            )
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(decision, indent=2, default=str))
+    else:
+        _render_repair_decision_rich(decision)
+
+
+@cli.command("repair-decision-export")
+@click.argument("decision_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def repair_decision_export_cmd(
+    decision_id: str,
+    json_output: bool,
+) -> None:
+    """Export a repair decision as markdown."""
+    from axiom_core.repair_decision_registry import RepairDecisionRegistry
+
+    try:
+        registry = RepairDecisionRegistry()
+        decision = registry.get_decision(decision_id)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if decision is None:
+        msg = {"error": f"Repair decision not found: {decision_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(
+                f"[red]Error:[/red] Repair decision not found: {decision_id}",
+            )
+        raise SystemExit(2)
+
+    md = registry.export_decision(decision_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"decision_id": decision_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_repair_decision_rich(decision: dict) -> None:
+    """Rich text rendering for a repair decision."""
+    status = decision.get("status", "").upper()
+    reason_str = decision.get("reason", "").upper()
+    console.print(f"\n[bold]Repair Decision ({status})[/bold]\n")
+    console.print(f"  Decision ID:   {decision.get('decision_id', '')}")
+    console.print(f"  Title:         {decision.get('title', '')}")
+    console.print(f"  Reason:        {reason_str}")
+    console.print(f"  Source:        {decision.get('source', '')}")
+    console.print(f"  Status:        {decision.get('status', '')}")
+    if decision.get("proposal_id"):
+        console.print(f"  Proposal ID:   {decision['proposal_id']}")
+    if decision.get("rationale"):
+        console.print(f"  Rationale:     {decision['rationale']}")
+    if decision.get("description"):
+        console.print(f"  Description:   {decision['description']}")
+    if decision.get("notes"):
+        console.print(f"  Notes:         {decision['notes']}")
+
+
 if __name__ == "__main__":
     cli()
