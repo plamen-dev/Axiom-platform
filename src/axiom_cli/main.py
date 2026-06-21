@@ -9118,5 +9118,211 @@ def _render_impact_result_rich(result: dict) -> None:
             console.print(f"  - {cmd['command_name']}")
 
 
+# ---------------------------------------------------------------------------
+# Session Plan Registry v1 (PR #72)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("session-plan-create")
+@click.option("--title", required=True, help="Plan title.")
+@click.option("--session-id", default="", help="Linked session ID.")
+@click.option("--work-item-id", default="", help="Linked work item ID.")
+@click.option("--rationale", default="", help="Plan rationale.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def session_plan_create_cmd(
+    title: str,
+    session_id: str,
+    work_item_id: str,
+    rationale: str,
+    json_output: bool,
+):
+    """Create a new session plan."""
+    from axiom_core.session_plan_registry import SessionPlanRegistry
+
+    try:
+        registry = SessionPlanRegistry()
+        plan = registry.create_plan(
+            title=title,
+            session_id=session_id,
+            work_item_id=work_item_id,
+            rationale=rationale,
+        )
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    try:
+        registry.write_evidence(plan["plan_id"])
+    except Exception as exc:
+        _logger.warning("Evidence write failed: %s", exc)
+
+    if json_output:
+        click.echo(json.dumps(plan, indent=2, default=str))
+    else:
+        _render_session_plan_rich(plan)
+
+
+@cli.command("session-plans")
+@click.option("--status", default="", help="Filter by status.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def session_plans_cmd(status: str, json_output: bool):
+    """List all session plans."""
+    from axiom_core.session_plan_registry import SessionPlanRegistry
+
+    try:
+        registry = SessionPlanRegistry()
+        plans = registry.list_plans(status=status)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(plans, indent=2, default=str))
+    else:
+        console.print(f"\n[bold]Session Plans ({len(plans)})[/bold]\n")
+        for p in plans:
+            summary = p.get("step_summary", {})
+            console.print(
+                f"  [{p.get('status', '')}] {p.get('plan_id', '')[:12]}… "
+                f"— {p.get('title', '')} "
+                f"({summary.get('total', 0)} steps, "
+                f"{summary.get('completed', 0)} done)",
+            )
+
+
+@cli.command("session-plan-show")
+@click.option("--plan-id", required=True, help="Plan ID.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def session_plan_show_cmd(plan_id: str, json_output: bool):
+    """Show a single session plan."""
+    from axiom_core.session_plan_registry import SessionPlanRegistry
+
+    try:
+        registry = SessionPlanRegistry()
+        plan = registry.get_plan(plan_id)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if plan is None:
+        msg = {"error": f"Plan not found: {plan_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Plan not found: {plan_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(plan, indent=2, default=str))
+    else:
+        _render_session_plan_rich(plan)
+
+
+@cli.command("session-plan-export")
+@click.option("--plan-id", required=True, help="Plan ID.")
+@click.option("--json-output", is_flag=True, help="Output as JSON.")
+def session_plan_export_cmd(plan_id: str, json_output: bool):
+    """Export a session plan as markdown."""
+    from axiom_core.session_plan_registry import SessionPlanRegistry
+
+    try:
+        registry = SessionPlanRegistry()
+        markdown = registry.export_plan(plan_id)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        plan = registry.get_plan(plan_id)
+        if plan is None:
+            msg = {"error": f"Plan not found: {plan_id}"}
+            click.echo(json.dumps(msg, indent=2))
+            raise SystemExit(2)
+        click.echo(json.dumps(plan, indent=2, default=str))
+    else:
+        click.echo(markdown)
+
+
+def _render_session_plan_rich(plan: dict) -> None:
+    """Rich text rendering for a session plan."""
+    console.print(f"\n[bold]Session Plan ({plan.get('status', '').upper()})[/bold]\n")
+    console.print(f"  Plan ID:     {plan.get('plan_id', '')}")
+    console.print(f"  Title:       {plan.get('title', '')}")
+    console.print(f"  Status:      {plan.get('status', '')}")
+    if plan.get("session_id"):
+        console.print(f"  Session ID:  {plan['session_id']}")
+    if plan.get("work_item_id"):
+        console.print(f"  Work Item:   {plan['work_item_id']}")
+    if plan.get("rationale"):
+        console.print(f"  Rationale:   {plan['rationale']}")
+
+    summary = plan.get("step_summary", {})
+    console.print(
+        f"\n  Steps: {summary.get('total', 0)} total, "
+        f"{summary.get('completed', 0)} completed, "
+        f"{summary.get('remaining', 0)} remaining",
+    )
+
+    goals = plan.get("goals", [])
+    if goals:
+        console.print(f"\n[bold]Goals ({len(goals)}):[/bold]")
+        for g in goals:
+            console.print(
+                f"  [{g.get('priority', 'medium')}] {g.get('description', '')}",
+            )
+
+    assumptions = plan.get("assumptions", [])
+    if assumptions:
+        console.print(f"\n[bold]Assumptions ({len(assumptions)}):[/bold]")
+        for a in assumptions:
+            verified = "verified" if a.get("verified") else "unverified"
+            console.print(f"  [{verified}] {a.get('description', '')}")
+
+    constraints = plan.get("constraints", [])
+    if constraints:
+        console.print(f"\n[bold]Constraints ({len(constraints)}):[/bold]")
+        for c in constraints:
+            console.print(f"  {c.get('description', '')}")
+
+    steps = plan.get("steps", [])
+    if steps:
+        console.print(f"\n[bold]Steps ({len(steps)}):[/bold]")
+        for s in sorted(steps, key=lambda x: x.get("order", 0)):
+            console.print(
+                f"  {s.get('order', 0)}. [{s.get('category', '')}] "
+                f"{s.get('description', '')} ({s.get('status', '')})",
+            )
+
+
 if __name__ == "__main__":
     cli()

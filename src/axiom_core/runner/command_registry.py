@@ -2826,6 +2826,86 @@ _register(
 
 
 # ---------------------------------------------------------------------------
+# Session Plan Registry v1 (PR #72)
+# ---------------------------------------------------------------------------
+
+_register(
+    CommandSpec(
+        name="session-plan-create",
+        command=(
+            "axiom session-plan-create --title <t> "
+            "[--session-id <id>] [--work-item-id <id>] "
+            "[--rationale <r>] [--json-output]"
+        ),
+        description="Create a new session plan.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("session_plan_request.json", required=True),
+            EvidenceOutput("session_plan_result.json", required=True),
+            EvidenceOutput("session_plan.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Create durable session plan artifact.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="session-plans",
+        command="axiom session-plans [--status <s>] [--json-output]",
+        description="List all session plans.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List session plans with optional status filter.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="session-plan-show",
+        command="axiom session-plan-show --plan-id <id> [--json-output]",
+        description="Show a single session plan.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Inspect a session plan by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="session-plan-export",
+        command="axiom session-plan-export --plan-id <id> [--json-output]",
+        description="Export a session plan as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export session plan as markdown document.",
+    )
+)
+
+
+# ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
 
