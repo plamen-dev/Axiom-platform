@@ -3707,6 +3707,89 @@ _register(
 )
 
 
+# -- Session Task Graph v1 --------------------------------------------------
+
+_register(
+    CommandSpec(
+        name="session-task-create",
+        command=(
+            "axiom session-task-create --title <t> "
+            "[--parent-task-id <pid>] [--description <d>] "
+            "[--task-type <tt>] [--status <s>] "
+            "[--json-output]"
+        ),
+        description="Create a new session task.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("session_task_request.json", required=True),
+            EvidenceOutput("session_task_result.json", required=True),
+            EvidenceOutput("session_task_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Create durable session task artifact.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="session-tasks",
+        command=(
+            "axiom session-tasks [--task-type <tt>] "
+            "[--status <s>] [--parent-task-id <pid>] "
+            "[--json-output]"
+        ),
+        description="List all session tasks.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List session tasks with optional filters.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="session-task-show",
+        command="axiom session-task-show <task_id> [--json-output]",
+        description="Show details of a session task.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Inspect a session task by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="session-task-export",
+        command="axiom session-task-export <task_id> [--json-output]",
+        description="Export a session task as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export session task to markdown.",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------

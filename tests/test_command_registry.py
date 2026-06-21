@@ -111,6 +111,8 @@ EXPECTED_AXIOM_COMMANDS = {
     "session-state-create", "session-states",
     "session-state-show", "session-state-transition",
     "session-state-export",
+    "session-task-create", "session-tasks",
+    "session-task-show", "session-task-export",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 

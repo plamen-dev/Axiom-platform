@@ -11413,5 +11413,197 @@ def _render_session_state_rich(state: dict) -> None:
         console.print(f"  Rationale:     {state['rationale']}")
 
 
+# ---------------------------------------------------------------------------
+# Session Task Graph CLI
+# ---------------------------------------------------------------------------
+
+
+@cli.command("session-task-create")
+@click.option("--title", required=True, help="Task title")
+@click.option("--parent-task-id", default="", help="Parent task ID")
+@click.option("--description", default="", help="Description")
+@click.option("--task-type", default="", help="Task type (implementation/validation/review/repair/reporting/other)")
+@click.option("--status", default="", help="Status")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def session_task_create_cmd(
+    title: str,
+    parent_task_id: str,
+    description: str,
+    task_type: str,
+    status: str,
+    json_output: bool,
+) -> None:
+    """Create a new session task."""
+    from axiom_core.session_task_graph import SessionTaskGraphRegistry
+
+    try:
+        registry = SessionTaskGraphRegistry()
+        task = registry.create_task(
+            title=title,
+            parent_task_id=parent_task_id,
+            description=description,
+            task_type=task_type,
+            status=status,
+        )
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    try:
+        registry.write_evidence(task["task_id"])
+    except Exception as exc:
+        _logger.warning("Evidence write failed: %s", exc)
+
+    if json_output:
+        click.echo(json.dumps(task, indent=2, default=str))
+    else:
+        _render_session_task_rich(task)
+
+
+@cli.command("session-tasks")
+@click.option("--task-type", default="", help="Filter by task type")
+@click.option("--status", default="", help="Filter by status")
+@click.option("--parent-task-id", default="", help="Filter by parent task ID")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def session_tasks_cmd(
+    task_type: str,
+    status: str,
+    parent_task_id: str,
+    json_output: bool,
+) -> None:
+    """List session tasks."""
+    from axiom_core.session_task_graph import SessionTaskGraphRegistry
+
+    try:
+        registry = SessionTaskGraphRegistry()
+        tasks = registry.list_tasks(
+            task_type=task_type,
+            status=status,
+            parent_task_id=parent_task_id,
+        )
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(tasks, indent=2, default=str))
+    else:
+        if not tasks:
+            console.print("[dim]No session tasks found.[/dim]")
+            return
+        console.print(f"\n[bold]Session Tasks ({len(tasks)})[/bold]\n")
+        for t in tasks:
+            console.print(
+                f"  [{t.get('status', '').upper()}] "
+                f"{t.get('task_id', '')[:12]}… — {t.get('title', '')}",
+            )
+
+
+@cli.command("session-task-show")
+@click.argument("task_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def session_task_show_cmd(
+    task_id: str,
+    json_output: bool,
+) -> None:
+    """Show details of a session task."""
+    from axiom_core.session_task_graph import SessionTaskGraphRegistry
+
+    try:
+        registry = SessionTaskGraphRegistry()
+        task = registry.get_task(task_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if task is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Session task not found: {task_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Session task not found: {task_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(task, indent=2, default=str))
+    else:
+        _render_session_task_rich(task)
+
+
+@cli.command("session-task-export")
+@click.argument("task_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def session_task_export_cmd(
+    task_id: str,
+    json_output: bool,
+) -> None:
+    """Export a session task as markdown."""
+    from axiom_core.session_task_graph import SessionTaskGraphRegistry
+
+    try:
+        registry = SessionTaskGraphRegistry()
+        task = registry.get_task(task_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if task is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Session task not found: {task_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Session task not found: {task_id}")
+        raise SystemExit(2)
+
+    md = registry.export_task(task_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"task_id": task_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_session_task_rich(task: dict) -> None:
+    """Rich text rendering for a session task."""
+    status = task.get("status", "").upper()
+    console.print(f"\n[bold]Session Task ({status})[/bold]\n")
+    console.print(f"  Task ID:     {task.get('task_id', '')}")
+    console.print(f"  Title:       {task.get('title', '')}")
+    console.print(f"  Type:        {task.get('task_type', '')}")
+    console.print(f"  Status:      {task.get('status', '')}")
+    if task.get("parent_task_id"):
+        console.print(f"  Parent:      {task['parent_task_id']}")
+    if task.get("description"):
+        console.print(f"  Description: {task['description']}")
+
+
 if __name__ == "__main__":
     cli()
