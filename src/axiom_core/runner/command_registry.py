@@ -3346,6 +3346,90 @@ _register(
 )
 
 
+# -- Repair Proposal Framework v1 -------------------------------------------
+
+_register(
+    CommandSpec(
+        name="repair-proposal-create",
+        command=(
+            "axiom repair-proposal-create --title <t> "
+            "[--escalation-id <eid>] [--description <d>] "
+            "[--source <s>] [--proposal-type <pt>] "
+            "[--rationale <r>] [--recommendations <rec>] "
+            "[--json-output]"
+        ),
+        description="Create a new repair proposal.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("repair_proposal_request.json", required=True),
+            EvidenceOutput("repair_proposal_result.json", required=True),
+            EvidenceOutput("repair_proposal_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Create durable repair proposal artifact.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="repair-proposals",
+        command=(
+            "axiom repair-proposals [--status <s>] "
+            "[--proposal-type <pt>] [--source <src>] "
+            "[--json-output]"
+        ),
+        description="List all repair proposals.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List repair proposals with optional filters.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="repair-proposal-show",
+        command="axiom repair-proposal-show <proposal_id> [--json-output]",
+        description="Show details of a repair proposal.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Inspect a repair proposal by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="repair-proposal-export",
+        command="axiom repair-proposal-export <proposal_id> [--json-output]",
+        description="Export a repair proposal as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export repair proposal to markdown.",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------

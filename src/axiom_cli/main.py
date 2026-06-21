@@ -10498,5 +10498,220 @@ def _render_escalation_rich(escalation: dict) -> None:
         console.print(f"  Resolution:    {escalation['resolution_notes']}")
 
 
+# ---------------------------------------------------------------------------
+# Repair Proposal Framework CLI
+# ---------------------------------------------------------------------------
+
+
+@cli.command("repair-proposal-create")
+@click.option("--title", required=True, help="Proposal title")
+@click.option("--escalation-id", default="", help="Linked escalation ID")
+@click.option("--description", default="", help="Proposal description")
+@click.option("--source", default="", help="Source (escalation/assertion/review_finding/validation)")
+@click.option("--proposal-type", default="", help="Type (code_change/test_change/configuration/documentation/other)")
+@click.option("--rationale", default="", help="Rationale for the proposal")
+@click.option("--recommendations", default="", help="Recommendations")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def repair_proposal_create_cmd(
+    title: str,
+    escalation_id: str,
+    description: str,
+    source: str,
+    proposal_type: str,
+    rationale: str,
+    recommendations: str,
+    json_output: bool,
+) -> None:
+    """Create a new repair proposal."""
+    from axiom_core.repair_proposal_registry import RepairProposalRegistry
+
+    try:
+        registry = RepairProposalRegistry()
+        proposal = registry.create_proposal(
+            title=title,
+            escalation_id=escalation_id,
+            description=description,
+            source=source,
+            proposal_type=proposal_type,
+            rationale=rationale,
+            recommendations=recommendations,
+        )
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    try:
+        registry.write_evidence(proposal["proposal_id"])
+    except Exception as exc:
+        _logger.warning("Evidence write failed: %s", exc)
+
+    if json_output:
+        click.echo(json.dumps(proposal, indent=2, default=str))
+    else:
+        _render_repair_proposal_rich(proposal)
+
+
+@cli.command("repair-proposals")
+@click.option("--status", default="", help="Filter by status")
+@click.option("--proposal-type", default="", help="Filter by proposal type")
+@click.option("--source", default="", help="Filter by source")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def repair_proposals_cmd(
+    status: str,
+    proposal_type: str,
+    source: str,
+    json_output: bool,
+) -> None:
+    """List repair proposals."""
+    from axiom_core.repair_proposal_registry import RepairProposalRegistry
+
+    try:
+        registry = RepairProposalRegistry()
+        proposals = registry.list_proposals(
+            status=status, proposal_type=proposal_type, source=source,
+        )
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(proposals, indent=2, default=str))
+    else:
+        if not proposals:
+            console.print("[dim]No repair proposals found.[/dim]")
+            return
+        console.print(f"\n[bold]Repair Proposals ({len(proposals)})[/bold]\n")
+        for p in proposals:
+            ptype = p.get("proposal_type", "other").upper()
+            console.print(
+                f"  [{p.get('status', '')}] {p.get('proposal_id', '')[:12]}… "
+                f"— [{ptype}] {p.get('title', '')}",
+            )
+
+
+@cli.command("repair-proposal-show")
+@click.argument("proposal_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def repair_proposal_show_cmd(
+    proposal_id: str,
+    json_output: bool,
+) -> None:
+    """Show details of a repair proposal."""
+    from axiom_core.repair_proposal_registry import RepairProposalRegistry
+
+    try:
+        registry = RepairProposalRegistry()
+        proposal = registry.get_proposal(proposal_id)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if proposal is None:
+        msg = {"error": f"Repair proposal not found: {proposal_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(
+                f"[red]Error:[/red] Repair proposal not found: {proposal_id}",
+            )
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(proposal, indent=2, default=str))
+    else:
+        _render_repair_proposal_rich(proposal)
+
+
+@cli.command("repair-proposal-export")
+@click.argument("proposal_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def repair_proposal_export_cmd(
+    proposal_id: str,
+    json_output: bool,
+) -> None:
+    """Export a repair proposal as markdown."""
+    from axiom_core.repair_proposal_registry import RepairProposalRegistry
+
+    try:
+        registry = RepairProposalRegistry()
+        proposal = registry.get_proposal(proposal_id)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if proposal is None:
+        msg = {"error": f"Repair proposal not found: {proposal_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(
+                f"[red]Error:[/red] Repair proposal not found: {proposal_id}",
+            )
+        raise SystemExit(2)
+
+    md = registry.export_proposal(proposal_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"proposal_id": proposal_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_repair_proposal_rich(proposal: dict) -> None:
+    """Rich text rendering for a repair proposal."""
+    status = proposal.get("status", "").upper()
+    ptype = proposal.get("proposal_type", "").upper()
+    console.print(f"\n[bold]Repair Proposal ({status})[/bold]\n")
+    console.print(f"  Proposal ID:   {proposal.get('proposal_id', '')}")
+    console.print(f"  Title:         {proposal.get('title', '')}")
+    console.print(f"  Type:          {ptype}")
+    console.print(f"  Source:        {proposal.get('source', '')}")
+    console.print(f"  Status:        {proposal.get('status', '')}")
+    if proposal.get("escalation_id"):
+        console.print(f"  Escalation ID: {proposal['escalation_id']}")
+    if proposal.get("rationale"):
+        console.print(f"  Rationale:     {proposal['rationale']}")
+    if proposal.get("description"):
+        console.print(f"  Description:   {proposal['description']}")
+    if proposal.get("recommendations"):
+        console.print(f"  Recommendations: {proposal['recommendations']}")
+
+
 if __name__ == "__main__":
     cli()
