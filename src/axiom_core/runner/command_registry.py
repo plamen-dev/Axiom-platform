@@ -3844,6 +3844,66 @@ _register(
 )
 
 
+# -- Structured Configuration v1 --------------------------------------------
+
+_register(
+    CommandSpec(
+        name="config-load",
+        command=(
+            "axiom config-load [--text <t>] [--file <f>] "
+            "[--file-name <fn>] [--json-output]"
+        ),
+        description="Load and validate a key=value configuration.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("configuration_request.json", required=True),
+            EvidenceOutput("configuration_result.json", required=True),
+            EvidenceOutput("configuration_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Load key=value text, validate, persist, generate evidence.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-show",
+        command="axiom config-show <config_id> [--json-output]",
+        description="Show a configuration by ID.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Display a persisted configuration.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-export",
+        command="axiom config-export <config_id> [--json-output]",
+        description="Export a configuration as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a configuration as markdown.",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------

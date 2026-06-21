@@ -3,6 +3,7 @@
 import json
 import logging
 from enum import Enum
+from pathlib import Path
 from typing import Optional
 from uuid import UUID
 
@@ -11713,6 +11714,167 @@ def parser_coding_trial_cmd(
             console.print("  [red]Escalation needed[/red]")
         else:
             console.print("  No escalation or repair needed")
+
+
+# ---------------------------------------------------------------------------
+# Structured Configuration CLI
+# ---------------------------------------------------------------------------
+
+
+@cli.command("config-load")
+@click.option("--text", default="", help="Key=value text to load")
+@click.option("--file", "file_path", default="", help="Path to key=value file")
+@click.option("--file-name", default="", help="Logical file name for evidence")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_load_cmd(
+    text: str,
+    file_path: str,
+    file_name: str,
+    json_output: bool,
+) -> None:
+    """Load and validate a key=value configuration."""
+    from axiom_core.configuration_registry import ConfigurationRegistry
+
+    if file_path and not text:
+        try:
+            text = Path(file_path).read_text(encoding="utf-8")
+            if not file_name:
+                file_name = file_path
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    try:
+        registry = ConfigurationRegistry()
+        config = registry.load_config(text=text, file_name=file_name)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    try:
+        registry.write_evidence(config["config_id"])
+    except Exception as exc:
+        _logger.warning("Evidence write failed: %s", exc)
+
+    if json_output:
+        click.echo(json.dumps(config, indent=2, default=str))
+    else:
+        _render_config_rich(config)
+
+
+@cli.command("config-show")
+@click.argument("config_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_show_cmd(
+    config_id: str,
+    json_output: bool,
+) -> None:
+    """Show a configuration by ID."""
+    from axiom_core.configuration_registry import ConfigurationRegistry
+
+    try:
+        registry = ConfigurationRegistry()
+        config = registry.get_config(config_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if config is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Configuration not found: {config_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Configuration not found: {config_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(config, indent=2, default=str))
+    else:
+        _render_config_rich(config)
+
+
+@cli.command("config-export")
+@click.argument("config_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_export_cmd(
+    config_id: str,
+    json_output: bool,
+) -> None:
+    """Export a configuration as markdown."""
+    from axiom_core.configuration_registry import ConfigurationRegistry
+
+    try:
+        registry = ConfigurationRegistry()
+        config = registry.get_config(config_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if config is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Configuration not found: {config_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Configuration not found: {config_id}")
+        raise SystemExit(2)
+
+    md = registry.export_config(config_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"config_id": config_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_config_rich(config: dict) -> None:
+    """Rich text rendering for a configuration."""
+    validation = config.get("validation", {})
+    valid = validation.get("valid", True)
+    status = "VALID" if valid else "INVALID"
+    console.print(f"\n[bold]Configuration ({status})[/bold]\n")
+    console.print(f"  Config ID:  {config.get('config_id', '')}")
+    if config.get("file_name"):
+        console.print(f"  File:       {config['file_name']}")
+    console.print(f"  Entries:    {config.get('entry_count', 0)}")
+    if validation.get("errors"):
+        for err in validation["errors"]:
+            console.print(f"  [red]ERROR:[/red] {err}")
+    if validation.get("warnings"):
+        for warn in validation["warnings"]:
+            console.print(f"  [yellow]WARNING:[/yellow] {warn}")
+    entries = config.get("entries", [])
+    if entries:
+        console.print("  Entries:")
+        for e in entries:
+            console.print(f"    {e['key']} = {e['value']}")
 
 
 if __name__ == "__main__":
