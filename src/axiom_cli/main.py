@@ -9729,5 +9729,221 @@ def _render_assertion_rich(assertion: dict) -> None:
     )
 
 
+# ---------------------------------------------------------------------------
+# Session Report Generator CLI
+# ---------------------------------------------------------------------------
+
+
+@cli.command("session-report")
+@click.option("--title", required=True, help="Report title")
+@click.option("--session-id", default="", help="Session ID")
+@click.option("--plan-id", default="", help="Linked plan ID")
+@click.option("--work-item-id", default="", help="Linked work item ID")
+@click.option("--rationale", default="", help="Rationale for the report")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def session_report_cmd(
+    title: str,
+    session_id: str,
+    plan_id: str,
+    work_item_id: str,
+    rationale: str,
+    json_output: bool,
+) -> None:
+    """Create a new session report."""
+    from axiom_core.session_report_generator import SessionReportGenerator
+
+    try:
+        gen = SessionReportGenerator()
+        report = gen.create_report(
+            title=title,
+            session_id=session_id,
+            plan_id=plan_id,
+            work_item_id=work_item_id,
+            rationale=rationale,
+        )
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    try:
+        gen.write_evidence(report["report_id"])
+    except Exception as exc:
+        _logger.warning("Evidence write failed: %s", exc)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_report_rich(report)
+
+
+@cli.command("session-reports")
+@click.option("--status", default="", help="Filter by status (draft/final/superseded)")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def session_reports_cmd(
+    status: str,
+    json_output: bool,
+) -> None:
+    """List session reports."""
+    from axiom_core.session_report_generator import SessionReportGenerator
+
+    try:
+        gen = SessionReportGenerator()
+        reports = gen.list_reports(status=status)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(reports, indent=2, default=str))
+    else:
+        if not reports:
+            console.print("[dim]No reports found.[/dim]")
+            return
+        for r in reports:
+            _render_report_rich(r)
+
+
+@cli.command("session-report-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def session_report_show_cmd(
+    report_id: str,
+    json_output: bool,
+) -> None:
+    """Show details of a session report."""
+    from axiom_core.session_report_generator import SessionReportGenerator
+
+    try:
+        gen = SessionReportGenerator()
+        report = gen.get_report(report_id)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        msg = {"error": f"Report not found: {report_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_report_rich(report)
+
+
+@cli.command("session-report-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def session_report_export_cmd(
+    report_id: str,
+    json_output: bool,
+) -> None:
+    """Export a session report as markdown."""
+    from axiom_core.session_report_generator import SessionReportGenerator
+
+    try:
+        gen = SessionReportGenerator()
+        report = gen.get_report(report_id)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        msg = {"error": f"Report not found: {report_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = gen.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_report_rich(report: dict) -> None:
+    """Rich text rendering for a session report."""
+    status = report.get("status", "").upper()
+    console.print(f"\n[bold]Session Report ({status})[/bold]\n")
+    console.print(f"  Report ID:    {report.get('report_id', '')}")
+    console.print(f"  Title:        {report.get('title', '')}")
+    console.print(f"  Status:       {report.get('status', '')}")
+    if report.get("session_id"):
+        console.print(f"  Session ID:   {report['session_id']}")
+    if report.get("plan_id"):
+        console.print(f"  Plan ID:      {report['plan_id']}")
+    if report.get("work_item_id"):
+        console.print(f"  Work Item:    {report['work_item_id']}")
+    if report.get("rationale"):
+        console.print(f"  Rationale:    {report['rationale']}")
+
+    sections = report.get("sections", [])
+    if sections:
+        console.print(f"\n  Sections: {len(sections)}")
+        for s in sections:
+            console.print(
+                f"    [{s.get('section_type', 'custom')}] "
+                f"{s.get('title', '(untitled)')}",
+            )
+
+    recs = report.get("recommendations", [])
+    if recs:
+        console.print(f"\n  Recommendations: {len(recs)}")
+        for r in recs:
+            console.print(
+                f"    [{r.get('priority', 'medium')}] "
+                f"{r.get('description', '')}",
+            )
+
+    summary = report.get("report_summary", {})
+    console.print(
+        f"\n  Summary: {summary.get('total_sections', 0)} sections, "
+        f"{summary.get('total_recommendations', 0)} recommendations, "
+        f"{summary.get('critical_recommendations', 0)} critical",
+    )
+
+
 if __name__ == "__main__":
     cli()

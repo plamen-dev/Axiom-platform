@@ -3060,6 +3060,84 @@ _register(
     )
 )
 
+# -- Session Report Generator v1 -------------------------------------------
+
+_register(
+    CommandSpec(
+        name="session-report",
+        command=(
+            "axiom session-report --title <t> "
+            "[--session-id <id>] [--plan-id <id>] "
+            "[--work-item-id <id>] [--rationale <r>] "
+            "[--json-output]"
+        ),
+        description="Create a new session report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("report_request.json", required=True),
+            EvidenceOutput("report_result.json", required=True),
+            EvidenceOutput("session_report.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Create durable session report artifact.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="session-reports",
+        command="axiom session-reports [--status <s>] [--json-output]",
+        description="List all session reports.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List session reports with optional status filter.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="session-report-show",
+        command="axiom session-report-show <report_id> [--json-output]",
+        description="Show details of a session report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Inspect a session report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="session-report-export",
+        command="axiom session-report-export <report_id> [--json-output]",
+        description="Export a session report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export report to markdown.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
