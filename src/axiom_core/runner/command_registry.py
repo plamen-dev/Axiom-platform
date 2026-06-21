@@ -3139,6 +3139,130 @@ _register(
 )
 
 
+# -- Session Review Registry v1 ---------------------------------------------
+
+_register(
+    CommandSpec(
+        name="review-create",
+        command=(
+            "axiom review-create --title <t> "
+            "[--source <s>] [--severity <sev>] "
+            "[--pr-id <id>] [--coding-session-id <id>] "
+            "[--session-report-id <id>] [--rationale <r>] "
+            "[--json-output]"
+        ),
+        description="Create a new session review.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("review_request.json", required=True),
+            EvidenceOutput("review_result.json", required=True),
+            EvidenceOutput("session_review.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Create durable session review artifact.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="review-add-finding",
+        command=(
+            "axiom review-add-finding <review_id> "
+            "--summary <s> [--details <d>] [--severity <sev>] "
+            "[--source <src>] [--file-path <p>] [--line-number <n>] "
+            "[--json-output]"
+        ),
+        description="Add a finding to a session review.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Add finding to an existing review.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="review-resolve",
+        command=(
+            "axiom review-resolve <review_id> "
+            "--finding-id <fid> --status <s> "
+            "[--note <n>] [--resolved-by <r>] [--commit-id <c>] "
+            "[--json-output]"
+        ),
+        description="Resolve a finding in a session review.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Mark a finding as fixed/acknowledged/rejected/deferred.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="reviews",
+        command="axiom reviews [--status <s>] [--source <src>] [--json-output]",
+        description="List all session reviews.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List session reviews with optional status/source filter.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="review-show",
+        command="axiom review-show <review_id> [--json-output]",
+        description="Show details of a session review.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Inspect a session review by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="review-export",
+        command="axiom review-export <review_id> [--json-output]",
+        description="Export a session review as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export review to markdown.",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------

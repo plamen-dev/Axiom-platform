@@ -9945,5 +9945,346 @@ def _render_report_rich(report: dict) -> None:
     )
 
 
+# ---------------------------------------------------------------------------
+# Session Review Registry CLI
+# ---------------------------------------------------------------------------
+
+
+@cli.command("review-create")
+@click.option("--title", required=True, help="Review title")
+@click.option("--source", default="", help="Review source (devin_review/human_review/ci_failure/cli_testing/automated_agent/other)")
+@click.option("--severity", default="", help="Severity (critical/high/medium/low/info)")
+@click.option("--pr-id", default="", help="Linked PR ID")
+@click.option("--coding-session-id", default="", help="Linked coding session ID")
+@click.option("--session-report-id", default="", help="Linked session report ID")
+@click.option("--rationale", default="", help="Rationale for the review")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def review_create_cmd(
+    title: str,
+    source: str,
+    severity: str,
+    pr_id: str,
+    coding_session_id: str,
+    session_report_id: str,
+    rationale: str,
+    json_output: bool,
+) -> None:
+    """Create a new session review."""
+    from axiom_core.session_review_registry import SessionReviewRegistry
+
+    try:
+        registry = SessionReviewRegistry()
+        review = registry.create_review(
+            title=title,
+            source=source,
+            severity=severity,
+            pr_id=pr_id,
+            coding_session_id=coding_session_id,
+            session_report_id=session_report_id,
+            rationale=rationale,
+        )
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    try:
+        registry.write_evidence(review["review_id"])
+    except Exception as exc:
+        _logger.warning("Evidence write failed: %s", exc)
+
+    if json_output:
+        click.echo(json.dumps(review, indent=2, default=str))
+    else:
+        _render_review_rich(review)
+
+
+@cli.command("review-add-finding")
+@click.argument("review_id")
+@click.option("--summary", required=True, help="Finding summary")
+@click.option("--details", default="", help="Finding details")
+@click.option("--severity", default="", help="Severity (critical/high/medium/low/info)")
+@click.option("--source", default="", help="Finding source")
+@click.option("--file-path", default="", help="File path reference")
+@click.option("--line-number", default=0, type=int, help="Line number")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def review_add_finding_cmd(
+    review_id: str,
+    summary: str,
+    details: str,
+    severity: str,
+    source: str,
+    file_path: str,
+    line_number: int,
+    json_output: bool,
+) -> None:
+    """Add a finding to a session review."""
+    from axiom_core.session_review_registry import SessionReviewRegistry
+
+    try:
+        registry = SessionReviewRegistry()
+        finding = registry.add_finding(
+            review_id=review_id,
+            summary=summary,
+            details=details,
+            severity=severity,
+            source=source,
+            file_path=file_path,
+            line_number=line_number,
+        )
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        if "not found" in str(exc).lower():
+            raise SystemExit(2)
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(finding, indent=2, default=str))
+    else:
+        console.print(f"\n[bold]Finding added[/bold]: {finding['finding_id']}")
+        console.print(f"  Summary:  {finding['summary']}")
+        console.print(f"  Severity: {finding['severity']}")
+        console.print(f"  Status:   {finding['status']}")
+
+
+@cli.command("review-resolve")
+@click.argument("review_id")
+@click.option("--finding-id", required=True, help="Finding ID to resolve")
+@click.option("--status", required=True, help="Resolution status (fixed/acknowledged/rejected/deferred)")
+@click.option("--note", default="", help="Resolution note")
+@click.option("--resolved-by", default="", help="Who resolved it")
+@click.option("--commit-id", default="", help="Fix commit ID")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def review_resolve_cmd(
+    review_id: str,
+    finding_id: str,
+    status: str,
+    note: str,
+    resolved_by: str,
+    commit_id: str,
+    json_output: bool,
+) -> None:
+    """Resolve a finding in a session review."""
+    from axiom_core.session_review_registry import SessionReviewRegistry
+
+    try:
+        registry = SessionReviewRegistry()
+        resolution = registry.resolve_finding(
+            review_id=review_id,
+            finding_id=finding_id,
+            status=status,
+            resolution_note=note,
+            resolved_by=resolved_by,
+            commit_id=commit_id,
+        )
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        if "not found" in str(exc).lower():
+            raise SystemExit(2)
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(resolution, indent=2, default=str))
+    else:
+        console.print(f"\n[bold]Finding resolved[/bold]: {finding_id}")
+        console.print(f"  Status: {status}")
+        if note:
+            console.print(f"  Note:   {note}")
+        if commit_id:
+            console.print(f"  Commit: {commit_id}")
+
+
+@cli.command("reviews")
+@click.option("--status", default="", help="Filter by status (open/in_progress/resolved/closed)")
+@click.option("--source", default="", help="Filter by source")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def reviews_cmd(
+    status: str,
+    source: str,
+    json_output: bool,
+) -> None:
+    """List session reviews."""
+    from axiom_core.session_review_registry import SessionReviewRegistry
+
+    try:
+        registry = SessionReviewRegistry()
+        reviews = registry.list_reviews(status=status, source=source)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(reviews, indent=2, default=str))
+    else:
+        if not reviews:
+            console.print("[dim]No reviews found.[/dim]")
+            return
+        console.print(f"\n[bold]Session Reviews ({len(reviews)})[/bold]\n")
+        for r in reviews:
+            summary = r.get("review_summary", {})
+            console.print(
+                f"  [{r.get('status', '')}] {r.get('review_id', '')[:12]}… "
+                f"— {r.get('title', '')} "
+                f"({summary.get('total_findings', 0)} findings, "
+                f"{summary.get('open_findings', 0)} open)",
+            )
+
+
+@cli.command("review-show")
+@click.argument("review_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def review_show_cmd(
+    review_id: str,
+    json_output: bool,
+) -> None:
+    """Show details of a session review."""
+    from axiom_core.session_review_registry import SessionReviewRegistry
+
+    try:
+        registry = SessionReviewRegistry()
+        review = registry.get_review(review_id)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if review is None:
+        msg = {"error": f"Review not found: {review_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Review not found: {review_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(review, indent=2, default=str))
+    else:
+        _render_review_rich(review)
+
+
+@cli.command("review-export")
+@click.argument("review_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def review_export_cmd(
+    review_id: str,
+    json_output: bool,
+) -> None:
+    """Export a session review as markdown."""
+    from axiom_core.session_review_registry import SessionReviewRegistry
+
+    try:
+        registry = SessionReviewRegistry()
+        review = registry.get_review(review_id)
+    except ValueError as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        msg = {"error": str(exc)}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if review is None:
+        msg = {"error": f"Review not found: {review_id}"}
+        if json_output:
+            click.echo(json.dumps(msg, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Review not found: {review_id}")
+        raise SystemExit(2)
+
+    md = registry.export_review(review_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"review_id": review_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_review_rich(review: dict) -> None:
+    """Rich text rendering for a session review."""
+    status = review.get("status", "").upper()
+    console.print(f"\n[bold]Session Review ({status})[/bold]\n")
+    console.print(f"  Review ID:       {review.get('review_id', '')}")
+    console.print(f"  Title:           {review.get('title', '')}")
+    console.print(f"  Source:          {review.get('source', '')}")
+    console.print(f"  Status:          {review.get('status', '')}")
+    console.print(f"  Severity:        {review.get('severity', '')}")
+    if review.get("pr_id"):
+        console.print(f"  PR ID:           {review['pr_id']}")
+    if review.get("coding_session_id"):
+        console.print(f"  Coding Session:  {review['coding_session_id']}")
+    if review.get("session_report_id"):
+        console.print(f"  Session Report:  {review['session_report_id']}")
+    if review.get("rationale"):
+        console.print(f"  Rationale:       {review['rationale']}")
+
+    summary = review.get("review_summary", {})
+    console.print(
+        f"\n  Summary: {summary.get('total_findings', 0)} findings, "
+        f"{summary.get('open_findings', 0)} open, "
+        f"{summary.get('fixed_findings', 0)} fixed, "
+        f"{summary.get('critical_findings', 0)} critical",
+    )
+
+    findings = review.get("findings", [])
+    if findings:
+        console.print("\n  [bold]Findings:[/bold]")
+        for f in findings:
+            sev = f.get("severity", "medium").upper()
+            st = f.get("status", "open").upper()
+            console.print(f"    [{sev}/{st}] {f.get('summary', '')}")
+
+
 if __name__ == "__main__":
     cli()
