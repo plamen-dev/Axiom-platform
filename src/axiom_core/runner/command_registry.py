@@ -4356,6 +4356,60 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="config-policy-check",
+        command="axiom config-policy-check [--config-text <ct>] [--config-file <cf>] [--policy-file <pf>] [--json-output]",
+        description="Check a configuration against a policy with evidence generation.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("config_policy_request.json", required=True),
+            EvidenceOutput("config_policy_result.json", required=True),
+            EvidenceOutput("config_policy_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Evaluate a configuration against policy rules deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-policy-show",
+        command="axiom config-policy-show <report_id> [--json-output]",
+        description="Show a policy report by ID.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a policy report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-policy-export",
+        command="axiom config-policy-export <report_id> [--json-output]",
+        description="Export a policy report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a policy report as markdown.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object

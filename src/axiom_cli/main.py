@@ -13571,5 +13571,170 @@ def _render_merge_report_rich(report: dict) -> None:
                 )
 
 
+@cli.command("config-policy-check")
+@click.option("--config-text", default="", help="Config key=value text")
+@click.option("--config-file", default="", help="Path to config file")
+@click.option("--policy-file", default="", help="Path to policy JSON file")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_policy_check_cmd(
+    config_text: str,
+    config_file: str,
+    policy_file: str,
+    json_output: bool,
+) -> None:
+    """Check a configuration against a policy."""
+    from axiom_core.config_policy import ConfigurationPolicyEngine
+    from axiom_core.configuration_registry import ConfigurationRegistry
+
+    if config_file and not config_text:
+        try:
+            config_text = Path(config_file).read_text(encoding="utf-8")
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    policy_data: dict = {}
+    if policy_file:
+        try:
+            policy_data = json.loads(Path(policy_file).read_text(encoding="utf-8"))
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    try:
+        config_reg = ConfigurationRegistry()
+        config = config_reg.load_config(text=config_text, file_name=config_file or "input")
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    try:
+        engine = ConfigurationPolicyEngine()
+        report = engine.check(config=config, policy=policy_data)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_policy_report_rich(report)
+
+
+@cli.command("config-policy-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_policy_show_cmd(report_id: str, json_output: bool) -> None:
+    """Show a configuration policy report."""
+    from axiom_core.config_policy import ConfigurationPolicyEngine
+
+    try:
+        engine = ConfigurationPolicyEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_policy_report_rich(report)
+
+
+@cli.command("config-policy-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_policy_export_cmd(report_id: str, json_output: bool) -> None:
+    """Export a configuration policy report as markdown."""
+    from axiom_core.config_policy import ConfigurationPolicyEngine
+
+    try:
+        engine = ConfigurationPolicyEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_policy_report_rich(report: dict) -> None:
+    """Rich text rendering for a policy report."""
+    console.print("\n[bold]Configuration Policy Report[/bold]\n")
+    console.print(f"  Report ID:  {report.get('report_id', '')}")
+    console.print(f"  Summary:    {report.get('policy_summary', '')}")
+
+    result = report.get("result")
+    if result:
+        status = "PASSED" if result.get("passed") else "FAILED"
+        console.print(f"  Status:     {status}")
+        console.print(f"  Blockers:   {result.get('blocker_count', 0)}")
+        console.print(f"  Errors:     {result.get('error_count', 0)}")
+        console.print(f"  Warnings:   {result.get('warning_count', 0)}")
+        console.print(f"  Info:       {result.get('info_count', 0)}")
+
+        violations = result.get("violations", [])
+        if violations:
+            console.print("\n  [bold]Violations:[/bold]")
+            for v in violations:
+                sev = v.get("severity", "").upper()
+                console.print(f"    [{sev}] {v.get('message', '')}")
+
+
 if __name__ == "__main__":
     cli()
