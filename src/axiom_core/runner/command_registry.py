@@ -4875,6 +4875,76 @@ _register(
 
 
 # ---------------------------------------------------------------------------
+# Capability Failure commands
+# ---------------------------------------------------------------------------
+
+_register(
+    CommandSpec(
+        name="capability-failure-create",
+        command="axiom capability-failure-create [--failures-file <ff>] [--report-id <rid>] [--json-output]",
+        description="Create a capability failure report with deterministic ordering.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("capability_failure_request.json", required=True),
+            EvidenceOutput("capability_failure_result.json", required=True),
+            EvidenceOutput("capability_failure_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Create and persist a capability failure report deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-failures",
+        command="axiom capability-failures [--json-output]",
+        description="List all capability failure reports.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List capability failure reports.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-failure-show",
+        command="axiom capability-failure-show <report_id> [--json-output]",
+        description="Show a capability failure report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a capability failure report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-failure-export",
+        command="axiom capability-failure-export <report_id> [--json-output]",
+        description="Export a capability failure report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a capability failure report as markdown.",
+    )
+)
+
+
+# ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
 

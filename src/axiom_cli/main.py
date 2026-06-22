@@ -14975,5 +14975,177 @@ def _render_capability_execution_report_rich(report: dict) -> None:
             console.print(f"    [{etype}] {msg}")
 
 
+@cli.command("capability-failure-create")
+@click.option("--failures-file", default="", help="Path to failures JSON file")
+@click.option("--report-id", default="", help="Execution report ID to associate")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_failure_create_cmd(
+    failures_file: str,
+    report_id: str,
+    json_output: bool,
+) -> None:
+    """Create a capability failure report."""
+    from axiom_core.capability_failure import CapabilityFailureEngine
+
+    failures: list = []
+    if failures_file:
+        try:
+            data = json.loads(Path(failures_file).read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                failures = data
+            elif isinstance(data, dict):
+                failures = data.get("failures", [])
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    try:
+        engine = CapabilityFailureEngine()
+        result = engine.create(failures=failures, report_id=report_id)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+    else:
+        _render_capability_failure_report_rich(result)
+
+
+@cli.command("capability-failures")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_failures_cmd(json_output: bool) -> None:
+    """List all capability failure reports."""
+    from axiom_core.capability_failure import CapabilityFailureEngine
+
+    try:
+        engine = CapabilityFailureEngine()
+        reports = engine.list_reports()
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(reports, indent=2, default=str))
+    else:
+        console.print(f"\n[bold]Capability Failure Reports ({len(reports)}):[/bold]\n")
+        for r in reports:
+            console.print(
+                f"  {r.get('report_id', '')} — "
+                f"failures={r.get('failure_count', 0)} "
+                f"blockers={r.get('blocker_count', 0)} "
+                f"errors={r.get('error_count', 0)}"
+            )
+
+
+@cli.command("capability-failure-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_failure_show_cmd(report_id: str, json_output: bool) -> None:
+    """Show a capability failure report."""
+    from axiom_core.capability_failure import CapabilityFailureEngine
+
+    try:
+        engine = CapabilityFailureEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_capability_failure_report_rich(report)
+
+
+@cli.command("capability-failure-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_failure_export_cmd(report_id: str, json_output: bool) -> None:
+    """Export a capability failure report as markdown."""
+    from axiom_core.capability_failure import CapabilityFailureEngine
+
+    try:
+        engine = CapabilityFailureEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_capability_failure_report_rich(report: dict) -> None:
+    """Rich text rendering for a capability failure report."""
+    console.print("\n[bold]Capability Failure Report[/bold]\n")
+    console.print(f"  Report ID:  {report.get('report_id', '')}")
+    console.print(f"  Failures:   {report.get('failure_count', 0)}")
+    console.print(f"  Blockers:   {report.get('blocker_count', 0)}")
+    console.print(f"  Errors:     {report.get('error_count', 0)}")
+    console.print(f"  Warnings:   {report.get('warning_count', 0)}")
+    console.print(f"  Info:       {report.get('info_count', 0)}")
+
+    failures = report.get("failures", [])
+    if failures:
+        console.print("\n  [bold]Failures:[/bold]")
+        for f in failures:
+            sev = f.get("severity", "").upper()
+            ftype = f.get("failure_type", "")
+            msg = f.get("message", "")
+            console.print(f"    [{sev}] ({ftype}) {msg}")
+
+
 if __name__ == "__main__":
     cli()
