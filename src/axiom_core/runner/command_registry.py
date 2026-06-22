@@ -4025,6 +4025,66 @@ _register(
 
 
 # ---------------------------------------------------------------------------
+# Configuration Explanation commands
+# ---------------------------------------------------------------------------
+
+
+_register(
+    CommandSpec(
+        name="config-explain",
+        command="axiom config-explain [--text <t>] [--file <f>] [--require-keys <rk>] [--non-empty-keys <nek>] [--json-output]",
+        description="Generate explanations for configuration validation and repair.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("config_explanation_request.json", required=True),
+            EvidenceOutput("config_explanation_result.json", required=True),
+            EvidenceOutput("config_explanation_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Generate explanations for config validation and repair recommendations.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-explanation-show",
+        command="axiom config-explanation-show <report_id> [--json-output]",
+        description="Show an explanation report by ID.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show an explanation report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-explanation-export",
+        command="axiom config-explanation-export <report_id> [--json-output]",
+        description="Export an explanation report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export an explanation report as markdown.",
+    )
+)
+
+
+# ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
 
