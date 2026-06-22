@@ -12069,5 +12069,219 @@ def _render_validation_report_rich(report: dict) -> None:
         console.print("  No violations found")
 
 
+# ---------------------------------------------------------------------------
+# Configuration Repair Recommendation CLI
+# ---------------------------------------------------------------------------
+
+
+@cli.command("config-repair-recommend")
+@click.option("--text", default="", help="Key=value text to validate and repair")
+@click.option("--file", "file_path", default="", help="Path to key=value file")
+@click.option("--require-keys", default="", help="Comma-separated required keys")
+@click.option("--non-empty-keys", default="", help="Comma-separated non-empty keys")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_repair_recommend_cmd(
+    text: str,
+    file_path: str,
+    require_keys: str,
+    non_empty_keys: str,
+    json_output: bool,
+) -> None:
+    """Generate repair recommendations for a key=value configuration."""
+    import re as re_mod
+
+    from axiom_core.config_repair import ConfigurationRepairEngine
+    from axiom_core.config_validation import (
+        ConfigurationRule,
+        ConfigurationRuleType,
+        ConfigurationValidator,
+    )
+    from axiom_core.configuration_registry import ConfigurationRegistry
+
+    if file_path and not text:
+        try:
+            text = Path(file_path).read_text(encoding="utf-8")
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    try:
+        config_reg = ConfigurationRegistry()
+        config = config_reg.load_config(text=text, file_name=file_path or "")
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    rules: list[ConfigurationRule] = []
+    if require_keys:
+        for key in require_keys.split(","):
+            key = key.strip()
+            if key:
+                rules.append(
+                    ConfigurationRule(
+                        key_pattern=re_mod.escape(key),
+                        rule_type=ConfigurationRuleType.REQUIRED_KEY,
+                    )
+                )
+    if non_empty_keys:
+        for key in non_empty_keys.split(","):
+            key = key.strip()
+            if key:
+                rules.append(
+                    ConfigurationRule(
+                        key_pattern=re_mod.escape(key),
+                        rule_type=ConfigurationRuleType.NON_EMPTY,
+                    )
+                )
+
+    try:
+        validator = ConfigurationValidator()
+        validation_report = validator.validate(config=config, rules=rules)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    try:
+        engine = ConfigurationRepairEngine()
+        repair_report = engine.recommend(
+            validation_report=validation_report,
+            config=config,
+        )
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(repair_report, indent=2, default=str))
+    else:
+        _render_repair_report_rich(repair_report)
+
+
+@cli.command("config-repair-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_repair_show_cmd(
+    report_id: str,
+    json_output: bool,
+) -> None:
+    """Show a repair recommendation report by ID."""
+    from axiom_core.config_repair import ConfigurationRepairEngine
+
+    try:
+        engine = ConfigurationRepairEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_repair_report_rich(report)
+
+
+@cli.command("config-repair-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_repair_export_cmd(
+    report_id: str,
+    json_output: bool,
+) -> None:
+    """Export a repair recommendation report as markdown."""
+    from axiom_core.config_repair import ConfigurationRepairEngine
+
+    try:
+        engine = ConfigurationRepairEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_repair_report_rich(report: dict) -> None:
+    """Rich text rendering for a repair report."""
+    repairable = report.get("repairable_count", 0)
+    unrepairable = report.get("unrepairable_count", 0)
+    no_action = report.get("no_action_count", 0)
+    status = "ALL REPAIRABLE" if unrepairable == 0 and repairable > 0 else (
+        "NO ACTION NEEDED" if repairable == 0 and unrepairable == 0
+        else "HAS UNREPAIRABLE"
+    )
+    console.print(f"\n[bold]Configuration Repair ({status})[/bold]\n")
+    console.print(f"  Report ID:      {report.get('report_id', '')}")
+    console.print(f"  Config ID:      {report.get('config_id', '')}")
+    console.print(f"  Validation ID:  {report.get('validation_report_id', '')}")
+    console.print(f"  Repairable:     {repairable}")
+    console.print(f"  Unrepairable:   {unrepairable}")
+    console.print(f"  No action:      {no_action}")
+    recommendations = report.get("recommendations", [])
+    if recommendations:
+        console.print("  Recommendations:")
+        for rec in recommendations:
+            action = rec.get("action", "no_action").upper()
+            key = rec.get("key", "")
+            rationale = rec.get("rationale", "")
+            console.print(f"    [{action}] {key}: {rationale}")
+    else:
+        console.print("  No recommendations")
+
+
 if __name__ == "__main__":
     cli()

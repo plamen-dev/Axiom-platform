@@ -3965,6 +3965,66 @@ _register(
 
 
 # ---------------------------------------------------------------------------
+# Configuration Repair Recommendation commands
+# ---------------------------------------------------------------------------
+
+
+_register(
+    CommandSpec(
+        name="config-repair-recommend",
+        command="axiom config-repair-recommend [--text <t>] [--file <f>] [--require-keys <rk>] [--non-empty-keys <nek>] [--json-output]",
+        description="Generate repair recommendations for key=value config violations.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("config_repair_request.json", required=True),
+            EvidenceOutput("config_repair_result.json", required=True),
+            EvidenceOutput("config_repair_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Generate repair recommendations for key=value config violations.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-repair-show",
+        command="axiom config-repair-show <report_id> [--json-output]",
+        description="Show a repair recommendation report by ID.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a repair recommendation report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-repair-export",
+        command="axiom config-repair-export <report_id> [--json-output]",
+        description="Export a repair recommendation report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a repair recommendation report as markdown.",
+    )
+)
+
+
+# ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
 
