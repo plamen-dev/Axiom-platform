@@ -14234,5 +14234,183 @@ def _render_dependency_report_rich(report: dict) -> None:
                 )
 
 
+@cli.command("capability-create")
+@click.option("--capabilities-file", default="", help="Path to capabilities JSON file")
+@click.option("--known-dependency-ids", default="", help="Comma-separated known dependency IDs")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_create_cmd(
+    capabilities_file: str,
+    known_dependency_ids: str,
+    json_output: bool,
+) -> None:
+    """Create a capability registry."""
+    from axiom_core.capability_definition import CapabilityDefinitionEngine
+
+    capabilities: list = []
+    if capabilities_file:
+        try:
+            data = json.loads(Path(capabilities_file).read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                capabilities = data
+            elif isinstance(data, dict):
+                capabilities = data.get("capabilities", [])
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    known_ids_list: list[str] | None = None
+    if known_dependency_ids.strip():
+        known_ids_list = [
+            k.strip() for k in known_dependency_ids.split(",") if k.strip()
+        ]
+
+    try:
+        engine = CapabilityDefinitionEngine()
+        report = engine.create(
+            capabilities=capabilities, known_dependency_ids=known_ids_list
+        )
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_capability_report_rich(report)
+
+
+@cli.command("capabilities")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capabilities_cmd(json_output: bool) -> None:
+    """List all capability reports."""
+    from axiom_core.capability_definition import CapabilityDefinitionEngine
+
+    try:
+        engine = CapabilityDefinitionEngine()
+        reports = engine.list_reports()
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(reports, indent=2, default=str))
+    else:
+        console.print(f"\n[bold]Capability Reports ({len(reports)}):[/bold]\n")
+        for r in reports:
+            console.print(f"  {r.get('report_id', '')} — {r.get('summary', '')}")
+
+
+@cli.command("capability-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_show_cmd(report_id: str, json_output: bool) -> None:
+    """Show a capability report."""
+    from axiom_core.capability_definition import CapabilityDefinitionEngine
+
+    try:
+        engine = CapabilityDefinitionEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_capability_report_rich(report)
+
+
+@cli.command("capability-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_export_cmd(report_id: str, json_output: bool) -> None:
+    """Export a capability report as markdown."""
+    from axiom_core.capability_definition import CapabilityDefinitionEngine
+
+    try:
+        engine = CapabilityDefinitionEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_capability_report_rich(report: dict) -> None:
+    """Rich text rendering for a capability report."""
+    console.print("\n[bold]Capability Definition Report[/bold]\n")
+    console.print(f"  Report ID:     {report.get('report_id', '')}")
+    console.print(f"  Summary:       {report.get('summary', '')}")
+    console.print(f"  Active:        {report.get('active_count', 0)}")
+    console.print(f"  Disabled:      {report.get('disabled_count', 0)}")
+    console.print(f"  Experimental:  {report.get('experimental_count', 0)}")
+    console.print(f"  Deprecated:    {report.get('deprecated_count', 0)}")
+
+    registry = report.get("registry")
+    if registry:
+        caps = registry.get("capabilities", [])
+        if caps:
+            console.print("\n  [bold]Capabilities:[/bold]")
+            for cap in caps:
+                status = cap.get("status", "").upper()
+                ctype = cap.get("capability_type", "")
+                console.print(
+                    f"    [{status}] {cap.get('name', '')} (type: {ctype})"
+                )
+
+
 if __name__ == "__main__":
     cli()

@@ -4589,6 +4589,77 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="capability-create",
+        command="axiom capability-create [--capabilities-file <cf>] [--known-dependency-ids <ids>] [--json-output]",
+        description="Create a capability registry with evidence generation.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("capability_request.json", required=True),
+            EvidenceOutput("capability_result.json", required=True),
+            EvidenceOutput("capability_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Create a capability registry deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capabilities",
+        command="axiom capabilities [--json-output]",
+        description="List all capability reports.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List all capability reports.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-show",
+        command="axiom capability-show <report_id> [--json-output]",
+        description="Show a capability report by ID.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a capability report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-export",
+        command="axiom capability-export <report_id> [--json-output]",
+        description="Export a capability report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a capability report as markdown.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object

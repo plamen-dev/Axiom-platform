@@ -129,6 +129,8 @@ EXPECTED_AXIOM_COMMANDS = {
     "config-batch-run", "config-batch-show", "config-batch-export",
     "config-dependency-create", "config-dependencies",
     "config-dependency-show", "config-dependency-export",
+    "capability-create", "capabilities",
+    "capability-show", "capability-export",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 
