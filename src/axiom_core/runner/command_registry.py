@@ -4945,6 +4945,76 @@ _register(
 
 
 # ---------------------------------------------------------------------------
+# Capability Repair Outcome commands
+# ---------------------------------------------------------------------------
+
+_register(
+    CommandSpec(
+        name="capability-repair-outcome-create",
+        command="axiom capability-repair-outcome-create [--outcomes-file <of>] [--json-output]",
+        description="Create a capability repair outcome report with deterministic ordering.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("capability_repair_outcome_request.json", required=True),
+            EvidenceOutput("capability_repair_outcome_result.json", required=True),
+            EvidenceOutput("capability_repair_outcome_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Create and persist a capability repair outcome report deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-repair-outcomes",
+        command="axiom capability-repair-outcomes [--json-output]",
+        description="List all capability repair outcome reports.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List capability repair outcome reports.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-repair-outcome-show",
+        command="axiom capability-repair-outcome-show <report_id> [--json-output]",
+        description="Show a capability repair outcome report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a capability repair outcome report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-repair-outcome-export",
+        command="axiom capability-repair-outcome-export <report_id> [--json-output]",
+        description="Export a capability repair outcome report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a capability repair outcome report as markdown.",
+    )
+)
+
+
+# ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
 

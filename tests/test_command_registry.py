@@ -139,6 +139,8 @@ EXPECTED_AXIOM_COMMANDS = {
     "capability-report-show", "capability-report-export",
     "capability-failure-create", "capability-failures",
     "capability-failure-show", "capability-failure-export",
+    "capability-repair-outcome-create", "capability-repair-outcomes",
+    "capability-repair-outcome-show", "capability-repair-outcome-export",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 

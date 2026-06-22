@@ -15147,5 +15147,183 @@ def _render_capability_failure_report_rich(report: dict) -> None:
             console.print(f"    [{sev}] ({ftype}) {msg}")
 
 
+@cli.command("capability-repair-outcome-create")
+@click.option("--outcomes-file", default="", help="Path to outcomes JSON file")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_repair_outcome_create_cmd(
+    outcomes_file: str,
+    json_output: bool,
+) -> None:
+    """Create a capability repair outcome report."""
+    from axiom_core.capability_repair_outcome import CapabilityRepairOutcomeEngine
+
+    outcomes: list = []
+    if outcomes_file:
+        try:
+            data = json.loads(Path(outcomes_file).read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                outcomes = data
+            elif isinstance(data, dict):
+                outcomes = data.get("outcomes", [])
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    try:
+        engine = CapabilityRepairOutcomeEngine()
+        result = engine.create(outcomes=outcomes)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+    else:
+        _render_capability_repair_outcome_report_rich(result)
+
+
+@cli.command("capability-repair-outcomes")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_repair_outcomes_cmd(json_output: bool) -> None:
+    """List all capability repair outcome reports."""
+    from axiom_core.capability_repair_outcome import CapabilityRepairOutcomeEngine
+
+    try:
+        engine = CapabilityRepairOutcomeEngine()
+        reports = engine.list_reports()
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(reports, indent=2, default=str))
+    else:
+        console.print(
+            f"\n[bold]Capability Repair Outcome Reports ({len(reports)}):[/bold]\n"
+        )
+        for r in reports:
+            console.print(
+                f"  {r.get('report_id', '')} — "
+                f"outcomes={r.get('outcome_count', 0)} "
+                f"recoveries={r.get('recovery_count', 0)} "
+                f"regressions={r.get('regression_count', 0)}"
+            )
+
+
+@cli.command("capability-repair-outcome-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_repair_outcome_show_cmd(
+    report_id: str, json_output: bool
+) -> None:
+    """Show a capability repair outcome report."""
+    from axiom_core.capability_repair_outcome import CapabilityRepairOutcomeEngine
+
+    try:
+        engine = CapabilityRepairOutcomeEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_capability_repair_outcome_report_rich(report)
+
+
+@cli.command("capability-repair-outcome-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_repair_outcome_export_cmd(
+    report_id: str, json_output: bool
+) -> None:
+    """Export a capability repair outcome report as markdown."""
+    from axiom_core.capability_repair_outcome import CapabilityRepairOutcomeEngine
+
+    try:
+        engine = CapabilityRepairOutcomeEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_capability_repair_outcome_report_rich(report: dict) -> None:
+    """Rich text rendering for a capability repair outcome report."""
+    console.print("\n[bold]Capability Repair Outcome Report[/bold]\n")
+    console.print(f"  Report ID:    {report.get('report_id', '')}")
+    console.print(f"  Outcomes:     {report.get('outcome_count', 0)}")
+    console.print(f"  Recoveries:   {report.get('recovery_count', 0)}")
+    console.print(f"  Regressions:  {report.get('regression_count', 0)}")
+
+    outcomes = report.get("outcomes", [])
+    if outcomes:
+        console.print("\n  [bold]Outcomes:[/bold]")
+        for o in outcomes:
+            otype = o.get("outcome_type", "").upper()
+            status = o.get("status", "").upper()
+            summary = o.get("summary", "")
+            console.print(f"    [{otype}] ({status}) {summary}")
+
+
 if __name__ == "__main__":
     cli()
