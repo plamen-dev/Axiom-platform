@@ -15506,5 +15506,152 @@ def _render_capability_confidence_report_rich(report: dict) -> None:
         console.print(f"    Recoveries: {factors.get('recovery_count', 0)}")
 
 
+@cli.command("capability-history-create")
+@click.option("--capability-id", default="", help="Capability ID")
+@click.option("--events-file", default="", help="Path to events JSON file")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_history_create_cmd(
+    capability_id: str,
+    events_file: str,
+    json_output: bool,
+) -> None:
+    """Create a capability history report."""
+    from axiom_core.capability_history import CapabilityHistoryEngine
+
+    events: list = []
+    if events_file:
+        try:
+            data = json.loads(Path(events_file).read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                events = data
+            elif isinstance(data, dict):
+                events = data.get("events", [])
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    try:
+        engine = CapabilityHistoryEngine()
+        result = engine.create(capability_id=capability_id, events=events)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+    else:
+        _render_capability_history_report_rich(result)
+
+
+@cli.command("capability-history-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_history_show_cmd(report_id: str, json_output: bool) -> None:
+    """Show a capability history report."""
+    from axiom_core.capability_history import CapabilityHistoryEngine
+
+    try:
+        engine = CapabilityHistoryEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_capability_history_report_rich(report)
+
+
+@cli.command("capability-history-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_history_export_cmd(report_id: str, json_output: bool) -> None:
+    """Export a capability history report as markdown."""
+    from axiom_core.capability_history import CapabilityHistoryEngine
+
+    try:
+        engine = CapabilityHistoryEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_capability_history_report_rich(report: dict) -> None:
+    """Rich text rendering for a capability history report."""
+    console.print("\n[bold]Capability History Report[/bold]\n")
+    console.print(f"  Report ID:    {report.get('report_id', '')}")
+    console.print(f"  Capability:   {report.get('capability_id', '')}")
+    console.print(f"  Event Count:  {report.get('event_count', 0)}")
+
+    history = report.get("history", {})
+    events = history.get("events", [])
+    if events:
+        console.print("\n  [bold]Timeline:[/bold]")
+        for e in events:
+            etype = e.get("event_type", "").upper()
+            source = e.get("source_id", "")
+            esummary = e.get("summary", "")
+            created = e.get("created_at", "")
+            source_part = f" <- {source}" if source else ""
+            console.print(f"    [{created}] {etype}{source_part}: {esummary}")
+
+
 if __name__ == "__main__":
     cli()

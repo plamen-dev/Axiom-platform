@@ -5085,6 +5085,61 @@ _register(
 
 
 # ---------------------------------------------------------------------------
+# Capability History commands
+# ---------------------------------------------------------------------------
+
+_register(
+    CommandSpec(
+        name="capability-history-create",
+        command="axiom capability-history-create [--capability-id <cid>] [--events-file <ef>] [--json-output]",
+        description="Create a capability history report with deterministic chronological ordering.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("capability_history_request.json", required=True),
+            EvidenceOutput("capability_history_result.json", required=True),
+            EvidenceOutput("capability_history_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Create and persist a capability history report deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-history-show",
+        command="axiom capability-history-show <report_id> [--json-output]",
+        description="Show a capability history report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a capability history report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-history-export",
+        command="axiom capability-history-export <report_id> [--json-output]",
+        description="Export a capability history report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a capability history report as markdown.",
+    )
+)
+
+
+# ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
 
