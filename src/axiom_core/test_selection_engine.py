@@ -198,6 +198,7 @@ _FILE_TO_TEST: dict[str, str] = {
     "src/axiom_core/config_explanation.py": "tests/test_config_explanation.py",
     "src/axiom_core/config_execution.py": "tests/test_config_execution.py",
     "src/axiom_core/config_rollback.py": "tests/test_config_rollback.py",
+    "src/axiom_core/config_history.py": "tests/test_config_history.py",
     "src/axiom_cli/main.py": "tests/test_command_registry.py",
 }
 

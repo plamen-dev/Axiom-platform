@@ -4194,6 +4194,61 @@ _register(
 )
 
 
+_register(
+    CommandSpec(
+        name="config-history-create",
+        command="axiom config-history-create [--text <t>] [--file <f>] [--require-keys <rk>] [--non-empty-keys <nek>] [--json-output]",
+        description="Create configuration change history from lifecycle events.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("config_history_request.json", required=True),
+            EvidenceOutput("config_history_result.json", required=True),
+            EvidenceOutput("config_history_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Create configuration change history deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-history-show",
+        command="axiom config-history-show <report_id> [--json-output]",
+        description="Show a history report by ID.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a history report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-history-export",
+        command="axiom config-history-export <report_id> [--json-output]",
+        description="Export a history report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a history report as markdown.",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------

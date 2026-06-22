@@ -12985,5 +12985,248 @@ def _render_rollback_report_rich(report: dict) -> None:
         console.print(f"  Actions:     {', '.join(actions)}")
 
 
+@cli.command("config-history-create")
+@click.option("--text", default="", help="Key=value text")
+@click.option("--file", "file_path", default="", help="Path to key=value file")
+@click.option("--require-keys", default="", help="Comma-separated required keys")
+@click.option("--non-empty-keys", default="", help="Comma-separated non-empty keys")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_history_create_cmd(
+    text: str,
+    file_path: str,
+    require_keys: str,
+    non_empty_keys: str,
+    json_output: bool,
+) -> None:
+    """Create configuration change history from lifecycle events."""
+    import re as re_mod
+
+    from axiom_core.config_execution import ConfigurationExecutionEngine
+    from axiom_core.config_history import ConfigurationChangeHistoryEngine
+    from axiom_core.config_repair import ConfigurationRepairEngine
+    from axiom_core.config_rollback import ConfigurationRollbackEngine
+    from axiom_core.config_validation import (
+        ConfigurationRule,
+        ConfigurationRuleType,
+        ConfigurationValidator,
+    )
+    from axiom_core.configuration_registry import ConfigurationRegistry
+
+    if file_path and not text:
+        try:
+            text = Path(file_path).read_text(encoding="utf-8")
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    try:
+        config_reg = ConfigurationRegistry()
+        config = config_reg.load_config(text=text, file_name=file_path or "")
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    rules: list[ConfigurationRule] = []
+    if require_keys:
+        for key in require_keys.split(","):
+            key = key.strip()
+            if key:
+                rules.append(
+                    ConfigurationRule(
+                        key_pattern=re_mod.escape(key),
+                        rule_type=ConfigurationRuleType.REQUIRED_KEY,
+                    )
+                )
+    if non_empty_keys:
+        for key in non_empty_keys.split(","):
+            key = key.strip()
+            if key:
+                rules.append(
+                    ConfigurationRule(
+                        key_pattern=re_mod.escape(key),
+                        rule_type=ConfigurationRuleType.NON_EMPTY,
+                    )
+                )
+
+    try:
+        validator = ConfigurationValidator()
+        validation_report = validator.validate(config=config, rules=rules)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    repair_report = None
+    if not validation_report.get("valid", True):
+        try:
+            repair_engine = ConfigurationRepairEngine()
+            repair_report = repair_engine.recommend(
+                validation_report=validation_report,
+                config=config,
+            )
+        except Exception:
+            pass
+
+    try:
+        exec_engine = ConfigurationExecutionEngine()
+        exec_actions = ["apply_valid_configuration"]
+        if repair_report and repair_report.get("repairable_count", 0) > 0:
+            exec_actions = ["apply_repair_recommendations"]
+        execution_report = exec_engine.execute(
+            config=config,
+            validation_report=validation_report,
+            repair_report=repair_report,
+            actions=exec_actions,
+        )
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    execution_result = execution_report.get("result")
+
+    rollback_result = None
+    try:
+        rb_engine = ConfigurationRollbackEngine()
+        rb_report = rb_engine.rollback(
+            execution_result=execution_result,
+            actions=["verify_only"],
+        )
+        rollback_result = rb_report.get("result")
+    except Exception:
+        pass
+
+    try:
+        history_engine = ConfigurationChangeHistoryEngine()
+        report = history_engine.create_history(
+            config=config,
+            validation_report=validation_report,
+            repair_report=repair_report,
+            execution_result=execution_result,
+            rollback_result=rollback_result,
+        )
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_history_report_rich(report)
+
+
+@cli.command("config-history-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_history_show_cmd(report_id: str, json_output: bool) -> None:
+    """Show a configuration change history report."""
+    from axiom_core.config_history import ConfigurationChangeHistoryEngine
+
+    try:
+        engine = ConfigurationChangeHistoryEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_history_report_rich(report)
+
+
+@cli.command("config-history-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_history_export_cmd(report_id: str, json_output: bool) -> None:
+    """Export a configuration change history report as markdown."""
+    from axiom_core.config_history import ConfigurationChangeHistoryEngine
+
+    try:
+        engine = ConfigurationChangeHistoryEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_history_report_rich(report: dict) -> None:
+    """Rich text rendering for a history report."""
+    console.print("\n[bold]Configuration Change History Report[/bold]\n")
+    console.print(f"  Report ID:   {report.get('report_id', '')}")
+    console.print(f"  Config ID:   {report.get('config_id', '')}")
+    console.print(f"  Event Count: {report.get('event_count', 0)}")
+    console.print(f"  Summary:     {report.get('timeline_summary', '')}")
+
+    history = report.get("history")
+    if history:
+        events = history.get("events", [])
+        if events:
+            console.print("\n  [bold]Timeline:[/bold]")
+            for i, event in enumerate(events, 1):
+                console.print(
+                    f"    {i}. [{event.get('event_type', '').upper()}] "
+                    f"{event.get('summary', '')}"
+                )
+
+
 if __name__ == "__main__":
     cli()
