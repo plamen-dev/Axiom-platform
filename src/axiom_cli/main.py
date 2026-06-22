@@ -16246,5 +16246,150 @@ def _render_work_priority_report_rich(report: dict) -> None:
             console.print(f"    {rank}. {work_id} (score={score})")
 
 
+@cli.command("execution-attempt-create")
+@click.option("--attempts-file", default="", help="Path to attempts JSON file")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def execution_attempt_create_cmd(attempts_file: str, json_output: bool) -> None:
+    """Create an execution attempt report."""
+    from axiom_core.execution_attempt import ExecutionAttemptEngine
+
+    attempts: list = []
+    if attempts_file:
+        try:
+            data = json.loads(Path(attempts_file).read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                attempts = data
+            elif isinstance(data, dict):
+                attempts = data.get("attempts", [])
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    try:
+        engine = ExecutionAttemptEngine()
+        result = engine.create(attempts=attempts)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+    else:
+        _render_execution_attempt_report_rich(result)
+
+
+@cli.command("execution-attempt-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def execution_attempt_show_cmd(report_id: str, json_output: bool) -> None:
+    """Show an execution attempt report."""
+    from axiom_core.execution_attempt import ExecutionAttemptEngine
+
+    try:
+        engine = ExecutionAttemptEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_execution_attempt_report_rich(report)
+
+
+@cli.command("execution-attempt-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def execution_attempt_export_cmd(report_id: str, json_output: bool) -> None:
+    """Export an execution attempt report as markdown."""
+    from axiom_core.execution_attempt import ExecutionAttemptEngine
+
+    try:
+        engine = ExecutionAttemptEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_execution_attempt_report_rich(report: dict) -> None:
+    """Rich text rendering for an execution attempt report."""
+    console.print("\n[bold]Execution Attempt Report[/bold]\n")
+    console.print(f"  Report ID:        {report.get('report_id', '')}")
+    console.print(f"  Attempts:         {report.get('attempt_count', 0)}")
+    console.print(f"  Succeeded:        {report.get('succeeded_count', 0)}")
+    console.print(f"  Failed:           {report.get('failed_count', 0)}")
+    console.print(f"  Partial Success:  {report.get('partial_success_count', 0)}")
+    console.print(f"  Cancelled:        {report.get('cancelled_count', 0)}")
+
+    attempts = report.get("attempts", [])
+    if attempts:
+        console.print("\n  [bold]Attempts:[/bold]")
+        for a in attempts:
+            attempt_type = a.get("attempt_type", "").upper()
+            status = a.get("status", "").upper()
+            work_id = a.get("work_id", "")
+            duration = a.get("duration_ms", 0)
+            console.print(
+                f"    [{attempt_type}] [{status}] {work_id} ({duration} ms)"
+            )
+
+
 if __name__ == "__main__":
     cli()

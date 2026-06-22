@@ -5363,6 +5363,61 @@ _register(
 
 
 # ---------------------------------------------------------------------------
+# Execution Attempt commands
+# ---------------------------------------------------------------------------
+
+_register(
+    CommandSpec(
+        name="execution-attempt-create",
+        command="axiom execution-attempt-create [--attempts-file <af>] [--json-output]",
+        description="Create an execution attempt report with status/duration tracking.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("execution_attempt_request.json", required=True),
+            EvidenceOutput("execution_attempt_result.json", required=True),
+            EvidenceOutput("execution_attempt_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Create and persist an execution attempt report deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-attempt-show",
+        command="axiom execution-attempt-show <report_id> [--json-output]",
+        description="Show an execution attempt report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show an execution attempt report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-attempt-export",
+        command="axiom execution-attempt-export <report_id> [--json-output]",
+        description="Export an execution attempt report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export an execution attempt report as markdown.",
+    )
+)
+
+
+# ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
 
