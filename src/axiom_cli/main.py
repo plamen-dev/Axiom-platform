@@ -13904,5 +13904,159 @@ def _render_scenario_report_rich(report: dict) -> None:
                 )
 
 
+@cli.command("config-batch-run")
+@click.option("--scenarios-file", default="", help="Path to scenarios JSON file (list of scenario objects)")
+@click.option("--execution-mode", default="run_all", type=click.Choice(["run_all", "stop_on_failure", "verify_only"]), help="Execution mode")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_batch_run_cmd(
+    scenarios_file: str,
+    execution_mode: str,
+    json_output: bool,
+) -> None:
+    """Run a batch of configuration scenarios."""
+    from axiom_core.config_batch_execution import ConfigurationBatchExecutionEngine
+
+    scenarios: list = []
+    scenario_ids: list = []
+    if scenarios_file:
+        try:
+            data = json.loads(Path(scenarios_file).read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                scenarios = data
+                scenario_ids = [s.get("scenario_id", "") for s in data]
+            elif isinstance(data, dict):
+                scenarios = data.get("scenarios", [])
+                scenario_ids = [s.get("scenario_id", "") for s in scenarios]
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    try:
+        engine = ConfigurationBatchExecutionEngine()
+        report = engine.run(
+            scenario_ids=scenario_ids,
+            execution_mode=execution_mode,
+            scenarios=scenarios,
+        )
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_batch_report_rich(report)
+
+
+@cli.command("config-batch-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_batch_show_cmd(report_id: str, json_output: bool) -> None:
+    """Show a batch execution report."""
+    from axiom_core.config_batch_execution import ConfigurationBatchExecutionEngine
+
+    try:
+        engine = ConfigurationBatchExecutionEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_batch_report_rich(report)
+
+
+@cli.command("config-batch-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_batch_export_cmd(report_id: str, json_output: bool) -> None:
+    """Export a batch execution report as markdown."""
+    from axiom_core.config_batch_execution import ConfigurationBatchExecutionEngine
+
+    try:
+        engine = ConfigurationBatchExecutionEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_batch_report_rich(report: dict) -> None:
+    """Rich text rendering for a batch execution report."""
+    console.print("\n[bold]Configuration Batch Execution Report[/bold]\n")
+    console.print(f"  Report ID:  {report.get('report_id', '')}")
+    console.print(f"  Summary:    {report.get('batch_summary', '')}")
+
+    result = report.get("result")
+    if result:
+        console.print(f"  Total:      {result.get('total_count', 0)}")
+        console.print(f"  Succeeded:  {result.get('succeeded_count', 0)}")
+        console.print(f"  Failed:     {result.get('failed_count', 0)}")
+        console.print(f"  Skipped:    {result.get('skipped_count', 0)}")
+        console.print(f"  Warnings:   {result.get('warning_count', 0)}")
+
+        items = result.get("items", [])
+        if items:
+            console.print("\n  [bold]Items:[/bold]")
+            for item in items:
+                status = item.get("status", "").upper()
+                console.print(
+                    f"    [{status}] scenario={item.get('scenario_id', '')}"
+                )
+
+
 if __name__ == "__main__":
     cli()

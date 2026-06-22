@@ -126,6 +126,7 @@ EXPECTED_AXIOM_COMMANDS = {
     "config-merge", "config-merge-show", "config-merge-export",
     "config-policy-check", "config-policy-show", "config-policy-export",
     "config-scenario-run", "config-scenario-show", "config-scenario-export",
+    "config-batch-run", "config-batch-show", "config-batch-export",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 

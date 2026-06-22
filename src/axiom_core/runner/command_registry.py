@@ -4464,6 +4464,60 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="config-batch-run",
+        command="axiom config-batch-run [--scenarios-file <sf>] [--execution-mode <mode>] [--json-output]",
+        description="Run a batch of configuration scenarios with evidence generation.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("config_batch_request.json", required=True),
+            EvidenceOutput("config_batch_result.json", required=True),
+            EvidenceOutput("config_batch_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Execute batch of scenarios deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-batch-show",
+        command="axiom config-batch-show <report_id> [--json-output]",
+        description="Show a batch execution report by ID.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a batch execution report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-batch-export",
+        command="axiom config-batch-export <report_id> [--json-output]",
+        description="Export a batch execution report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a batch execution report as markdown.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
