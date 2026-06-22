@@ -119,6 +119,7 @@ EXPECTED_AXIOM_COMMANDS = {
     "config-validate", "config-validation-show", "config-validation-export",
     "config-repair-recommend", "config-repair-show", "config-repair-export",
     "config-explain", "config-explanation-show", "config-explanation-export",
+    "config-execute", "config-execution-show", "config-execution-export",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 

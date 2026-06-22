@@ -4084,6 +4084,61 @@ _register(
 )
 
 
+_register(
+    CommandSpec(
+        name="config-execute",
+        command="axiom config-execute [--text <t>] [--file <f>] [--require-keys <rk>] [--non-empty-keys <nek>] [--actions <a>] [--json-output]",
+        description="Execute configuration actions with evidence generation.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("config_execution_request.json", required=True),
+            EvidenceOutput("config_execution_result.json", required=True),
+            EvidenceOutput("config_execution_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Execute configuration actions deterministically with evidence.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-execution-show",
+        command="axiom config-execution-show <report_id> [--json-output]",
+        description="Show an execution report by ID.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show an execution report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-execution-export",
+        command="axiom config-execution-export <report_id> [--json-output]",
+        description="Export an execution report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export an execution report as markdown.",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
