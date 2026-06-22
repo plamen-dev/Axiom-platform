@@ -116,6 +116,7 @@ EXPECTED_AXIOM_COMMANDS = {
     "live-coding-trial",
     "parser-coding-trial",
     "config-load", "config-show", "config-export",
+    "config-validate", "config-validation-show", "config-validation-export",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 

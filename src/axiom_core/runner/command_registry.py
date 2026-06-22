@@ -3904,6 +3904,66 @@ _register(
 )
 
 
+# -- Structured Configuration Validation v1 ---------------------------------
+
+_register(
+    CommandSpec(
+        name="config-validate",
+        command=(
+            "axiom config-validate [--text <t>] [--file <f>] "
+            "[--require-keys <rk>] [--non-empty-keys <nek>] [--json-output]"
+        ),
+        description="Validate a key=value configuration against rules.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("config_validation_request.json", required=True),
+            EvidenceOutput("config_validation_result.json", required=True),
+            EvidenceOutput("config_validation_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Validate key=value config against rules, generate evidence.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-validation-show",
+        command="axiom config-validation-show <report_id> [--json-output]",
+        description="Show a configuration validation report by ID.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Display a persisted validation report.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-validation-export",
+        command="axiom config-validation-export <report_id> [--json-output]",
+        description="Export a configuration validation report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a validation report as markdown.",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
