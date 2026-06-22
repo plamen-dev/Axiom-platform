@@ -14782,5 +14782,198 @@ def _render_capability_output_report_rich(report: dict) -> None:
             )
 
 
+@cli.command("capability-report-create")
+@click.option("--capability-id", default="", help="Capability ID")
+@click.option("--execution-status", default="succeeded", help="Execution status")
+@click.option("--started-at", default="", help="Execution start timestamp")
+@click.option("--completed-at", default="", help="Execution completion timestamp")
+@click.option("--duration-ms", default=0, type=int, help="Duration in milliseconds")
+@click.option("--events-file", default="", help="Path to events JSON file")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_report_create_cmd(
+    capability_id: str,
+    execution_status: str,
+    started_at: str,
+    completed_at: str,
+    duration_ms: int,
+    events_file: str,
+    json_output: bool,
+) -> None:
+    """Create a capability execution report."""
+    from axiom_core.capability_execution_report import CapabilityExecutionReportEngine
+
+    events: list = []
+    if events_file:
+        try:
+            data = json.loads(Path(events_file).read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                events = data
+            elif isinstance(data, dict):
+                events = data.get("events", [])
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    try:
+        engine = CapabilityExecutionReportEngine()
+        report = engine.create(
+            capability_id=capability_id,
+            execution_status=execution_status,
+            started_at=started_at,
+            completed_at=completed_at,
+            duration_ms=duration_ms,
+            events=events,
+        )
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_capability_execution_report_rich(report)
+
+
+@cli.command("capability-reports")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_reports_cmd(json_output: bool) -> None:
+    """List all capability execution reports."""
+    from axiom_core.capability_execution_report import CapabilityExecutionReportEngine
+
+    try:
+        engine = CapabilityExecutionReportEngine()
+        reports = engine.list_reports()
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(reports, indent=2, default=str))
+    else:
+        console.print(f"\n[bold]Capability Execution Reports ({len(reports)}):[/bold]\n")
+        for r in reports:
+            console.print(
+                f"  {r.get('report_id', '')} — "
+                f"cap={r.get('capability_id', '')} "
+                f"status={r.get('execution_status', '')} "
+                f"duration={r.get('duration_ms', 0)}ms"
+            )
+
+
+@cli.command("capability-report-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_report_show_cmd(report_id: str, json_output: bool) -> None:
+    """Show a capability execution report."""
+    from axiom_core.capability_execution_report import CapabilityExecutionReportEngine
+
+    try:
+        engine = CapabilityExecutionReportEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_capability_execution_report_rich(report)
+
+
+@cli.command("capability-report-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_report_export_cmd(report_id: str, json_output: bool) -> None:
+    """Export a capability execution report as markdown."""
+    from axiom_core.capability_execution_report import CapabilityExecutionReportEngine
+
+    try:
+        engine = CapabilityExecutionReportEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_capability_execution_report_rich(report: dict) -> None:
+    """Rich text rendering for a capability execution report."""
+    console.print("\n[bold]Capability Execution Report[/bold]\n")
+    console.print(f"  Report ID:  {report.get('report_id', '')}")
+    console.print(f"  Capability: {report.get('capability_id', '')}")
+    console.print(f"  Status:     {report.get('execution_status', '')}")
+    console.print(f"  Duration:   {report.get('duration_ms', 0)}ms")
+    console.print(f"  Started:    {report.get('started_at', '')}")
+    console.print(f"  Completed:  {report.get('completed_at', '')}")
+
+    summary = report.get("summary", {})
+    if summary:
+        console.print("\n  [bold]Summary:[/bold]")
+        console.print(f"    Events:   {summary.get('event_count', 0)}")
+        console.print(f"    Warnings: {summary.get('warning_count', 0)}")
+        console.print(f"    Errors:   {summary.get('error_count', 0)}")
+
+    events = report.get("events", [])
+    if events:
+        console.print("\n  [bold]Events:[/bold]")
+        for ev in events:
+            etype = ev.get("event_type", "").upper()
+            msg = ev.get("message", "")
+            console.print(f"    [{etype}] {msg}")
+
+
 if __name__ == "__main__":
     cli()
