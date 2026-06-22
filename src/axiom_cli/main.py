@@ -14412,5 +14412,190 @@ def _render_capability_report_rich(report: dict) -> None:
                 )
 
 
+@cli.command("capability-input-create")
+@click.option("--inputs-file", default="", help="Path to inputs JSON file")
+@click.option("--capability-id", default="", help="Capability ID for inputs")
+@click.option("--known-capability-ids", default="", help="Comma-separated known capability IDs")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_input_create_cmd(
+    inputs_file: str,
+    capability_id: str,
+    known_capability_ids: str,
+    json_output: bool,
+) -> None:
+    """Create capability inputs and validate them."""
+    from axiom_core.capability_input import CapabilityInputEngine
+
+    inputs: list = []
+    if inputs_file:
+        try:
+            data = json.loads(Path(inputs_file).read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                inputs = data
+            elif isinstance(data, dict):
+                inputs = data.get("inputs", [])
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    known_ids_list: list[str] | None = None
+    if known_capability_ids.strip():
+        known_ids_list = [
+            k.strip() for k in known_capability_ids.split(",") if k.strip()
+        ]
+
+    try:
+        engine = CapabilityInputEngine()
+        report = engine.create(
+            capability_id=capability_id,
+            inputs=inputs,
+            known_capability_ids=known_ids_list,
+        )
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_capability_input_report_rich(report)
+
+
+@cli.command("capability-inputs")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_inputs_cmd(json_output: bool) -> None:
+    """List all capability input reports."""
+    from axiom_core.capability_input import CapabilityInputEngine
+
+    try:
+        engine = CapabilityInputEngine()
+        reports = engine.list_reports()
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(reports, indent=2, default=str))
+    else:
+        console.print(f"\n[bold]Capability Input Reports ({len(reports)}):[/bold]\n")
+        for r in reports:
+            console.print(
+                f"  {r.get('report_id', '')} — "
+                f"cap={r.get('capability_id', '')} "
+                f"valid={r.get('valid_count', 0)} invalid={r.get('invalid_count', 0)}"
+            )
+
+
+@cli.command("capability-input-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_input_show_cmd(report_id: str, json_output: bool) -> None:
+    """Show a capability input report."""
+    from axiom_core.capability_input import CapabilityInputEngine
+
+    try:
+        engine = CapabilityInputEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_capability_input_report_rich(report)
+
+
+@cli.command("capability-input-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_input_export_cmd(report_id: str, json_output: bool) -> None:
+    """Export a capability input report as markdown."""
+    from axiom_core.capability_input import CapabilityInputEngine
+
+    try:
+        engine = CapabilityInputEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_capability_input_report_rich(report: dict) -> None:
+    """Rich text rendering for a capability input report."""
+    console.print("\n[bold]Capability Input Report[/bold]\n")
+    console.print(f"  Report ID:    {report.get('report_id', '')}")
+    console.print(f"  Capability:   {report.get('capability_id', '')}")
+    console.print(f"  Inputs:       {report.get('input_count', 0)}")
+    console.print(f"  Valid:        {report.get('valid_count', 0)}")
+    console.print(f"  Invalid:      {report.get('invalid_count', 0)}")
+    console.print(f"  Missing:      {report.get('missing_count', 0)}")
+    console.print(f"  Unsupported:  {report.get('unsupported_count', 0)}")
+
+    inputs = report.get("inputs", [])
+    if inputs:
+        console.print("\n  [bold]Inputs:[/bold]")
+        for inp in inputs:
+            status = inp.get("status", "").upper()
+            itype = inp.get("input_type", "")
+            console.print(
+                f"    [{status}] {inp.get('name', '')} (type: {itype})"
+            )
+
+
 if __name__ == "__main__":
     cli()
