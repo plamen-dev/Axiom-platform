@@ -4139,6 +4139,61 @@ _register(
 )
 
 
+_register(
+    CommandSpec(
+        name="config-rollback",
+        command="axiom config-rollback [--text <t>] [--file <f>] [--require-keys <rk>] [--non-empty-keys <nek>] [--actions <a>] [--json-output]",
+        description="Roll back configuration execution actions.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("config_rollback_request.json", required=True),
+            EvidenceOutput("config_rollback_result.json", required=True),
+            EvidenceOutput("config_rollback_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Roll back configuration execution actions deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-rollback-show",
+        command="axiom config-rollback-show <report_id> [--json-output]",
+        description="Show a rollback report by ID.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a rollback report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-rollback-export",
+        command="axiom config-rollback-export <report_id> [--json-output]",
+        description="Export a rollback report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a rollback report as markdown.",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------

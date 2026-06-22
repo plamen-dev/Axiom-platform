@@ -12737,5 +12737,253 @@ def _render_execution_report_rich(report: dict) -> None:
         console.print(f"  Actions:    {', '.join(actions)}")
 
 
+@cli.command("config-rollback")
+@click.option("--text", default="", help="Key=value text to rollback against")
+@click.option("--file", "file_path", default="", help="Path to key=value file")
+@click.option("--require-keys", default="", help="Comma-separated required keys")
+@click.option("--non-empty-keys", default="", help="Comma-separated non-empty keys")
+@click.option(
+    "--actions",
+    default="verify_only",
+    help="Comma-separated rollback actions: revert_applied_configuration, revert_repair_application, verify_only, no_action",
+)
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_rollback_cmd(
+    text: str,
+    file_path: str,
+    require_keys: str,
+    non_empty_keys: str,
+    actions: str,
+    json_output: bool,
+) -> None:
+    """Roll back configuration execution actions."""
+    import re as re_mod
+
+    from axiom_core.config_execution import ConfigurationExecutionEngine
+    from axiom_core.config_repair import ConfigurationRepairEngine
+    from axiom_core.config_rollback import ConfigurationRollbackEngine
+    from axiom_core.config_validation import (
+        ConfigurationRule,
+        ConfigurationRuleType,
+        ConfigurationValidator,
+    )
+    from axiom_core.configuration_registry import ConfigurationRegistry
+
+    if file_path and not text:
+        try:
+            text = Path(file_path).read_text(encoding="utf-8")
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    try:
+        config_reg = ConfigurationRegistry()
+        config = config_reg.load_config(text=text, file_name=file_path or "")
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    rules: list[ConfigurationRule] = []
+    if require_keys:
+        for key in require_keys.split(","):
+            key = key.strip()
+            if key:
+                rules.append(
+                    ConfigurationRule(
+                        key_pattern=re_mod.escape(key),
+                        rule_type=ConfigurationRuleType.REQUIRED_KEY,
+                    )
+                )
+    if non_empty_keys:
+        for key in non_empty_keys.split(","):
+            key = key.strip()
+            if key:
+                rules.append(
+                    ConfigurationRule(
+                        key_pattern=re_mod.escape(key),
+                        rule_type=ConfigurationRuleType.NON_EMPTY,
+                    )
+                )
+
+    try:
+        validator = ConfigurationValidator()
+        validation_report = validator.validate(config=config, rules=rules)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    repair_report = None
+    if not validation_report.get("valid", True):
+        try:
+            repair_engine = ConfigurationRepairEngine()
+            repair_report = repair_engine.recommend(
+                validation_report=validation_report,
+                config=config,
+            )
+        except Exception:
+            pass
+
+    try:
+        exec_engine = ConfigurationExecutionEngine()
+        exec_actions = ["apply_valid_configuration"]
+        if repair_report and repair_report.get("repairable_count", 0) > 0:
+            exec_actions = ["apply_repair_recommendations"]
+        execution_report = exec_engine.execute(
+            config=config,
+            validation_report=validation_report,
+            repair_report=repair_report,
+            actions=exec_actions,
+        )
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    execution_result = execution_report.get("result")
+
+    action_list = [a.strip() for a in actions.split(",") if a.strip()]
+
+    try:
+        engine = ConfigurationRollbackEngine()
+        rollback_report = engine.rollback(
+            execution_result=execution_result,
+            actions=action_list,
+        )
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(rollback_report, indent=2, default=str))
+    else:
+        _render_rollback_report_rich(rollback_report)
+
+
+@cli.command("config-rollback-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_rollback_show_cmd(
+    report_id: str,
+    json_output: bool,
+) -> None:
+    """Show a rollback report by ID."""
+    from axiom_core.config_rollback import ConfigurationRollbackEngine
+
+    try:
+        engine = ConfigurationRollbackEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_rollback_report_rich(report)
+
+
+@cli.command("config-rollback-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_rollback_export_cmd(
+    report_id: str,
+    json_output: bool,
+) -> None:
+    """Export a rollback report as markdown."""
+    from axiom_core.config_rollback import ConfigurationRollbackEngine
+
+    try:
+        engine = ConfigurationRollbackEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_rollback_report_rich(report: dict) -> None:
+    """Rich text rendering for a rollback report."""
+    console.print("\n[bold]Configuration Rollback Report[/bold]\n")
+    console.print(f"  Report ID:   {report.get('report_id', '')}")
+    console.print(f"  Rollback ID: {report.get('rollback_id', '')}")
+    console.print(f"  Status:      {report.get('status', '').upper()}")
+    console.print(f"  Summary:     {report.get('rollback_summary', '')}")
+
+    result = report.get("result")
+    if result:
+        reverted = result.get("reverted_actions", [])
+        failed = result.get("failed_actions", [])
+        warnings = result.get("warnings", [])
+        console.print(f"  Reverted:    {', '.join(reverted) or '(none)'}")
+        console.print(f"  Failed:      {', '.join(failed) or '(none)'}")
+        if warnings:
+            console.print("  Warnings:")
+            for w in warnings:
+                console.print(f"    - {w}")
+
+    request = report.get("request")
+    if request:
+        actions = request.get("requested_actions", [])
+        console.print(f"  Actions:     {', '.join(actions)}")
+
+
 if __name__ == "__main__":
     cli()
