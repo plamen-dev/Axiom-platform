@@ -4518,6 +4518,77 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="config-dependency-create",
+        command="axiom config-dependency-create [--dependencies-file <df>] [--known-ids <ids>] [--json-output]",
+        description="Create a configuration dependency graph with evidence generation.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("config_dependency_request.json", required=True),
+            EvidenceOutput("config_dependency_result.json", required=True),
+            EvidenceOutput("config_dependency_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Create a dependency graph deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-dependencies",
+        command="axiom config-dependencies [--json-output]",
+        description="List all dependency reports.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List all dependency reports.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-dependency-show",
+        command="axiom config-dependency-show <report_id> [--json-output]",
+        description="Show a dependency report by ID.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a dependency report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-dependency-export",
+        command="axiom config-dependency-export <report_id> [--json-output]",
+        description="Export a dependency report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a dependency report as markdown.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object

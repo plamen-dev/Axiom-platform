@@ -14058,5 +14058,181 @@ def _render_batch_report_rich(report: dict) -> None:
                 )
 
 
+@cli.command("config-dependency-create")
+@click.option("--dependencies-file", default="", help="Path to dependencies JSON file")
+@click.option("--known-ids", default="", help="Comma-separated known node IDs for validation")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_dependency_create_cmd(
+    dependencies_file: str,
+    known_ids: str,
+    json_output: bool,
+) -> None:
+    """Create a configuration dependency graph."""
+    from axiom_core.config_dependency import ConfigurationDependencyEngine
+
+    dependencies: list = []
+    if dependencies_file:
+        try:
+            data = json.loads(Path(dependencies_file).read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                dependencies = data
+            elif isinstance(data, dict):
+                dependencies = data.get("dependencies", [])
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    known_id_list: list[str] | None = None
+    if known_ids.strip():
+        known_id_list = [k.strip() for k in known_ids.split(",") if k.strip()]
+
+    try:
+        engine = ConfigurationDependencyEngine()
+        report = engine.create(dependencies=dependencies, known_ids=known_id_list)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_dependency_report_rich(report)
+
+
+@cli.command("config-dependencies")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_dependencies_cmd(json_output: bool) -> None:
+    """List all dependency reports."""
+    from axiom_core.config_dependency import ConfigurationDependencyEngine
+
+    try:
+        engine = ConfigurationDependencyEngine()
+        reports = engine.list_reports()
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(reports, indent=2, default=str))
+    else:
+        console.print(f"\n[bold]Dependency Reports ({len(reports)}):[/bold]\n")
+        for r in reports:
+            console.print(f"  {r.get('report_id', '')} — {r.get('dependency_summary', '')}")
+
+
+@cli.command("config-dependency-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_dependency_show_cmd(report_id: str, json_output: bool) -> None:
+    """Show a dependency report."""
+    from axiom_core.config_dependency import ConfigurationDependencyEngine
+
+    try:
+        engine = ConfigurationDependencyEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_dependency_report_rich(report)
+
+
+@cli.command("config-dependency-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_dependency_export_cmd(report_id: str, json_output: bool) -> None:
+    """Export a dependency report as markdown."""
+    from axiom_core.config_dependency import ConfigurationDependencyEngine
+
+    try:
+        engine = ConfigurationDependencyEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_dependency_report_rich(report: dict) -> None:
+    """Rich text rendering for a dependency report."""
+    console.print("\n[bold]Configuration Dependency Report[/bold]\n")
+    console.print(f"  Report ID:  {report.get('report_id', '')}")
+    console.print(f"  Summary:    {report.get('dependency_summary', '')}")
+    console.print(f"  Blocked:    {report.get('blocked_count', 0)}")
+    console.print(f"  Invalid:    {report.get('invalid_count', 0)}")
+
+    graph = report.get("graph")
+    if graph:
+        console.print(f"  Nodes:      {graph.get('node_count', 0)}")
+        console.print(f"  Edges:      {graph.get('edge_count', 0)}")
+
+        deps = graph.get("dependencies", [])
+        if deps:
+            console.print("\n  [bold]Dependencies:[/bold]")
+            for dep in deps:
+                status = dep.get("status", "").upper()
+                dtype = dep.get("dependency_type", "")
+                console.print(
+                    f"    [{status}] {dep.get('source_id', '')} "
+                    f"--{dtype}--> {dep.get('target_id', '')}"
+                )
+
+
 if __name__ == "__main__":
     cli()
