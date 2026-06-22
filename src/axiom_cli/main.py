@@ -15803,5 +15803,149 @@ def _render_capability_skill_report_rich(report: dict) -> None:
                 console.print(f"      [{created}]{source_part}: {osummary}")
 
 
+@cli.command("work-create")
+@click.option("--items-file", default="", help="Path to work items JSON file")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def work_create_cmd(items_file: str, json_output: bool) -> None:
+    """Create a work queue report."""
+    from axiom_core.work_queue import WorkQueueEngine
+
+    work_items: list = []
+    if items_file:
+        try:
+            data = json.loads(Path(items_file).read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                work_items = data
+            elif isinstance(data, dict):
+                work_items = data.get("work_items", [])
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    try:
+        engine = WorkQueueEngine()
+        result = engine.create(work_items=work_items)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+    else:
+        _render_work_queue_report_rich(result)
+
+
+@cli.command("work-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def work_show_cmd(report_id: str, json_output: bool) -> None:
+    """Show a work queue report."""
+    from axiom_core.work_queue import WorkQueueEngine
+
+    try:
+        engine = WorkQueueEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_work_queue_report_rich(report)
+
+
+@cli.command("work-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def work_export_cmd(report_id: str, json_output: bool) -> None:
+    """Export a work queue report as markdown."""
+    from axiom_core.work_queue import WorkQueueEngine
+
+    try:
+        engine = WorkQueueEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_work_queue_report_rich(report: dict) -> None:
+    """Rich text rendering for a work queue report."""
+    console.print("\n[bold]Work Queue Report[/bold]\n")
+    console.print(f"  Report ID:  {report.get('report_id', '')}")
+    console.print(f"  Queue ID:   {report.get('queue_id', '')}")
+    console.print(f"  Pending:    {report.get('pending_count', 0)}")
+    console.print(f"  Running:    {report.get('running_count', 0)}")
+    console.print(f"  Blocked:    {report.get('blocked_count', 0)}")
+    console.print(f"  Completed:  {report.get('completed_count', 0)}")
+    console.print(f"  Failed:     {report.get('failed_count', 0)}")
+
+    queue = report.get("queue", {})
+    work_items = queue.get("work_items", [])
+    if work_items:
+        console.print("\n  [bold]Work Items:[/bold]")
+        for w in work_items:
+            priority = w.get("priority", "").upper()
+            status = w.get("status", "").upper()
+            title = w.get("title", "")
+            console.print(f"    [{priority}] [{status}] {title}")
+
+
 if __name__ == "__main__":
     cli()

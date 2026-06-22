@@ -147,6 +147,7 @@ EXPECTED_AXIOM_COMMANDS = {
     "capability-history-export",
     "capability-skill-create", "capability-skill-show",
     "capability-skill-export",
+    "work-create", "work-show", "work-export",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 
