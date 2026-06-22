@@ -5140,6 +5140,61 @@ _register(
 
 
 # ---------------------------------------------------------------------------
+# Capability Skill commands
+# ---------------------------------------------------------------------------
+
+_register(
+    CommandSpec(
+        name="capability-skill-create",
+        command="axiom capability-skill-create [--capability-id <cid>] [--skills-file <sf>] [--json-output]",
+        description="Create a capability skill report with deterministic ordering.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("capability_skill_request.json", required=True),
+            EvidenceOutput("capability_skill_result.json", required=True),
+            EvidenceOutput("capability_skill_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Create and persist a capability skill report deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-skill-show",
+        command="axiom capability-skill-show <report_id> [--json-output]",
+        description="Show a capability skill report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a capability skill report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-skill-export",
+        command="axiom capability-skill-export <report_id> [--json-output]",
+        description="Export a capability skill report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a capability skill report as markdown.",
+    )
+)
+
+
+# ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
 

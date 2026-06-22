@@ -15653,5 +15653,155 @@ def _render_capability_history_report_rich(report: dict) -> None:
             console.print(f"    [{created}] {etype}{source_part}: {esummary}")
 
 
+@cli.command("capability-skill-create")
+@click.option("--capability-id", default="", help="Capability ID")
+@click.option("--skills-file", default="", help="Path to skills JSON file")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_skill_create_cmd(
+    capability_id: str,
+    skills_file: str,
+    json_output: bool,
+) -> None:
+    """Create a capability skill report."""
+    from axiom_core.capability_skill import CapabilitySkillEngine
+
+    skills: list = []
+    if skills_file:
+        try:
+            data = json.loads(Path(skills_file).read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                skills = data
+            elif isinstance(data, dict):
+                skills = data.get("skills", [])
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    try:
+        engine = CapabilitySkillEngine()
+        result = engine.create(capability_id=capability_id, skills=skills)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+    else:
+        _render_capability_skill_report_rich(result)
+
+
+@cli.command("capability-skill-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_skill_show_cmd(report_id: str, json_output: bool) -> None:
+    """Show a capability skill report."""
+    from axiom_core.capability_skill import CapabilitySkillEngine
+
+    try:
+        engine = CapabilitySkillEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_capability_skill_report_rich(report)
+
+
+@cli.command("capability-skill-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_skill_export_cmd(report_id: str, json_output: bool) -> None:
+    """Export a capability skill report as markdown."""
+    from axiom_core.capability_skill import CapabilitySkillEngine
+
+    try:
+        engine = CapabilitySkillEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_capability_skill_report_rich(report: dict) -> None:
+    """Rich text rendering for a capability skill report."""
+    console.print("\n[bold]Capability Skill Report[/bold]\n")
+    console.print(f"  Report ID:    {report.get('report_id', '')}")
+    console.print(f"  Capability:   {report.get('capability_id', '')}")
+    console.print(f"  Skill Count:  {report.get('skill_count', 0)}")
+
+    skills = report.get("skills", [])
+    if skills:
+        console.print("\n  [bold]Skills:[/bold]")
+        for s in skills:
+            stype = s.get("skill_type", "").upper()
+            name = s.get("name", "")
+            score = s.get("confidence_score", 0.0)
+            console.print(f"    {name} [{stype}] (confidence {score})")
+            for o in s.get("observations", []):
+                source = o.get("source_id", "")
+                osummary = o.get("summary", "")
+                created = o.get("created_at", "")
+                source_part = f" <- {source}" if source else ""
+                console.print(f"      [{created}]{source_part}: {osummary}")
+
+
 if __name__ == "__main__":
     cli()
