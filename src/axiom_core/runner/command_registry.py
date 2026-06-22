@@ -5015,6 +5015,76 @@ _register(
 
 
 # ---------------------------------------------------------------------------
+# Capability Confidence commands
+# ---------------------------------------------------------------------------
+
+_register(
+    CommandSpec(
+        name="capability-confidence-create",
+        command="axiom capability-confidence-create [--capability-id <cid>] [--execution-count <n>] [--success-count <n>] [--failure-count <n>] [--repair-count <n>] [--recovery-count <n>] [--json-output]",
+        description="Create a capability confidence report with deterministic scoring.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("capability_confidence_request.json", required=True),
+            EvidenceOutput("capability_confidence_result.json", required=True),
+            EvidenceOutput("capability_confidence_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Create and persist a capability confidence report deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-confidences",
+        command="axiom capability-confidences [--json-output]",
+        description="List all capability confidence reports.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List capability confidence reports.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-confidence-show",
+        command="axiom capability-confidence-show <report_id> [--json-output]",
+        description="Show a capability confidence report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a capability confidence report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-confidence-export",
+        command="axiom capability-confidence-export <report_id> [--json-output]",
+        description="Export a capability confidence report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a capability confidence report as markdown.",
+    )
+)
+
+
+# ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
 

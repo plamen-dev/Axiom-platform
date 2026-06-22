@@ -15325,5 +15325,186 @@ def _render_capability_repair_outcome_report_rich(report: dict) -> None:
             console.print(f"    [{otype}] ({status}) {summary}")
 
 
+@cli.command("capability-confidence-create")
+@click.option("--capability-id", default="", help="Capability ID")
+@click.option("--execution-count", default=0, type=int, help="Total executions")
+@click.option("--success-count", default=0, type=int, help="Successful executions")
+@click.option("--failure-count", default=0, type=int, help="Failed executions")
+@click.option("--repair-count", default=0, type=int, help="Repair attempts")
+@click.option("--recovery-count", default=0, type=int, help="Successful recoveries")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_confidence_create_cmd(
+    capability_id: str,
+    execution_count: int,
+    success_count: int,
+    failure_count: int,
+    repair_count: int,
+    recovery_count: int,
+    json_output: bool,
+) -> None:
+    """Create a capability confidence report."""
+    from axiom_core.capability_confidence import CapabilityConfidenceEngine
+
+    try:
+        engine = CapabilityConfidenceEngine()
+        result = engine.create(
+            capability_id=capability_id,
+            execution_count=execution_count,
+            success_count=success_count,
+            failure_count=failure_count,
+            repair_count=repair_count,
+            recovery_count=recovery_count,
+        )
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+    else:
+        _render_capability_confidence_report_rich(result)
+
+
+@cli.command("capability-confidences")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_confidences_cmd(json_output: bool) -> None:
+    """List all capability confidence reports."""
+    from axiom_core.capability_confidence import CapabilityConfidenceEngine
+
+    try:
+        engine = CapabilityConfidenceEngine()
+        reports = engine.list_reports()
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(reports, indent=2, default=str))
+    else:
+        console.print(
+            f"\n[bold]Capability Confidence Reports ({len(reports)}):[/bold]\n"
+        )
+        for r in reports:
+            console.print(
+                f"  {r.get('report_id', '')} — "
+                f"capability={r.get('capability_id', '')} "
+                f"score={r.get('score', 0.0)} "
+                f"level={r.get('confidence_level', '')}"
+            )
+
+
+@cli.command("capability-confidence-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_confidence_show_cmd(
+    report_id: str, json_output: bool
+) -> None:
+    """Show a capability confidence report."""
+    from axiom_core.capability_confidence import CapabilityConfidenceEngine
+
+    try:
+        engine = CapabilityConfidenceEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_capability_confidence_report_rich(report)
+
+
+@cli.command("capability-confidence-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_confidence_export_cmd(
+    report_id: str, json_output: bool
+) -> None:
+    """Export a capability confidence report as markdown."""
+    from axiom_core.capability_confidence import CapabilityConfidenceEngine
+
+    try:
+        engine = CapabilityConfidenceEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_capability_confidence_report_rich(report: dict) -> None:
+    """Rich text rendering for a capability confidence report."""
+    console.print("\n[bold]Capability Confidence Report[/bold]\n")
+    console.print(f"  Report ID:    {report.get('report_id', '')}")
+    console.print(f"  Capability:   {report.get('capability_id', '')}")
+    console.print(f"  Score:        {report.get('score', 0.0)}")
+    console.print(f"  Level:        {report.get('confidence_level', '')}")
+
+    confidence = report.get("confidence", {})
+    factors = confidence.get("factors", {})
+    if factors:
+        console.print("\n  [bold]Factors:[/bold]")
+        console.print(f"    Executions: {factors.get('execution_count', 0)}")
+        console.print(f"    Successes:  {factors.get('success_count', 0)}")
+        console.print(f"    Failures:   {factors.get('failure_count', 0)}")
+        console.print(f"    Repairs:    {factors.get('repair_count', 0)}")
+        console.print(f"    Recoveries: {factors.get('recovery_count', 0)}")
+
+
 if __name__ == "__main__":
     cli()
