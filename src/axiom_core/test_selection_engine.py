@@ -215,6 +215,7 @@ _FILE_TO_TEST: dict[str, str] = {
     "src/axiom_core/capability_history.py": "tests/test_capability_history.py",
     "src/axiom_core/capability_skill.py": "tests/test_capability_skill.py",
     "src/axiom_core/work_queue.py": "tests/test_work_queue.py",
+    "src/axiom_core/work_dependency.py": "tests/test_work_dependency.py",
     "src/axiom_cli/main.py": "tests/test_command_registry.py",
 }
 

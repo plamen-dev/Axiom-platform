@@ -15947,5 +15947,153 @@ def _render_work_queue_report_rich(report: dict) -> None:
             console.print(f"    [{priority}] [{status}] {title}")
 
 
+@cli.command("work-dependency-create")
+@click.option("--deps-file", default="", help="Path to dependencies JSON file")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def work_dependency_create_cmd(deps_file: str, json_output: bool) -> None:
+    """Create a work dependency graph report."""
+    from axiom_core.work_dependency import WorkDependencyEngine
+
+    dependencies: list = []
+    if deps_file:
+        try:
+            data = json.loads(Path(deps_file).read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                dependencies = data
+            elif isinstance(data, dict):
+                dependencies = data.get("dependencies", [])
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    try:
+        engine = WorkDependencyEngine()
+        result = engine.create(dependencies=dependencies)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+    else:
+        _render_work_dependency_report_rich(result)
+
+
+@cli.command("work-dependency-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def work_dependency_show_cmd(report_id: str, json_output: bool) -> None:
+    """Show a work dependency graph report."""
+    from axiom_core.work_dependency import WorkDependencyEngine
+
+    try:
+        engine = WorkDependencyEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_work_dependency_report_rich(report)
+
+
+@cli.command("work-dependency-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def work_dependency_export_cmd(report_id: str, json_output: bool) -> None:
+    """Export a work dependency graph report as markdown."""
+    from axiom_core.work_dependency import WorkDependencyEngine
+
+    try:
+        engine = WorkDependencyEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_work_dependency_report_rich(report: dict) -> None:
+    """Rich text rendering for a work dependency graph report."""
+    console.print("\n[bold]Work Dependency Report[/bold]\n")
+    console.print(f"  Report ID:  {report.get('report_id', '')}")
+    console.print(f"  Graph ID:   {report.get('graph_id', '')}")
+    graph = report.get("graph", {})
+    console.print(f"  Nodes:      {graph.get('node_count', 0)}")
+    console.print(f"  Edges:      {graph.get('edge_count', 0)}")
+    console.print(f"  Blocked:    {report.get('blocked_count', 0)}")
+    console.print(f"  Invalid:    {report.get('invalid_count', 0)}")
+    console.print(f"  Has Cycle:  {report.get('has_cycle', False)}")
+    cycle = report.get("cycle", [])
+    if cycle:
+        console.print(f"  Cycle:      {' -> '.join(cycle)}")
+
+    dependencies = graph.get("dependencies", [])
+    if dependencies:
+        console.print("\n  [bold]Dependencies:[/bold]")
+        for d in dependencies:
+            dep_type = d.get("dependency_type", "").upper()
+            status = d.get("status", "").upper()
+            source = d.get("source_work_id", "")
+            target = d.get("target_work_id", "")
+            console.print(f"    [{dep_type}] [{status}] {source} -> {target}")
+
+
 if __name__ == "__main__":
     cli()

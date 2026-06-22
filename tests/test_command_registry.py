@@ -148,6 +148,8 @@ EXPECTED_AXIOM_COMMANDS = {
     "capability-skill-create", "capability-skill-show",
     "capability-skill-export",
     "work-create", "work-show", "work-export",
+    "work-dependency-create", "work-dependency-show",
+    "work-dependency-export",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 

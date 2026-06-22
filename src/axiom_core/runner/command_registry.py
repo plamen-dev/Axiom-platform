@@ -5250,6 +5250,61 @@ _register(
 
 
 # ---------------------------------------------------------------------------
+# Work Item Dependency commands
+# ---------------------------------------------------------------------------
+
+_register(
+    CommandSpec(
+        name="work-dependency-create",
+        command="axiom work-dependency-create [--deps-file <df>] [--json-output]",
+        description="Create a work dependency graph report with cycle detection.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("work_dependency_request.json", required=True),
+            EvidenceOutput("work_dependency_result.json", required=True),
+            EvidenceOutput("work_dependency_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Create and persist a work dependency graph deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="work-dependency-show",
+        command="axiom work-dependency-show <report_id> [--json-output]",
+        description="Show a work dependency graph report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a work dependency graph report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="work-dependency-export",
+        command="axiom work-dependency-export <report_id> [--json-output]",
+        description="Export a work dependency graph report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a work dependency graph report as markdown.",
+    )
+)
+
+
+# ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
 
