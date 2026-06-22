@@ -5305,6 +5305,64 @@ _register(
 
 
 # ---------------------------------------------------------------------------
+# Work Prioritization commands
+# ---------------------------------------------------------------------------
+
+_register(
+    CommandSpec(
+        name="work-priority-create",
+        command=(
+            "axiom work-priority-create [--rules-file <rf>] "
+            "[--factors-file <ff>] [--json-output]"
+        ),
+        description="Create a work prioritization report with deterministic ranking.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("work_priority_request.json", required=True),
+            EvidenceOutput("work_priority_result.json", required=True),
+            EvidenceOutput("work_priority_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Create and persist a work prioritization report deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="work-priority-show",
+        command="axiom work-priority-show <report_id> [--json-output]",
+        description="Show a work prioritization report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a work prioritization report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="work-priority-export",
+        command="axiom work-priority-export <report_id> [--json-output]",
+        description="Export a work prioritization report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a work prioritization report as markdown.",
+    )
+)
+
+
+# ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------
 

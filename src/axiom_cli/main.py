@@ -16095,5 +16095,156 @@ def _render_work_dependency_report_rich(report: dict) -> None:
             console.print(f"    [{dep_type}] [{status}] {source} -> {target}")
 
 
+@cli.command("work-priority-create")
+@click.option("--rules-file", default="", help="Path to rules JSON file")
+@click.option("--factors-file", default="", help="Path to factors JSON file")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def work_priority_create_cmd(
+    rules_file: str, factors_file: str, json_output: bool
+) -> None:
+    """Create a work prioritization report."""
+    from axiom_core.work_prioritization import WorkPrioritizationEngine
+
+    rules: list = []
+    factors: list = []
+    try:
+        if rules_file:
+            data = json.loads(Path(rules_file).read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                rules = data
+            elif isinstance(data, dict):
+                rules = data.get("rules", [])
+        if factors_file:
+            data = json.loads(Path(factors_file).read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                factors = data
+            elif isinstance(data, dict):
+                factors = data.get("factors", [])
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    try:
+        engine = WorkPrioritizationEngine()
+        result = engine.create(rules=rules, factors=factors)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+    else:
+        _render_work_priority_report_rich(result)
+
+
+@cli.command("work-priority-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def work_priority_show_cmd(report_id: str, json_output: bool) -> None:
+    """Show a work prioritization report."""
+    from axiom_core.work_prioritization import WorkPrioritizationEngine
+
+    try:
+        engine = WorkPrioritizationEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_work_priority_report_rich(report)
+
+
+@cli.command("work-priority-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def work_priority_export_cmd(report_id: str, json_output: bool) -> None:
+    """Export a work prioritization report as markdown."""
+    from axiom_core.work_prioritization import WorkPrioritizationEngine
+
+    try:
+        engine = WorkPrioritizationEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_work_priority_report_rich(report: dict) -> None:
+    """Rich text rendering for a work prioritization report."""
+    console.print("\n[bold]Work Prioritization Report[/bold]\n")
+    console.print(f"  Report ID:  {report.get('report_id', '')}")
+    console.print(f"  Items:      {report.get('item_count', 0)}")
+    console.print(
+        f"  Highest:    {report.get('highest_priority_work_id', '') or 'none'}"
+    )
+
+    results = report.get("results", [])
+    if results:
+        console.print("\n  [bold]Ranking:[/bold]")
+        for r in results:
+            rank = r.get("execution_rank", 0)
+            work_id = r.get("work_id", "")
+            score = r.get("priority_score", 0)
+            console.print(f"    {rank}. {work_id} (score={score})")
+
+
 if __name__ == "__main__":
     cli()

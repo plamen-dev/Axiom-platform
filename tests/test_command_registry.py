@@ -150,6 +150,8 @@ EXPECTED_AXIOM_COMMANDS = {
     "work-create", "work-show", "work-export",
     "work-dependency-create", "work-dependency-show",
     "work-dependency-export",
+    "work-priority-create", "work-priority-show",
+    "work-priority-export",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 
