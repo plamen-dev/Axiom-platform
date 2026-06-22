@@ -13736,5 +13736,173 @@ def _render_policy_report_rich(report: dict) -> None:
                 console.print(f"    [{sev}] {v.get('message', '')}")
 
 
+@cli.command("config-scenario-run")
+@click.option("--scenario-file", default="", help="Path to scenario JSON file")
+@click.option("--policy-passed", type=bool, default=None, help="Policy passed")
+@click.option("--policy-blocker-count", type=int, default=0, help="Policy blocker count")
+@click.option("--validation-passed", type=bool, default=None, help="Validation passed")
+@click.option("--execution-status", default="", help="Execution status")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_scenario_run_cmd(
+    scenario_file: str,
+    policy_passed: bool | None,
+    policy_blocker_count: int,
+    validation_passed: bool | None,
+    execution_status: str,
+    json_output: bool,
+) -> None:
+    """Run a configuration scenario evaluation."""
+    from axiom_core.config_scenario import ConfigurationScenarioEngine
+
+    scenario_data: dict = {}
+    if scenario_file:
+        try:
+            scenario_data = json.loads(Path(scenario_file).read_text(encoding="utf-8"))
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    policy_result: dict = {}
+    if policy_passed is not None:
+        policy_result["passed"] = policy_passed
+    if policy_blocker_count:
+        policy_result["blocker_count"] = policy_blocker_count
+
+    validation_result: dict = {}
+    if validation_passed is not None:
+        validation_result["passed"] = validation_passed
+
+    execution_result: dict = {}
+    if execution_status:
+        execution_result["status"] = execution_status
+
+    try:
+        engine = ConfigurationScenarioEngine()
+        report = engine.run(
+            scenario=scenario_data,
+            policy_result=policy_result,
+            validation_result=validation_result,
+            execution_result=execution_result,
+        )
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_scenario_report_rich(report)
+
+
+@cli.command("config-scenario-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_scenario_show_cmd(report_id: str, json_output: bool) -> None:
+    """Show a configuration scenario report."""
+    from axiom_core.config_scenario import ConfigurationScenarioEngine
+
+    try:
+        engine = ConfigurationScenarioEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_scenario_report_rich(report)
+
+
+@cli.command("config-scenario-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_scenario_export_cmd(report_id: str, json_output: bool) -> None:
+    """Export a configuration scenario report as markdown."""
+    from axiom_core.config_scenario import ConfigurationScenarioEngine
+
+    try:
+        engine = ConfigurationScenarioEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_scenario_report_rich(report: dict) -> None:
+    """Rich text rendering for a scenario report."""
+    console.print("\n[bold]Configuration Scenario Report[/bold]\n")
+    console.print(f"  Report ID:  {report.get('report_id', '')}")
+    console.print(f"  Summary:    {report.get('scenario_summary', '')}")
+
+    result = report.get("result")
+    if result:
+        status = "PASSED" if result.get("passed") else "FAILED"
+        console.print(f"  Status:     {status}")
+        console.print(f"  Blockers:   {result.get('blocker_count', 0)}")
+        console.print(f"  Warnings:   {result.get('warning_count', 0)}")
+
+        exp_results = result.get("expectation_results", [])
+        if exp_results:
+            console.print("\n  [bold]Expectations:[/bold]")
+            for er in exp_results:
+                met = "MET" if er.get("met") else "NOT MET"
+                console.print(
+                    f"    [{er.get('severity', '').upper()}] "
+                    f"{er.get('expectation_type', '')}: {met}"
+                )
+
+
 if __name__ == "__main__":
     cli()

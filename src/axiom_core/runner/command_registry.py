@@ -4410,6 +4410,60 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="config-scenario-run",
+        command="axiom config-scenario-run [--scenario-file <sf>] [--policy-passed <bool>] [--policy-blocker-count <int>] [--validation-passed <bool>] [--execution-status <s>] [--json-output]",
+        description="Run a configuration scenario evaluation with evidence generation.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("config_scenario_request.json", required=True),
+            EvidenceOutput("config_scenario_result.json", required=True),
+            EvidenceOutput("config_scenario_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Evaluate a configuration scenario deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-scenario-show",
+        command="axiom config-scenario-show <report_id> [--json-output]",
+        description="Show a scenario report by ID.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a scenario report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-scenario-export",
+        command="axiom config-scenario-export <report_id> [--json-output]",
+        description="Export a scenario report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a scenario report as markdown.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
