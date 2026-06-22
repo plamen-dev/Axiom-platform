@@ -13393,5 +13393,183 @@ def _render_diff_report_rich(report: dict) -> None:
                 console.print(f"    [{dt}] {entry.get('summary', '')}")
 
 
+@cli.command("config-merge")
+@click.option("--left-text", default="", help="Left config key=value text")
+@click.option("--right-text", default="", help="Right config key=value text")
+@click.option("--left-file", default="", help="Path to left config file")
+@click.option("--right-file", default="", help="Path to right config file")
+@click.option(
+    "--strategy",
+    default="left_wins",
+    type=click.Choice(["left_wins", "right_wins", "keep_identical_only", "fail_on_conflict"]),
+    help="Merge strategy",
+)
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_merge_cmd(
+    left_text: str,
+    right_text: str,
+    left_file: str,
+    right_file: str,
+    strategy: str,
+    json_output: bool,
+) -> None:
+    """Merge two configuration states."""
+    from axiom_core.config_merge import ConfigurationMergeEngine
+    from axiom_core.configuration_registry import ConfigurationRegistry
+
+    if left_file and not left_text:
+        try:
+            left_text = Path(left_file).read_text(encoding="utf-8")
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    if right_file and not right_text:
+        try:
+            right_text = Path(right_file).read_text(encoding="utf-8")
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    try:
+        config_reg = ConfigurationRegistry()
+        left_config = config_reg.load_config(text=left_text, file_name=left_file or "left")
+        right_config = config_reg.load_config(text=right_text, file_name=right_file or "right")
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    try:
+        engine = ConfigurationMergeEngine()
+        report = engine.merge(
+            left_config=left_config,
+            right_config=right_config,
+            strategy=strategy,
+        )
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_merge_report_rich(report)
+
+
+@cli.command("config-merge-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_merge_show_cmd(report_id: str, json_output: bool) -> None:
+    """Show a configuration merge report."""
+    from axiom_core.config_merge import ConfigurationMergeEngine
+
+    try:
+        engine = ConfigurationMergeEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_merge_report_rich(report)
+
+
+@cli.command("config-merge-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_merge_export_cmd(report_id: str, json_output: bool) -> None:
+    """Export a configuration merge report as markdown."""
+    from axiom_core.config_merge import ConfigurationMergeEngine
+
+    try:
+        engine = ConfigurationMergeEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_merge_report_rich(report: dict) -> None:
+    """Rich text rendering for a merge report."""
+    console.print("\n[bold]Configuration Merge Report[/bold]\n")
+    console.print(f"  Report ID:  {report.get('report_id', '')}")
+    console.print(f"  Summary:    {report.get('merge_summary', '')}")
+
+    result = report.get("result")
+    if result:
+        console.print(f"  Status:     {result.get('status', '').upper()}")
+        console.print(f"  Merged:     {result.get('merged_count', 0)}")
+        console.print(f"  Conflicts:  {result.get('conflict_count', 0)}")
+
+        entries = result.get("merged_entries", [])
+        if entries:
+            console.print("\n  [bold]Entries:[/bold]")
+            for entry in entries:
+                conflict = " [CONFLICT]" if entry.get("conflict_detected") else ""
+                console.print(
+                    f"    {entry.get('key', '')}: "
+                    f"merged='{entry.get('merged_value', '')}'{conflict}"
+                )
+
+
 if __name__ == "__main__":
     cli()

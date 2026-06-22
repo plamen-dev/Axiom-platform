@@ -4302,6 +4302,60 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="config-merge",
+        command="axiom config-merge [--left-text <lt>] [--right-text <rt>] [--left-file <lf>] [--right-file <rf>] [--strategy <s>] [--json-output]",
+        description="Merge two configuration states with evidence generation.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("config_merge_request.json", required=True),
+            EvidenceOutput("config_merge_result.json", required=True),
+            EvidenceOutput("config_merge_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Merge two configuration states deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-merge-show",
+        command="axiom config-merge-show <report_id> [--json-output]",
+        description="Show a merge report by ID.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a merge report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-merge-export",
+        command="axiom config-merge-export <report_id> [--json-output]",
+        description="Export a merge report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a merge report as markdown.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
