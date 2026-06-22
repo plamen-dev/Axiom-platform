@@ -13228,5 +13228,170 @@ def _render_history_report_rich(report: dict) -> None:
                 )
 
 
+@cli.command("config-diff")
+@click.option("--left-text", default="", help="Left config key=value text")
+@click.option("--right-text", default="", help="Right config key=value text")
+@click.option("--left-file", default="", help="Path to left config file")
+@click.option("--right-file", default="", help="Path to right config file")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_diff_cmd(
+    left_text: str,
+    right_text: str,
+    left_file: str,
+    right_file: str,
+    json_output: bool,
+) -> None:
+    """Diff two configuration states."""
+    from axiom_core.config_diff import ConfigurationDiffEngine
+    from axiom_core.configuration_registry import ConfigurationRegistry
+
+    if left_file and not left_text:
+        try:
+            left_text = Path(left_file).read_text(encoding="utf-8")
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    if right_file and not right_text:
+        try:
+            right_text = Path(right_file).read_text(encoding="utf-8")
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    try:
+        config_reg = ConfigurationRegistry()
+        left_config = config_reg.load_config(text=left_text, file_name=left_file or "left")
+        right_config = config_reg.load_config(text=right_text, file_name=right_file or "right")
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    try:
+        engine = ConfigurationDiffEngine()
+        report = engine.diff(left_config=left_config, right_config=right_config)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_diff_report_rich(report)
+
+
+@cli.command("config-diff-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_diff_show_cmd(report_id: str, json_output: bool) -> None:
+    """Show a configuration diff report."""
+    from axiom_core.config_diff import ConfigurationDiffEngine
+
+    try:
+        engine = ConfigurationDiffEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_diff_report_rich(report)
+
+
+@cli.command("config-diff-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def config_diff_export_cmd(report_id: str, json_output: bool) -> None:
+    """Export a configuration diff report as markdown."""
+    from axiom_core.config_diff import ConfigurationDiffEngine
+
+    try:
+        engine = ConfigurationDiffEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(json.dumps({"error": f"Report not found: {report_id}"}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_diff_report_rich(report: dict) -> None:
+    """Rich text rendering for a diff report."""
+    console.print("\n[bold]Configuration Diff Report[/bold]\n")
+    console.print(f"  Report ID:  {report.get('report_id', '')}")
+    console.print(f"  Summary:    {report.get('diff_summary', '')}")
+
+    result = report.get("result")
+    if result:
+        console.print(f"  Added:      {result.get('added_count', 0)}")
+        console.print(f"  Removed:    {result.get('removed_count', 0)}")
+        console.print(f"  Changed:    {result.get('changed_count', 0)}")
+        console.print(f"  Unchanged:  {result.get('unchanged_count', 0)}")
+
+        entries = result.get("entries", [])
+        if entries:
+            console.print("\n  [bold]Entries:[/bold]")
+            for entry in entries:
+                dt = entry.get("diff_type", "").upper()
+                console.print(f"    [{dt}] {entry.get('summary', '')}")
+
+
 if __name__ == "__main__":
     cli()

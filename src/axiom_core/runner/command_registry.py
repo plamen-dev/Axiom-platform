@@ -4248,6 +4248,60 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="config-diff",
+        command="axiom config-diff [--left-text <lt>] [--right-text <rt>] [--left-file <lf>] [--right-file <rf>] [--json-output]",
+        description="Diff two configuration states with evidence generation.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("config_diff_request.json", required=True),
+            EvidenceOutput("config_diff_result.json", required=True),
+            EvidenceOutput("config_diff_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Diff two configuration states deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-diff-show",
+        command="axiom config-diff-show <report_id> [--json-output]",
+        description="Show a diff report by ID.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a diff report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="config-diff-export",
+        command="axiom config-diff-export <report_id> [--json-output]",
+        description="Export a diff report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("EV_CONSOLE", required=False),
+        ),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a diff report as markdown.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
