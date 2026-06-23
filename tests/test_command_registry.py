@@ -166,6 +166,8 @@ EXPECTED_AXIOM_COMMANDS = {
     "session-memory-export",
     "skill-composition-create", "skill-composition-show",
     "skill-composition-export",
+    "capability-routing-create", "capability-routing-show",
+    "capability-routing-export",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 

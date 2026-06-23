@@ -91,6 +91,8 @@ artifacts/recovery_executions/
 artifacts/session_memory/
 # Skill Composition Framework bundles (generated run outputs; keep curated evidence)
 artifacts/skill_compositions/
+# Capability Routing Framework bundles (generated run outputs; keep curated evidence)
+artifacts/capability_routing/
 
 # Visual Studio local state
 .vs/
