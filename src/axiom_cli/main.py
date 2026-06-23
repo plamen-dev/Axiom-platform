@@ -17495,5 +17495,183 @@ def _render_capability_routing_report_rich(report: dict) -> None:
             )
 
 
+@cli.command("capability-selection-create")
+@click.option(
+    "--selection-file",
+    default="",
+    help="Path to capability selection JSON file (candidates/decisions)",
+)
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_selection_create_cmd(selection_file: str, json_output: bool) -> None:
+    """Create a capability selection report."""
+    from axiom_core.capability_selection import CapabilitySelectionEngine
+
+    candidates: list = []
+    decisions: list = []
+    if selection_file:
+        try:
+            data = json.loads(Path(selection_file).read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                candidates = data.get("candidates", [])
+                decisions = data.get("decisions", [])
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    try:
+        engine = CapabilitySelectionEngine()
+        result = engine.create(candidates=candidates, decisions=decisions)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+    else:
+        _render_capability_selection_report_rich(result)
+
+
+@cli.command("capability-selection-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_selection_show_cmd(report_id: str, json_output: bool) -> None:
+    """Show a capability selection report."""
+    from axiom_core.capability_selection import CapabilitySelectionEngine
+
+    try:
+        engine = CapabilitySelectionEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_capability_selection_report_rich(report)
+
+
+@cli.command("capability-selection-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_selection_export_cmd(report_id: str, json_output: bool) -> None:
+    """Export a capability selection report as markdown."""
+    from axiom_core.capability_selection import CapabilitySelectionEngine
+
+    try:
+        engine = CapabilitySelectionEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_capability_selection_report_rich(report: dict) -> None:
+    """Rich text rendering for a capability selection report."""
+    console.print("\n[bold]Capability Selection Report[/bold]\n")
+    console.print(f"  Report ID:     {report.get('report_id', '')}")
+    console.print(f"  Decisions:     {report.get('decision_count', 0)}")
+    console.print(f"  Candidates:    {len(report.get('candidates', []))}")
+    console.print(f"  Selected:      {report.get('selected_count', 0)}")
+    console.print(f"  No candidate:  {report.get('no_candidate_count', 0)}")
+
+    capability_counts = report.get("capability_counts", {})
+    if capability_counts:
+        console.print("\n  [bold]Capability Counts:[/bold]")
+        for capability_id in sorted(capability_counts):
+            console.print(
+                f"    {_rich_escape(capability_id)}: "
+                f"{capability_counts[capability_id]}"
+            )
+
+    candidates = report.get("candidates", [])
+    if candidates:
+        console.print("\n  [bold]Candidates:[/bold]")
+        for c in candidates:
+            work_id = _rich_escape(f"[{c.get('work_id', '')}]")
+            capability_id = _rich_escape(c.get("capability_id", ""))
+            console.print(
+                f"    {work_id} {capability_id} "
+                f"(final {c.get('final_score', 0)}, "
+                f"routing {c.get('routing_score', 0)}, "
+                f"confidence {c.get('confidence_score', 0)}, "
+                f"priority {c.get('priority_score', 0)})"
+            )
+
+    decisions = report.get("decisions", [])
+    if decisions:
+        console.print("\n  [bold]Decisions:[/bold]")
+        for d in decisions:
+            selected = _rich_escape(
+                d.get("selected_capability_id", "") or "(no candidate)"
+            )
+            work_id = _rich_escape(d.get("work_id", ""))
+            console.print(
+                f"    {work_id} -> {selected} "
+                f"(final {d.get('final_score', 0)}, "
+                f"{d.get('candidate_count', 0)} candidates)"
+            )
+            for reason in d.get("reasons", []):
+                console.print(
+                    f"      - {_rich_escape(reason.get('reason_type', ''))}: "
+                    f"{_rich_escape(reason.get('summary', ''))}"
+                )
+
+
 if __name__ == "__main__":
     cli()

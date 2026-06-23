@@ -94,6 +94,9 @@ artifacts/skill_compositions/
 # Capability Routing Framework bundles (generated run outputs; keep curated evidence)
 artifacts/capability_routing/
 
+# Capability Selection Framework bundles (generated run outputs; keep curated evidence)
+artifacts/capability_selection/
+
 # Visual Studio local state
 .vs/
 
