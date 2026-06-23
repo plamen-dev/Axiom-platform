@@ -14,6 +14,7 @@ from axiom_core.orchestrator import Orchestrator
 from axiom_core.persistence import storage
 from axiom_core.schemas import JobStatus, PlanStatus
 from rich.console import Console
+from rich.markup import escape as _rich_escape
 from rich.panel import Panel
 from rich.table import Table
 from rich.tree import Tree
@@ -17310,6 +17311,188 @@ def _render_skill_composition_report_rich(report: dict) -> None:
                 order_index = el.get("order_index", 0)
                 skill_id = el.get("skill_id", "")
                 console.print(f"      {order_index}. {skill_id}")
+
+
+@cli.command("capability-routing-create")
+@click.option(
+    "--routing-file",
+    default="",
+    help="Path to capability routing JSON file (routes/rules/decisions)",
+)
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_routing_create_cmd(routing_file: str, json_output: bool) -> None:
+    """Create a capability routing report."""
+    from axiom_core.capability_routing import CapabilityRoutingEngine
+
+    routes: list = []
+    rules: list = []
+    decisions: list = []
+    if routing_file:
+        try:
+            data = json.loads(Path(routing_file).read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                routes = data.get("routes", [])
+                rules = data.get("rules", [])
+                decisions = data.get("decisions", [])
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    try:
+        engine = CapabilityRoutingEngine()
+        result = engine.create(routes=routes, rules=rules, decisions=decisions)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+    else:
+        _render_capability_routing_report_rich(result)
+
+
+@cli.command("capability-routing-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_routing_show_cmd(report_id: str, json_output: bool) -> None:
+    """Show a capability routing report."""
+    from axiom_core.capability_routing import CapabilityRoutingEngine
+
+    try:
+        engine = CapabilityRoutingEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_capability_routing_report_rich(report)
+
+
+@cli.command("capability-routing-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def capability_routing_export_cmd(report_id: str, json_output: bool) -> None:
+    """Export a capability routing report as markdown."""
+    from axiom_core.capability_routing import CapabilityRoutingEngine
+
+    try:
+        engine = CapabilityRoutingEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_capability_routing_report_rich(report: dict) -> None:
+    """Rich text rendering for a capability routing report."""
+    console.print("\n[bold]Capability Routing Report[/bold]\n")
+    console.print(f"  Report ID:  {report.get('report_id', '')}")
+    console.print(f"  Decisions:  {report.get('decision_count', 0)}")
+    console.print(f"  Routes:     {len(report.get('routes', []))}")
+    console.print(f"  Rules:      {len(report.get('rules', []))}")
+
+    capability_counts = report.get("capability_counts", {})
+    if capability_counts:
+        console.print("\n  [bold]Capability Counts:[/bold]")
+        for capability_id in sorted(capability_counts):
+            console.print(
+                f"    {_rich_escape(capability_id)}: "
+                f"{capability_counts[capability_id]}"
+            )
+
+    routes = report.get("routes", [])
+    if routes:
+        console.print("\n  [bold]Routes:[/bold]")
+        for r in routes:
+            work_type = _rich_escape(f"[{r.get('work_type', '')}]")
+            capability_id = _rich_escape(r.get("capability_id", ""))
+            console.print(
+                f"    {work_type} -> {capability_id} "
+                f"(priority {r.get('priority', 0)})"
+            )
+
+    rules = report.get("rules", [])
+    if rules:
+        console.print("\n  [bold]Rules:[/bold]")
+        for r in rules:
+            work_pattern = _rich_escape(f"[{r.get('work_pattern', '')}]")
+            capability_id = _rich_escape(r.get("capability_id", ""))
+            console.print(
+                f"    {work_pattern} -> "
+                f"{capability_id} (weight {r.get('weight', 0)})"
+            )
+
+    decisions = report.get("decisions", [])
+    if decisions:
+        console.print("\n  [bold]Decisions:[/bold]")
+        for d in decisions:
+            selected = _rich_escape(
+                d.get("selected_capability_id", "") or "(unrouted)"
+            )
+            work_id = _rich_escape(d.get("work_id", ""))
+            console.print(
+                f"    {work_id} -> {selected} "
+                f"(score {d.get('routing_score', 0)}, "
+                f"{d.get('candidate_count', 0)} candidates)"
+            )
 
 
 if __name__ == "__main__":

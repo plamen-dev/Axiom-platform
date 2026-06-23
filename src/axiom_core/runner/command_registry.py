@@ -5740,6 +5740,61 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="capability-routing-create",
+        command=(
+            "axiom capability-routing-create "
+            "[--routing-file <rf>] [--json-output]"
+        ),
+        description=(
+            "Create a capability routing report with per-capability counts."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("capability_routing_request.json", required=True),
+            EvidenceOutput("capability_routing_result.json", required=True),
+            EvidenceOutput("capability_routing_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Create and persist a capability routing report deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-routing-show",
+        command="axiom capability-routing-show <report_id> [--json-output]",
+        description="Show a capability routing report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a capability routing report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-routing-export",
+        command="axiom capability-routing-export <report_id> [--json-output]",
+        description="Export a capability routing report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a capability routing report as markdown.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
