@@ -5521,6 +5521,61 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="recovery-recommendation-create",
+        command=(
+            "axiom recovery-recommendation-create "
+            "[--recommendations-file <rf>] [--json-output]"
+        ),
+        description=(
+            "Create a recovery recommendation report with priority counts."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("recovery_recommendation_request.json", required=True),
+            EvidenceOutput("recovery_recommendation_result.json", required=True),
+            EvidenceOutput("recovery_recommendation_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Create and persist a recovery recommendation report deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="recovery-recommendation-show",
+        command="axiom recovery-recommendation-show <report_id> [--json-output]",
+        description="Show a recovery recommendation report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a recovery recommendation report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="recovery-recommendation-export",
+        command="axiom recovery-recommendation-export <report_id> [--json-output]",
+        description="Export a recovery recommendation report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a recovery recommendation report as markdown.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
