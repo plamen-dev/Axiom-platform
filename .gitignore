@@ -81,6 +81,8 @@ artifacts/promotion_checks/
 artifacts/pr_snapshots/
 # Execution Outcome Framework bundles (generated run outputs; keep curated evidence)
 artifacts/execution_outcomes/
+# Failure Classification Framework bundles (generated run outputs; keep curated evidence)
+artifacts/failure_classifications/
 
 # Visual Studio local state
 .vs/

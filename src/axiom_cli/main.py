@@ -16537,5 +16537,166 @@ def _render_execution_outcome_report_rich(report: dict) -> None:
             console.print(line)
 
 
+@cli.command("failure-classification-create")
+@click.option(
+    "--classifications-file",
+    default="",
+    help="Path to classifications JSON file",
+)
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def failure_classification_create_cmd(
+    classifications_file: str, json_output: bool
+) -> None:
+    """Create a failure classification report."""
+    from axiom_core.failure_classification_framework import (
+        FailureClassificationEngine,
+    )
+
+    classifications: list = []
+    if classifications_file:
+        try:
+            data = json.loads(
+                Path(classifications_file).read_text(encoding="utf-8")
+            )
+            if isinstance(data, list):
+                classifications = data
+            elif isinstance(data, dict):
+                classifications = data.get("classifications", [])
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    try:
+        engine = FailureClassificationEngine()
+        result = engine.create(classifications=classifications)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+    else:
+        _render_failure_classification_report_rich(result)
+
+
+@cli.command("failure-classification-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def failure_classification_show_cmd(report_id: str, json_output: bool) -> None:
+    """Show a failure classification report."""
+    from axiom_core.failure_classification_framework import (
+        FailureClassificationEngine,
+    )
+
+    try:
+        engine = FailureClassificationEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_failure_classification_report_rich(report)
+
+
+@cli.command("failure-classification-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def failure_classification_export_cmd(report_id: str, json_output: bool) -> None:
+    """Export a failure classification report as markdown."""
+    from axiom_core.failure_classification_framework import (
+        FailureClassificationEngine,
+    )
+
+    try:
+        engine = FailureClassificationEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_failure_classification_report_rich(report: dict) -> None:
+    """Rich text rendering for a failure classification report."""
+    console.print("\n[bold]Failure Classification Report[/bold]\n")
+    console.print(f"  Report ID:        {report.get('report_id', '')}")
+    console.print(f"  Classifications:  {report.get('classification_count', 0)}")
+    console.print(f"  Info:             {report.get('info_count', 0)}")
+    console.print(f"  Warning:          {report.get('warning_count', 0)}")
+    console.print(f"  Error:            {report.get('error_count', 0)}")
+    console.print(f"  Critical:         {report.get('critical_count', 0)}")
+
+    classifications = report.get("classifications", [])
+    if classifications:
+        console.print("\n  [bold]Classifications:[/bold]")
+        for c in classifications:
+            failure_type = c.get("failure_type", "").upper()
+            category = c.get("category", "").upper()
+            severity = c.get("severity", "").upper()
+            outcome_id = c.get("outcome_id", "")
+            summary = c.get("summary", "")
+            line = f"    [{severity}] [{failure_type}] [{category}] {outcome_id}"
+            if summary:
+                line += f" — {summary}"
+            console.print(line)
+
+
 if __name__ == "__main__":
     cli()
