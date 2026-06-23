@@ -6469,6 +6469,85 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="capability-validation-create",
+        command=(
+            "axiom capability-validation-create "
+            "[--validation-file <vf>] [--json-output]"
+        ),
+        description="Create a capability validation knowledge report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput(
+                "capability_validation_request.json", required=True
+            ),
+            EvidenceOutput(
+                "capability_validation_result.json", required=True
+            ),
+            EvidenceOutput(
+                "capability_validation_summary.md", required=True
+            ),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Deterministic validations; dedup + unresolved detection.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-validations",
+        command="axiom capability-validations [--json-output]",
+        description="List capability validation knowledge reports.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List persisted capability validation knowledge reports.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-validation-show",
+        command=(
+            "axiom capability-validation-show <report_id> [--json-output]"
+        ),
+        description="Show a capability validation knowledge report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a persisted capability validation report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-validation-export",
+        command=(
+            "axiom capability-validation-export <report_id> "
+            "[--format markdown|json|csv]"
+        ),
+        description="Export a capability validation knowledge report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a capability validation report (md/json/csv).",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
