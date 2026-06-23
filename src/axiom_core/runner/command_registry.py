@@ -5576,6 +5576,61 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="recovery-execution-create",
+        command=(
+            "axiom recovery-execution-create "
+            "[--executions-file <ef>] [--json-output]"
+        ),
+        description=(
+            "Create a recovery execution report with status counts."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("recovery_execution_request.json", required=True),
+            EvidenceOutput("recovery_execution_result.json", required=True),
+            EvidenceOutput("recovery_execution_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Create and persist a recovery execution report deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="recovery-execution-show",
+        command="axiom recovery-execution-show <report_id> [--json-output]",
+        description="Show a recovery execution report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a recovery execution report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="recovery-execution-export",
+        command="axiom recovery-execution-export <report_id> [--json-output]",
+        description="Export a recovery execution report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a recovery execution report as markdown.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
