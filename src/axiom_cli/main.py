@@ -18773,6 +18773,188 @@ def _render_capability_impact_report_rich(report: dict) -> None:
             )
 
 
+@cli.command("capability-file-create")
+@click.option(
+    "--file-file",
+    "file_file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to a JSON file with capability file relationships.",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_file_create(file_file: str | None, json_output: bool) -> None:
+    """Create a capability file knowledge report."""
+    from axiom_core.capability_file_knowledge import (
+        CapabilityFileKnowledgeEngine,
+    )
+
+    try:
+        relationships_data: list = []
+        references_data: list = []
+        knowledge_payloads: dict = {}
+        raw_metadata: dict = {}
+        if file_file:
+            with open(file_file, encoding="utf-8") as f:
+                payload = json.loads(f.read())
+            relationships_data = payload.get("file_relationships", [])
+            references_data = payload.get("file_references", [])
+            knowledge_payloads = payload.get("knowledge_payloads", {})
+            raw_metadata = payload.get("raw_metadata", {})
+
+        engine = CapabilityFileKnowledgeEngine()
+        report = engine.create(
+            file_relationships=relationships_data,
+            file_references=references_data,
+            knowledge_payloads=knowledge_payloads,
+            raw_metadata=raw_metadata,
+        )
+
+        if json_output:
+            click.echo(json.dumps(report, indent=2, default=str))
+        else:
+            _render_capability_file_report_rich(report)
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+
+@cli.command("capability-files")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_files(json_output: bool) -> None:
+    """List all persisted capability file knowledge reports."""
+    from axiom_core.capability_file_knowledge import (
+        CapabilityFileKnowledgeEngine,
+    )
+
+    engine = CapabilityFileKnowledgeEngine()
+    reports = engine.list_reports()
+
+    if json_output:
+        click.echo(json.dumps(reports, indent=2, default=str))
+        return
+
+    if not reports:
+        click.echo("No capability file knowledge reports found.")
+        return
+
+    console.print("\n[bold]Capability File Knowledge Reports[/bold]\n")
+    for r in reports:
+        console.print(
+            f"  {r.get('report_id', '')}  "
+            f"({r.get('file_count', 0)} files, "
+            f"{r.get('relationship_count', 0)} relationships, "
+            f"created {r.get('created_at', '')})"
+        )
+
+
+@cli.command("capability-file-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_file_show(report_id: str, json_output: bool) -> None:
+    """Show a persisted capability file knowledge report."""
+    from axiom_core.capability_file_knowledge import (
+        CapabilityFileKnowledgeEngine,
+    )
+
+    try:
+        engine = CapabilityFileKnowledgeEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if report is None:
+        click.echo(f"Error: Report not found: {report_id}", err=True)
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_capability_file_report_rich(report)
+
+
+@cli.command("capability-file-export")
+@click.argument("report_id")
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["markdown", "json", "csv"]),
+    default="markdown",
+    help="Export format.",
+)
+def capability_file_export(report_id: str, fmt: str) -> None:
+    """Export a capability file knowledge report (markdown/json/csv)."""
+    from axiom_core.capability_file_knowledge import (
+        CapabilityFileKnowledgeEngine,
+    )
+
+    try:
+        engine = CapabilityFileKnowledgeEngine()
+        output = engine.export_report(report_id, fmt=fmt)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        if "not found" in str(exc).lower():
+            raise SystemExit(2) from exc
+        raise SystemExit(1) from exc
+
+    click.echo(output)
+
+
+def _render_capability_file_report_rich(report: dict) -> None:
+    """Rich text rendering for a capability file knowledge report."""
+    console.print("\n[bold]Capability File Knowledge Report[/bold]\n")
+    console.print(f"  Report ID:      {report.get('report_id', '')}")
+    console.print(f"  Capabilities:   {report.get('capability_count', 0)}")
+    console.print(f"  Files:          {report.get('file_count', 0)}")
+    console.print(
+        f"  Relationships:  {report.get('relationship_count', 0)}"
+    )
+    console.print(f"  Directories:    {report.get('directory_count', 0)}")
+    console.print(
+        f"  Duplicates:     "
+        f"{report.get('duplicate_relationship_count', 0)}"
+    )
+    console.print(
+        f"  Schema Version: {report.get('schema_version', '')}"
+    )
+
+    type_counts = report.get("relationship_type_counts", {})
+    if type_counts:
+        console.print("\n  [bold]Relationship Type Counts:[/bold]")
+        for rel_type in sorted(type_counts):
+            console.print(
+                f"    {_rich_escape(rel_type)}: {type_counts[rel_type]}"
+            )
+
+    directories = report.get("affected_directories", [])
+    if directories:
+        console.print("\n  [bold]Affected Directories:[/bold]")
+        for directory in directories:
+            console.print(f"    {_rich_escape(directory)}")
+
+    relationships = report.get("relationships", [])
+    if relationships:
+        console.print("\n  [bold]File Relationships:[/bold]")
+        for r in relationships:
+            cap = r.get("capability_id", "")
+            rel_type = r.get("relationship_type", "")
+            file_path = r.get("file_path", "")
+            console.print(
+                _rich_escape(f"    [{cap}] [{rel_type}] {file_path}")
+            )
+
+    references = report.get("references", [])
+    if references:
+        console.print("\n  [bold]File References:[/bold]")
+        for ref in references:
+            cap = ref.get("capability_id", "")
+            file_path = ref.get("file_path", "")
+            ext = ref.get("file_extension", "")
+            console.print(
+                _rich_escape(f"    [{cap}] {file_path} ({ext})")
+            )
+
+
 @cli.command("devin-session-import")
 @click.option(
     "--session-file",

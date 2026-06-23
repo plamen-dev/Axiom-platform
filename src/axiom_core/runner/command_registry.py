@@ -6398,6 +6398,77 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="capability-file-create",
+        command=(
+            "axiom capability-file-create "
+            "[--file-file <ff>] [--json-output]"
+        ),
+        description="Create a capability file knowledge report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("capability_file_request.json", required=True),
+            EvidenceOutput("capability_file_result.json", required=True),
+            EvidenceOutput("capability_file_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Deterministic file relationships; dedup + dir aggregation.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-files",
+        command="axiom capability-files [--json-output]",
+        description="List capability file knowledge reports.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List persisted capability file knowledge reports.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-file-show",
+        command="axiom capability-file-show <report_id> [--json-output]",
+        description="Show a capability file knowledge report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a persisted capability file knowledge report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-file-export",
+        command=(
+            "axiom capability-file-export <report_id> "
+            "[--format markdown|json|csv]"
+        ),
+        description="Export a capability file knowledge report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a capability file knowledge report (md/json/csv).",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
