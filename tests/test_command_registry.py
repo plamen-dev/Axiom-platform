@@ -177,6 +177,7 @@ EXPECTED_AXIOM_COMMANDS = {
     "capability-event-create", "capability-event-append",
     "capability-event-list", "capability-event-show",
     "capability-event-export",
+    "github-import", "github-import-show", "github-import-export",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 

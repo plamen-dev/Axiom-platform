@@ -6075,6 +6075,62 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="github-import",
+        command=(
+            "axiom github-import [--metadata-file <mf>] [--repo owner/name] "
+            "[--pr <n>] [--global-capability-number <n>] [--json-output]"
+        ),
+        description="Import GitHub PR metadata into registry/timeline shapes.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("github_import_request.json", required=True),
+            EvidenceOutput("github_import_result.json", required=True),
+            EvidenceOutput("github_import_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only deterministic ingestion; no GitHub mutation.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="github-import-show",
+        command="axiom github-import-show <report_id> [--json-output]",
+        description="Show a GitHub metadata import.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a persisted GitHub metadata import by report ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="github-import-export",
+        command=(
+            "axiom github-import-export <report_id> "
+            "[--format markdown|json|csv]"
+        ),
+        description="Export a GitHub metadata import.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a GitHub metadata import as markdown/json/csv.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
