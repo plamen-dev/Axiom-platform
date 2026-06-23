@@ -218,6 +218,7 @@ _FILE_TO_TEST: dict[str, str] = {
     "src/axiom_core/work_dependency.py": "tests/test_work_dependency.py",
     "src/axiom_core/work_prioritization.py": "tests/test_work_prioritization.py",
     "src/axiom_core/execution_attempt.py": "tests/test_execution_attempt.py",
+    "src/axiom_core/execution_outcome.py": "tests/test_execution_outcome.py",
     "src/axiom_cli/main.py": "tests/test_command_registry.py",
 }
 

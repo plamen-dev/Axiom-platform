@@ -16391,5 +16391,151 @@ def _render_execution_attempt_report_rich(report: dict) -> None:
             )
 
 
+@cli.command("execution-outcome-create")
+@click.option("--outcomes-file", default="", help="Path to outcomes JSON file")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def execution_outcome_create_cmd(outcomes_file: str, json_output: bool) -> None:
+    """Create an execution outcome report."""
+    from axiom_core.execution_outcome import ExecutionOutcomeEngine
+
+    outcomes: list = []
+    if outcomes_file:
+        try:
+            data = json.loads(Path(outcomes_file).read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                outcomes = data
+            elif isinstance(data, dict):
+                outcomes = data.get("outcomes", [])
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    try:
+        engine = ExecutionOutcomeEngine()
+        result = engine.create(outcomes=outcomes)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+    else:
+        _render_execution_outcome_report_rich(result)
+
+
+@cli.command("execution-outcome-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def execution_outcome_show_cmd(report_id: str, json_output: bool) -> None:
+    """Show an execution outcome report."""
+    from axiom_core.execution_outcome import ExecutionOutcomeEngine
+
+    try:
+        engine = ExecutionOutcomeEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_execution_outcome_report_rich(report)
+
+
+@cli.command("execution-outcome-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def execution_outcome_export_cmd(report_id: str, json_output: bool) -> None:
+    """Export an execution outcome report as markdown."""
+    from axiom_core.execution_outcome import ExecutionOutcomeEngine
+
+    try:
+        engine = ExecutionOutcomeEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_execution_outcome_report_rich(report: dict) -> None:
+    """Rich text rendering for an execution outcome report."""
+    console.print("\n[bold]Execution Outcome Report[/bold]\n")
+    console.print(f"  Report ID:    {report.get('report_id', '')}")
+    console.print(f"  Outcomes:     {report.get('outcome_count', 0)}")
+    console.print(f"  Success:      {report.get('success_count', 0)}")
+    console.print(f"  Failure:      {report.get('failure_count', 0)}")
+    console.print(f"  Partial:      {report.get('partial_count', 0)}")
+    console.print(f"  Cancelled:    {report.get('cancelled_count', 0)}")
+
+    outcomes = report.get("outcomes", [])
+    if outcomes:
+        console.print("\n  [bold]Outcomes:[/bold]")
+        for o in outcomes:
+            outcome_type = o.get("outcome_type", "").upper()
+            status = o.get("status", "").upper()
+            attempt_id = o.get("attempt_id", "")
+            summary = o.get("summary", "")
+            line = f"    [{outcome_type}] [{status}] {attempt_id}"
+            if summary:
+                line += f" — {summary}"
+            console.print(line)
+
+
 if __name__ == "__main__":
     cli()

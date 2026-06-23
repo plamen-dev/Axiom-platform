@@ -79,6 +79,8 @@ artifacts/capability_runs/
 artifacts/promotion_checks/
 # PR snapshot artifacts (generated CI evidence bundles)
 artifacts/pr_snapshots/
+# Execution Outcome Framework bundles (generated run outputs; keep curated evidence)
+artifacts/execution_outcomes/
 
 # Visual Studio local state
 .vs/
