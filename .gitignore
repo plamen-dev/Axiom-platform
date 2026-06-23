@@ -100,6 +100,9 @@ artifacts/capability_selection/
 # Capability Chain Framework bundles (generated run outputs; keep curated evidence)
 artifacts/capability_chains/
 
+# Global Capability Registry Framework bundles (generated run outputs; keep curated evidence)
+artifacts/global_capability_registry/
+
 # Visual Studio local state
 .vs/
 
