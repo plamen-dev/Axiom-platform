@@ -742,6 +742,14 @@ def test_export_csv_rows():
     assert "artifact" in record_types
     assert "skill_proposal" in record_types
 
+    summary_idx = header.index("summary")
+    skill_rows = [r for r in rows[1:] if r[0] == "skill_proposal"]
+    assert skill_rows
+    # The summary column must carry the proposal_summary (not be silently
+    # dropped); skill_name is preserved alongside it.
+    assert any("Add zeta testing checklist" in r[summary_idx] for r in skill_rows)
+    assert any("zeta-skill" in r[summary_idx] for r in skill_rows)
+
 
 def test_export_invalid_format_rejected():
     engine = _tmp_engine()
