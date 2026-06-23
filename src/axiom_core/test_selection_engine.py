@@ -240,6 +240,7 @@ _FILE_TO_TEST: dict[str, str] = {
     "src/axiom_core/devin_session_import.py": "tests/test_devin_session_import.py",
     "src/axiom_core/capability_relationship.py": "tests/test_capability_relationship.py",
     "src/axiom_core/capability_impact.py": "tests/test_capability_impact.py",
+    "src/axiom_core/capability_file_knowledge.py": "tests/test_capability_file_knowledge.py",
     "src/axiom_cli/main.py": "tests/test_command_registry.py",
 }
 

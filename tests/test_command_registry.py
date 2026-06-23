@@ -185,6 +185,8 @@ EXPECTED_AXIOM_COMMANDS = {
     "capability-relationship-show", "capability-relationship-export",
     "capability-impact-create", "capability-impacts",
     "capability-impact-show", "capability-impact-export",
+    "capability-file-create", "capability-files",
+    "capability-file-show", "capability-file-export",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 
