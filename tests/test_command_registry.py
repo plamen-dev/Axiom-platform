@@ -174,6 +174,9 @@ EXPECTED_AXIOM_COMMANDS = {
     "capability-chain-export",
     "global-capability-create", "global-capability-list",
     "global-capability-show", "global-capability-export",
+    "capability-event-create", "capability-event-append",
+    "capability-event-list", "capability-event-show",
+    "capability-event-export",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 

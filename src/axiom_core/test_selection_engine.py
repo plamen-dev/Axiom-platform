@@ -234,6 +234,7 @@ _FILE_TO_TEST: dict[str, str] = {
     "src/axiom_core/capability_selection.py": "tests/test_capability_selection.py",
     "src/axiom_core/capability_chain.py": "tests/test_capability_chain.py",
     "src/axiom_core/global_capability_registry.py": "tests/test_global_capability_registry.py",
+    "src/axiom_core/capability_event_timeline.py": "tests/test_capability_event_timeline.py",
     "src/axiom_cli/main.py": "tests/test_command_registry.py",
 }
 

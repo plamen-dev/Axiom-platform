@@ -5981,6 +5981,101 @@ _register(
 )
 
 
+_register(
+    CommandSpec(
+        name="capability-event-create",
+        command=(
+            "axiom capability-event-create "
+            "[--timeline-file <tf>] [--json-output]"
+        ),
+        description="Create a capability event timeline from events.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("capability_event_request.json", required=True),
+            EvidenceOutput("capability_event_result.json", required=True),
+            EvidenceOutput("capability_event_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Create and persist a capability event timeline deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-event-append",
+        command=(
+            "axiom capability-event-append <timeline_id> "
+            "[--timeline-file <tf>] [--json-output]"
+        ),
+        description="Append events to a capability event timeline (append-only).",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("capability_event_request.json", required=True),
+            EvidenceOutput("capability_event_result.json", required=True),
+            EvidenceOutput("capability_event_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Append events to an existing timeline; existing events preserved.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-event-list",
+        command="axiom capability-event-list [--json-output]",
+        description="List capability event timelines.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List all persisted capability event timelines.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-event-show",
+        command="axiom capability-event-show <timeline_id> [--json-output]",
+        description="Show a capability event timeline.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a capability event timeline by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-event-export",
+        command=(
+            "axiom capability-event-export <timeline_id> "
+            "[--format markdown|json|csv]"
+        ),
+        description="Export a capability event timeline.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a capability event timeline as markdown/json/csv.",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------

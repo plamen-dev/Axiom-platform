@@ -103,6 +103,9 @@ artifacts/capability_chains/
 # Global Capability Registry Framework bundles (generated run outputs; keep curated evidence)
 artifacts/global_capability_registry/
 
+# Capability Event Timeline Framework bundles (generated run outputs; keep curated evidence)
+artifacts/capability_event_timeline/
+
 # Visual Studio local state
 .vs/
 
