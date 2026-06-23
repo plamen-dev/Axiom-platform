@@ -16852,5 +16852,157 @@ def _render_recovery_recommendation_report_rich(report: dict) -> None:
             console.print(line)
 
 
+@cli.command("recovery-execution-create")
+@click.option(
+    "--executions-file",
+    default="",
+    help="Path to executions JSON file",
+)
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def recovery_execution_create_cmd(
+    executions_file: str, json_output: bool
+) -> None:
+    """Create a recovery execution report."""
+    from axiom_core.recovery_execution import RecoveryExecutionEngine
+
+    executions: list = []
+    if executions_file:
+        try:
+            data = json.loads(Path(executions_file).read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                executions = data
+            elif isinstance(data, dict):
+                executions = data.get("executions", [])
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    try:
+        engine = RecoveryExecutionEngine()
+        result = engine.create(executions=executions)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+    else:
+        _render_recovery_execution_report_rich(result)
+
+
+@cli.command("recovery-execution-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def recovery_execution_show_cmd(report_id: str, json_output: bool) -> None:
+    """Show a recovery execution report."""
+    from axiom_core.recovery_execution import RecoveryExecutionEngine
+
+    try:
+        engine = RecoveryExecutionEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_recovery_execution_report_rich(report)
+
+
+@cli.command("recovery-execution-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def recovery_execution_export_cmd(report_id: str, json_output: bool) -> None:
+    """Export a recovery execution report as markdown."""
+    from axiom_core.recovery_execution import RecoveryExecutionEngine
+
+    try:
+        engine = RecoveryExecutionEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_recovery_execution_report_rich(report: dict) -> None:
+    """Rich text rendering for a recovery execution report."""
+    console.print("\n[bold]Recovery Execution Report[/bold]\n")
+    console.print(f"  Report ID:         {report.get('report_id', '')}")
+    console.print(f"  Executions:        {report.get('execution_count', 0)}")
+    console.print(f"  Succeeded:         {report.get('succeeded_count', 0)}")
+    console.print(f"  Failed:            {report.get('failed_count', 0)}")
+    console.print(f"  Partial Success:   {report.get('partial_success_count', 0)}")
+    console.print(f"  Cancelled:         {report.get('cancelled_count', 0)}")
+
+    executions = report.get("executions", [])
+    if executions:
+        console.print("\n  [bold]Executions:[/bold]")
+        for e in executions:
+            exec_type = e.get("execution_type", "").upper()
+            status = e.get("status", "").upper()
+            recommendation_id = e.get("recommendation_id", "")
+            summary = e.get("summary", "")
+            line = f"    [{status}] [{exec_type}] {recommendation_id}"
+            if summary:
+                line += f" — {summary}"
+            console.print(line)
+
+
 if __name__ == "__main__":
     cli()

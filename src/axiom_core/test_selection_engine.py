@@ -225,6 +225,9 @@ _FILE_TO_TEST: dict[str, str] = {
     "src/axiom_core/recovery_recommendation.py": (
         "tests/test_recovery_recommendation.py"
     ),
+    "src/axiom_core/recovery_execution.py": (
+        "tests/test_recovery_execution.py"
+    ),
     "src/axiom_cli/main.py": "tests/test_command_registry.py",
 }
 

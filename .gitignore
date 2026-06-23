@@ -85,6 +85,8 @@ artifacts/execution_outcomes/
 artifacts/failure_classifications/
 # Recovery Recommendation Framework bundles (generated run outputs; keep curated evidence)
 artifacts/recovery_recommendations/
+# Recovery Execution Framework bundles (generated run outputs; keep curated evidence)
+artifacts/recovery_executions/
 
 # Visual Studio local state
 .vs/
