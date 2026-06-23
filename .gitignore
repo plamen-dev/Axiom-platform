@@ -106,6 +106,15 @@ artifacts/global_capability_registry/
 # Capability Event Timeline Framework bundles (generated run outputs; keep curated evidence)
 artifacts/capability_event_timeline/
 
+# GitHub Metadata Import Framework bundles (generated run outputs; keep curated evidence)
+artifacts/github_metadata_import/
+
+# Capability Summary Framework bundles (generated run outputs; keep curated evidence)
+artifacts/capability_summary/
+
+# Devin Session Metadata Import Framework bundles (generated run outputs; keep curated evidence)
+artifacts/devin_session_import/
+
 # Visual Studio local state
 .vs/
 
