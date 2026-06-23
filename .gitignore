@@ -115,6 +115,9 @@ artifacts/capability_summary/
 # Devin Session Metadata Import Framework bundles (generated run outputs; keep curated evidence)
 artifacts/devin_session_import/
 
+# Capability Relationship Framework bundles (generated run outputs; keep curated evidence)
+artifacts/capability_relationships/
+
 # Visual Studio local state
 .vs/
 
