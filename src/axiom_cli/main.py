@@ -16698,5 +16698,159 @@ def _render_failure_classification_report_rich(report: dict) -> None:
             console.print(line)
 
 
+@cli.command("recovery-recommendation-create")
+@click.option(
+    "--recommendations-file",
+    default="",
+    help="Path to recommendations JSON file",
+)
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def recovery_recommendation_create_cmd(
+    recommendations_file: str, json_output: bool
+) -> None:
+    """Create a recovery recommendation report."""
+    from axiom_core.recovery_recommendation import RecoveryRecommendationEngine
+
+    recommendations: list = []
+    if recommendations_file:
+        try:
+            data = json.loads(
+                Path(recommendations_file).read_text(encoding="utf-8")
+            )
+            if isinstance(data, list):
+                recommendations = data
+            elif isinstance(data, dict):
+                recommendations = data.get("recommendations", [])
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    try:
+        engine = RecoveryRecommendationEngine()
+        result = engine.create(recommendations=recommendations)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+    else:
+        _render_recovery_recommendation_report_rich(result)
+
+
+@cli.command("recovery-recommendation-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def recovery_recommendation_show_cmd(report_id: str, json_output: bool) -> None:
+    """Show a recovery recommendation report."""
+    from axiom_core.recovery_recommendation import RecoveryRecommendationEngine
+
+    try:
+        engine = RecoveryRecommendationEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_recovery_recommendation_report_rich(report)
+
+
+@cli.command("recovery-recommendation-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def recovery_recommendation_export_cmd(report_id: str, json_output: bool) -> None:
+    """Export a recovery recommendation report as markdown."""
+    from axiom_core.recovery_recommendation import RecoveryRecommendationEngine
+
+    try:
+        engine = RecoveryRecommendationEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_recovery_recommendation_report_rich(report: dict) -> None:
+    """Rich text rendering for a recovery recommendation report."""
+    console.print("\n[bold]Recovery Recommendation Report[/bold]\n")
+    console.print(f"  Report ID:        {report.get('report_id', '')}")
+    console.print(f"  Recommendations:  {report.get('recommendation_count', 0)}")
+    console.print(f"  Low:              {report.get('low_count', 0)}")
+    console.print(f"  Normal:           {report.get('normal_count', 0)}")
+    console.print(f"  High:             {report.get('high_count', 0)}")
+    console.print(f"  Critical:         {report.get('critical_count', 0)}")
+
+    recommendations = report.get("recommendations", [])
+    if recommendations:
+        console.print("\n  [bold]Recommendations:[/bold]")
+        for r in recommendations:
+            rec_type = r.get("recommendation_type", "").upper()
+            priority = r.get("priority", "").upper()
+            classification_id = r.get("classification_id", "")
+            summary = r.get("summary", "")
+            line = f"    [{priority}] [{rec_type}] {classification_id}"
+            if summary:
+                line += f" — {summary}"
+            console.print(line)
+
+
 if __name__ == "__main__":
     cli()

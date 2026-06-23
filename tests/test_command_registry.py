@@ -158,6 +158,8 @@ EXPECTED_AXIOM_COMMANDS = {
     "execution-outcome-export",
     "failure-classification-create", "failure-classification-show",
     "failure-classification-export",
+    "recovery-recommendation-create", "recovery-recommendation-show",
+    "recovery-recommendation-export",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 

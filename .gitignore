@@ -83,6 +83,8 @@ artifacts/pr_snapshots/
 artifacts/execution_outcomes/
 # Failure Classification Framework bundles (generated run outputs; keep curated evidence)
 artifacts/failure_classifications/
+# Recovery Recommendation Framework bundles (generated run outputs; keep curated evidence)
+artifacts/recovery_recommendations/
 
 # Visual Studio local state
 .vs/
