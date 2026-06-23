@@ -18152,5 +18152,157 @@ def _render_capability_event_report_rich(report: dict) -> None:
             console.print(f"    [{seq}] {ts} [{etype}] {summary_text}")
 
 
+@cli.command("github-import")
+@click.option(
+    "--metadata-file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to a JSON file with GitHub PR metadata.",
+)
+@click.option(
+    "--repo",
+    default=None,
+    help="Repository in 'owner/name' form (overrides metadata).",
+)
+@click.option(
+    "--pr",
+    "pr_number",
+    type=int,
+    default=None,
+    help="Repository PR number (overrides metadata).",
+)
+@click.option(
+    "--global-capability-number",
+    "global_capability_number",
+    type=int,
+    default=None,
+    help="Global capability number (overrides metadata).",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def github_import(
+    metadata_file: str | None,
+    repo: str | None,
+    pr_number: int | None,
+    global_capability_number: int | None,
+    json_output: bool,
+) -> None:
+    """Import GitHub PR metadata into registry/timeline shapes."""
+    from axiom_core.github_metadata_import import GitHubMetadataImportEngine
+
+    try:
+        metadata: dict = {}
+        if metadata_file:
+            with open(metadata_file, encoding="utf-8") as f:
+                metadata = json.loads(f.read())
+
+        engine = GitHubMetadataImportEngine()
+        report = engine.import_metadata(
+            metadata=metadata,
+            repo=repo,
+            pr_number=pr_number,
+            global_capability_number=global_capability_number,
+        )
+
+        if json_output:
+            click.echo(json.dumps(report, indent=2, default=str))
+        else:
+            _render_github_import_report_rich(report)
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+
+@cli.command("github-import-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def github_import_show(report_id: str, json_output: bool) -> None:
+    """Show a persisted GitHub metadata import."""
+    from axiom_core.github_metadata_import import GitHubMetadataImportEngine
+
+    try:
+        engine = GitHubMetadataImportEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if report is None:
+        click.echo(
+            f"Error: GitHub metadata import not found: {report_id}", err=True
+        )
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_github_import_report_rich(report)
+
+
+@cli.command("github-import-export")
+@click.argument("report_id")
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["markdown", "json", "csv"]),
+    default="markdown",
+    help="Export format.",
+)
+def github_import_export(report_id: str, fmt: str) -> None:
+    """Export a GitHub metadata import (markdown/json/csv)."""
+    from axiom_core.github_metadata_import import GitHubMetadataImportEngine
+
+    try:
+        engine = GitHubMetadataImportEngine()
+        output = engine.export_report(report_id, fmt=fmt)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        if "not found" in str(exc).lower():
+            raise SystemExit(2) from exc
+        raise SystemExit(1) from exc
+
+    click.echo(output)
+
+
+def _render_github_import_report_rich(report: dict) -> None:
+    """Rich text rendering for a GitHub metadata import."""
+    console.print("\n[bold]GitHub Metadata Import[/bold]\n")
+    console.print(f"  Report ID:       {report.get('report_id', '')}")
+    console.print(f"  Repository:      {_rich_escape(report.get('repository', ''))}")
+    console.print(
+        f"  PR Number:       {report.get('repository_pr_number', 0)}"
+    )
+    console.print(
+        f"  Global Cap No.:  {report.get('global_capability_number', 0)}"
+    )
+    console.print(
+        f"  Import Status:   {_rich_escape(report.get('status', ''))}"
+    )
+    console.print(f"  Commits:         {report.get('commit_count', 0)}")
+    console.print(f"  Files:           {report.get('file_count', 0)}")
+    console.print(f"  Labels:          {report.get('label_count', 0)}")
+    console.print(
+        f"  Schema Version:  {report.get('schema_version', '')}"
+    )
+
+    type_counts = report.get("timeline_event_type_counts", {})
+    if type_counts:
+        console.print("\n  [bold]Timeline Event Counts:[/bold]")
+        for event_type in sorted(type_counts):
+            console.print(
+                f"    {_rich_escape(event_type.upper())}: "
+                f"{type_counts[event_type]}"
+            )
+
+    events = report.get("timeline_events", [])
+    if events:
+        console.print("\n  [bold]Timeline Events:[/bold]")
+        for e in events:
+            seq = e.get("event_sequence", 0)
+            etype = _rich_escape(e.get("event_type", "").upper())
+            ts = _rich_escape(e.get("timestamp", ""))
+            summary_text = _rich_escape(e.get("summary", ""))
+            console.print(f"    [{seq}] {ts} [{etype}] {summary_text}")
+
+
 if __name__ == "__main__":
     cli()
