@@ -181,6 +181,8 @@ EXPECTED_AXIOM_COMMANDS = {
     "capability-summary-create", "capability-summary-show",
     "capability-summary-export",
     "devin-session-import", "devin-session-show", "devin-session-export",
+    "capability-relationship-create", "capability-relationships",
+    "capability-relationship-show", "capability-relationship-export",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 

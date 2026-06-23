@@ -6248,6 +6248,85 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="capability-relationship-create",
+        command=(
+            "axiom capability-relationship-create "
+            "[--relationship-file <rf>] [--json-output]"
+        ),
+        description="Create a capability relationship report (graph edges).",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput(
+                "capability_relationship_request.json", required=True
+            ),
+            EvidenceOutput(
+                "capability_relationship_result.json", required=True
+            ),
+            EvidenceOutput(
+                "capability_relationship_summary.md", required=True
+            ),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Deterministic, append-only graph edges; no mutation.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-relationships",
+        command="axiom capability-relationships [--json-output]",
+        description="List capability relationship reports.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List persisted capability relationship reports.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-relationship-show",
+        command=(
+            "axiom capability-relationship-show <report_id> [--json-output]"
+        ),
+        description="Show a capability relationship report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a persisted capability relationship report by report ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-relationship-export",
+        command=(
+            "axiom capability-relationship-export <report_id> "
+            "[--format markdown|json|csv]"
+        ),
+        description="Export a capability relationship report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a capability relationship report as markdown/json/csv.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object

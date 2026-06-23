@@ -18430,6 +18430,177 @@ def _render_capability_summary_report_rich(report: dict) -> None:
             console.print(f"    [{cap_id}] {context}")
 
 
+@cli.command("capability-relationship-create")
+@click.option(
+    "--relationship-file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to a JSON file with capability relationships.",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_relationship_create(
+    relationship_file: str | None, json_output: bool
+) -> None:
+    """Create a capability relationship report (graph-ready edges)."""
+    from axiom_core.capability_relationship import (
+        CapabilityRelationshipEngine,
+    )
+
+    try:
+        relationships_data: list = []
+        known_capability_ids: list = []
+        raw_metadata: dict = {}
+        if relationship_file:
+            with open(relationship_file, encoding="utf-8") as f:
+                payload = json.loads(f.read())
+            relationships_data = payload.get("relationships", [])
+            known_capability_ids = payload.get("known_capability_ids", [])
+            raw_metadata = payload.get("raw_metadata", {})
+
+        engine = CapabilityRelationshipEngine()
+        report = engine.create(
+            relationships=relationships_data,
+            known_capability_ids=known_capability_ids,
+            raw_metadata=raw_metadata,
+        )
+
+        if json_output:
+            click.echo(json.dumps(report, indent=2, default=str))
+        else:
+            _render_capability_relationship_report_rich(report)
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+
+@cli.command("capability-relationships")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_relationships(json_output: bool) -> None:
+    """List all persisted capability relationship reports."""
+    from axiom_core.capability_relationship import (
+        CapabilityRelationshipEngine,
+    )
+
+    engine = CapabilityRelationshipEngine()
+    reports = engine.list_reports()
+
+    if json_output:
+        click.echo(json.dumps(reports, indent=2, default=str))
+        return
+
+    if not reports:
+        click.echo("No capability relationship reports found.")
+        return
+
+    console.print("\n[bold]Capability Relationship Reports[/bold]\n")
+    for r in reports:
+        console.print(
+            f"  {r.get('report_id', '')}  "
+            f"({r.get('relationship_count', 0)} relationships, "
+            f"{r.get('orphan_capability_count', 0)} orphans, "
+            f"created {r.get('created_at', '')})"
+        )
+
+
+@cli.command("capability-relationship-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_relationship_show(report_id: str, json_output: bool) -> None:
+    """Show a persisted capability relationship report."""
+    from axiom_core.capability_relationship import (
+        CapabilityRelationshipEngine,
+    )
+
+    try:
+        engine = CapabilityRelationshipEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if report is None:
+        click.echo(f"Error: Report not found: {report_id}", err=True)
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_capability_relationship_report_rich(report)
+
+
+@cli.command("capability-relationship-export")
+@click.argument("report_id")
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["markdown", "json", "csv"]),
+    default="markdown",
+    help="Export format.",
+)
+def capability_relationship_export(report_id: str, fmt: str) -> None:
+    """Export a capability relationship report (markdown/json/csv)."""
+    from axiom_core.capability_relationship import (
+        CapabilityRelationshipEngine,
+    )
+
+    try:
+        engine = CapabilityRelationshipEngine()
+        output = engine.export_report(report_id, fmt=fmt)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        if "not found" in str(exc).lower():
+            raise SystemExit(2) from exc
+        raise SystemExit(1) from exc
+
+    click.echo(output)
+
+
+def _render_capability_relationship_report_rich(report: dict) -> None:
+    """Rich text rendering for a capability relationship report."""
+    console.print("\n[bold]Capability Relationship Report[/bold]\n")
+    console.print(f"  Report ID:      {report.get('report_id', '')}")
+    console.print(
+        f"  Relationships:  {report.get('relationship_count', 0)}"
+    )
+    console.print(
+        f"  Duplicates:     "
+        f"{report.get('duplicate_relationship_count', 0)}"
+    )
+    console.print(
+        f"  Orphans:        {report.get('orphan_capability_count', 0)}"
+    )
+    console.print(
+        f"  Schema Version: {report.get('schema_version', '')}"
+    )
+
+    type_counts = report.get("relationship_type_counts", {})
+    if type_counts:
+        console.print("\n  [bold]Relationship Type Counts:[/bold]")
+        for rel_type in sorted(type_counts):
+            console.print(
+                f"    {_rich_escape(rel_type)}: {type_counts[rel_type]}"
+            )
+
+    relationships = report.get("relationships", [])
+    if relationships:
+        console.print("\n  [bold]Relationships:[/bold]")
+        for r in relationships:
+            source = r.get("source_capability_id", "")
+            target = r.get("target_capability_id", "")
+            rel_type = r.get("relationship_type", "")
+            console.print(
+                _rich_escape(
+                    f"    [{source}] --[{rel_type}]--> [{target}]"
+                )
+            )
+
+    orphans = report.get("orphan_capability_ids", [])
+    if orphans:
+        console.print("\n  [bold]Orphan Capabilities:[/bold]")
+        for cap_id in orphans:
+            console.print(_rich_escape(f"    [{cap_id}]"))
+
+
 @cli.command("devin-session-import")
 @click.option(
     "--session-file",
