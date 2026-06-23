@@ -7,12 +7,17 @@ Capability Summary Framework, so Program 1 captures worker/session execution
 context that GitHub metadata alone does not record.
 
 This framework performs read-only metadata ingestion from a provided payload
-(no Devin API, no scraping, no browser automation, no network calls). It
-produces, but never mutates, registry entries and timeline events: a derived
-registry entry and append-only timeline events (TEST_STARTED/TEST_COMPLETED,
-VIDEO_RECORDED, SCREENSHOT_CAPTURED, SKILL_PROPOSED/SKILL_APPROVED,
-REVIEW_FINDING, BUG_FIXED, PR_READY, WARNING, NOTE) are built from the imported
-metadata. Raw payloads, schema version, and manual overrides are preserved.
+(no Devin API, no scraping, no browser automation, no network calls). The
+import adapter only observes and enriches: the Global Capability Registry
+remains the sole owner of capability identity. It never creates, mutates, or
+duplicates registry entries. Instead it records a non-owning ``registry
+reference`` (consuming an existing ``capability_id``/``global_capability_number``
+when provided, otherwise flagging ``missing_registry_reference`` without
+touching the registry) and builds append-only timeline events
+(TEST_STARTED/TEST_COMPLETED, VIDEO_RECORDED, SCREENSHOT_CAPTURED,
+SKILL_PROPOSED/SKILL_APPROVED, REVIEW_FINDING, BUG_FIXED, PR_READY, WARNING,
+NOTE) from the imported metadata. Raw payloads, schema version, and manual
+overrides are preserved.
 
 Non-goals: no Devin API integration, no automatic scraping, no browser
 automation, no worker orchestration, no automatic PR sequencing, no Operator
@@ -39,13 +44,13 @@ from axiom_core.capability_event_timeline import (
     CapabilityEventReference,
     CapabilityEventType,
 )
-from axiom_core.global_capability_registry import (
-    GlobalCapabilityEntry,
-    GlobalCapabilityRepositoryRef,
-    GlobalCapabilityWorkerRef,
-)
 
 SCHEMA_VERSION = "1.0"
+
+# Registry-reference status: whether the session names an existing global
+# capability identity for the import to reference (never mint).
+REGISTRY_REFERENCE_REFERENCED = "referenced"
+REGISTRY_REFERENCE_MISSING = "missing_registry_reference"
 
 
 # ---------------------------------------------------------------------------
@@ -97,16 +102,6 @@ _VALID_IMPORT_STATUSES = {s.value for s in DevinSessionImportStatus}
 _VALID_ACTION_TYPES = {t.value for t in DevinSessionActionType}
 _VALID_ARTIFACT_TYPES = {t.value for t in DevinSessionArtifactType}
 _VALID_SKILL_STATUSES = {s.value for s in DevinSessionSkillProposalStatus}
-
-# Map a Devin session status onto a Global Capability Registry status.
-_SESSION_STATUS_TO_REGISTRY_STATUS = {
-    "open": "open",
-    "in_progress": "open",
-    "blocked": "open",
-    "merged": "merged",
-    "completed": "merged",
-    "closed": "closed",
-}
 
 # Map an action type onto a single timeline event type (conservative: only
 # actions that clearly correspond to a recorded capability event emit one).
@@ -447,7 +442,8 @@ class DevinSessionImportReport:
     metadata_import: DevinSessionMetadataImport = field(
         default_factory=DevinSessionMetadataImport
     )
-    registry_entry: dict[str, Any] = field(default_factory=dict)
+    registry_reference_status: str = REGISTRY_REFERENCE_MISSING
+    registry_reference: dict[str, Any] = field(default_factory=dict)
     timeline_events: list[dict[str, Any]] = field(default_factory=list)
     created_at: str = ""
     schema_version: str = SCHEMA_VERSION
@@ -478,7 +474,8 @@ class DevinSessionImportReport:
                 self.timeline_event_type_counts
             ),
             "metadata_import": self.metadata_import.to_dict(),
-            "registry_entry": dict(self.registry_entry),
+            "registry_reference_status": self.registry_reference_status,
+            "registry_reference": dict(self.registry_reference),
             "timeline_events": list(self.timeline_events),
             "created_at": self.created_at,
             "schema_version": self.schema_version,
@@ -627,7 +624,9 @@ class DevinSessionMetadataImportEngine:
             raw_metadata=dict(metadata.get("raw_metadata", {})),
         )
 
-        registry_entry = self._build_registry_entry(metadata_import)
+        reference_status, registry_reference = self._build_registry_reference(
+            metadata_import
+        )
         timeline_events = self._build_timeline_events(metadata_import)
 
         report = DevinSessionImportReport(
@@ -650,7 +649,8 @@ class DevinSessionMetadataImportEngine:
                 e.get("event_type", "") for e in timeline_events
             ),
             metadata_import=metadata_import,
-            registry_entry=registry_entry,
+            registry_reference_status=reference_status,
+            registry_reference=registry_reference,
             timeline_events=timeline_events,
         )
 
@@ -737,41 +737,52 @@ class DevinSessionMetadataImportEngine:
         return proposals
 
     # ------------------------------------------------------------------
-    # Integration: build (never mutate) registry entry + timeline events
+    # Integration: reference (never own/mutate) registry + append events
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _build_registry_entry(
+    def _build_registry_reference(
         metadata_import: DevinSessionMetadataImport,
-    ) -> dict[str, Any]:
+    ) -> tuple[str, dict[str, Any]]:
+        """Record a non-owning reference to an existing global capability.
+
+        The Global Capability Registry owns capability identity; this adapter
+        only observes it. When the session names an existing identity (a
+        ``capability_id`` or ``global_capability_number``) the reference points
+        at it; otherwise ``missing_registry_reference`` is reported and the
+        registry is left untouched (no new canonical identity is minted).
+        """
         session = metadata_import.session
-        registry_status = _SESSION_STATUS_TO_REGISTRY_STATUS.get(
-            session.status.lower(), "proposed"
+        has_reference = bool(session.capability_id.strip()) or (
+            metadata_import.global_capability_number > 0
         )
-        entry = GlobalCapabilityEntry(
-            global_capability_id=session.capability_id,
-            global_capability_number=metadata_import.global_capability_number,
-            capability_name=session.capability_name,
-            worker=GlobalCapabilityWorkerRef(
-                worker_id=session.worker_id,
-                worker_type=session.worker_type,
+        reference_status = (
+            REGISTRY_REFERENCE_REFERENCED
+            if has_reference
+            else REGISTRY_REFERENCE_MISSING
+        )
+        reference = {
+            "reference_status": reference_status,
+            "global_capability_number": (
+                metadata_import.global_capability_number
             ),
-            repository=GlobalCapabilityRepositoryRef(
-                repository_owner=session.repository_owner,
-                repository_name=session.repository_name,
-                repository_pr_number=session.repository_pr_number,
-            ),
-            affected_files=[
+            "capability_id": session.capability_id,
+            "capability_name": session.capability_name,
+            "repository_owner": session.repository_owner,
+            "repository_name": session.repository_name,
+            "repository_pr_number": session.repository_pr_number,
+            "worker": {
+                "worker_id": session.worker_id,
+                "worker_type": session.worker_type,
+            },
+            "observed_session_status": session.status,
+            "affected_files": [
                 p.file_path
                 for p in metadata_import.skill_proposals
                 if p.file_path
             ],
-            status=registry_status,
-            created_at=session.started_at,
-            updated_at=session.completed_at,
-            raw_metadata=dict(metadata_import.raw_metadata),
-        )
-        return entry.to_dict()
+        }
+        return reference_status, reference
 
     def _build_timeline_events(
         self, metadata_import: DevinSessionMetadataImport
@@ -990,6 +1001,7 @@ class DevinSessionMetadataImportEngine:
             "repository_pr_number": report.repository_pr_number,
             "global_capability_number": report.global_capability_number,
             "import_status": report.status,
+            "registry_reference_status": report.registry_reference_status,
             "action_count": report.action_count,
             "artifact_count": report.artifact_count,
             "skill_proposal_count": report.skill_proposal_count,
@@ -1044,6 +1056,22 @@ class DevinSessionMetadataImportEngine:
         lines.append(f"- Capability: {session.get('capability_name', '')}")
         lines.append(f"- Status: {session.get('status', '')}")
         lines.append(f"- Summary: {session.get('summary', '')}")
+        lines.append("")
+
+        reference = data.get("registry_reference", {})
+        lines.append("## Registry Reference")
+        lines.append("")
+        lines.append(
+            f"- Reference Status: "
+            f"{data.get('registry_reference_status', '')}"
+        )
+        lines.append(
+            f"- Global Capability Number: "
+            f"{reference.get('global_capability_number', 0)}"
+        )
+        lines.append(
+            f"- Capability ID: {reference.get('capability_id', '')}"
+        )
         lines.append("")
 
         action_counts = data.get("action_type_counts", {})

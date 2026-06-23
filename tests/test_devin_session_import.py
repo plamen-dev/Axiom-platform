@@ -610,29 +610,61 @@ def test_slept_action_maps_to_warning():
 
 
 # ---------------------------------------------------------------------------
-# Registry entry (built, not mutated)
+# Registry reference (observed, never owned or mutated)
 # ---------------------------------------------------------------------------
 
 
-def test_registry_entry_built():
+def test_registry_reference_built():
     engine = _tmp_engine()
     report = engine.import_session(metadata=_metadata())
-    entry = report["registry_entry"]
-    assert entry["global_capability_number"] == 126
-    assert entry["capability_name"].startswith("PR #126")
-    assert entry["worker"]["worker_id"] == "devin"
-    assert entry["worker"]["worker_type"] == "ai"
-    assert entry["repository"]["repository_owner"] == "plamen-dev"
-    assert entry["status"] == "merged"
+    ref = report["registry_reference"]
+    assert report["registry_reference_status"] == "referenced"
+    assert ref["reference_status"] == "referenced"
+    assert ref["global_capability_number"] == 126
+    assert ref["capability_id"] == "gc-126"
+    assert ref["capability_name"].startswith("PR #126")
+    assert ref["worker"]["worker_id"] == "devin"
+    assert ref["worker"]["worker_type"] == "ai"
+    assert ref["repository_owner"] == "plamen-dev"
+    assert ref["observed_session_status"] == "merged"
 
 
-def test_registry_status_defaults_to_proposed():
+def test_registry_reference_does_not_mint_canonical_entry():
+    # The reference is a plain observation, never a GlobalCapabilityEntry:
+    # it carries no canonical-identity fields the registry owns.
+    engine = _tmp_engine()
+    ref = engine.import_session(metadata=_metadata())["registry_reference"]
+    assert "global_capability_id" not in ref
+    assert "merge_sha" not in ref
+    assert "primary_program" not in ref
+
+
+def test_missing_registry_reference_flagged_not_minted():
+    engine = _tmp_engine()
+    md = _metadata()
+    md["session"] = dict(md["session"])
+    md["session"]["capability_id"] = ""
+    md["session"]["global_capability_number"] = 0
+    md["global_capability_number"] = 0
+    report = engine.import_session(metadata=md, global_capability_number=0)
+    assert report["registry_reference_status"] == "missing_registry_reference"
+    assert (
+        report["registry_reference"]["reference_status"]
+        == "missing_registry_reference"
+    )
+    # Still a successful import; absence is flagged, not failed.
+    assert report["status"] == DevinSessionImportStatus.IMPORTED.value
+
+
+def test_registry_reference_observes_session_status_verbatim():
     engine = _tmp_engine()
     md = _metadata()
     md["session"] = dict(md["session"])
     md["session"]["status"] = "in_progress"
     report = engine.import_session(metadata=md)
-    assert report["registry_entry"]["status"] == "open"
+    ref = report["registry_reference"]
+    assert ref["observed_session_status"] == "in_progress"
+    assert report["registry_reference_status"] == "referenced"
 
 
 # ---------------------------------------------------------------------------

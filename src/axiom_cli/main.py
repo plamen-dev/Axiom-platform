@@ -18571,6 +18571,10 @@ def _render_devin_session_import_report_rich(report: dict) -> None:
     console.print(
         f"  Import Status:   {_rich_escape(report.get('status', ''))}"
     )
+    console.print(
+        f"  Registry Ref.:   "
+        f"{_rich_escape(report.get('registry_reference_status', ''))}"
+    )
     console.print(f"  Actions:         {report.get('action_count', 0)}")
     console.print(f"  Artifacts:       {report.get('artifact_count', 0)}")
     console.print(
