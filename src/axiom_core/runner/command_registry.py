@@ -6327,6 +6327,77 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="capability-impact-create",
+        command=(
+            "axiom capability-impact-create "
+            "[--impact-file <if>] [--json-output]"
+        ),
+        description="Create a capability impact report (impacts + opps).",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("capability_impact_request.json", required=True),
+            EvidenceOutput("capability_impact_result.json", required=True),
+            EvidenceOutput("capability_impact_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Deterministic, append-only impacts/opportunities; no mutation.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-impacts",
+        command="axiom capability-impacts [--json-output]",
+        description="List capability impact reports.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List persisted capability impact reports.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-impact-show",
+        command="axiom capability-impact-show <report_id> [--json-output]",
+        description="Show a capability impact report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a persisted capability impact report by report ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-impact-export",
+        command=(
+            "axiom capability-impact-export <report_id> "
+            "[--format markdown|json|csv]"
+        ),
+        description="Export a capability impact report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a capability impact report as markdown/json/csv.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object

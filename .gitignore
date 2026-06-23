@@ -118,6 +118,9 @@ artifacts/devin_session_import/
 # Capability Relationship Framework bundles (generated run outputs; keep curated evidence)
 artifacts/capability_relationships/
 
+# Capability Impact Framework bundles (generated run outputs; keep curated evidence)
+artifacts/capability_impacts/
+
 # Visual Studio local state
 .vs/
 
