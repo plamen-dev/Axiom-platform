@@ -5466,6 +5466,61 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="failure-classification-create",
+        command=(
+            "axiom failure-classification-create "
+            "[--classifications-file <cf>] [--json-output]"
+        ),
+        description=(
+            "Create a failure classification report with severity/category counts."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("failure_classification_request.json", required=True),
+            EvidenceOutput("failure_classification_result.json", required=True),
+            EvidenceOutput("failure_classification_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Create and persist a failure classification report deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="failure-classification-show",
+        command="axiom failure-classification-show <report_id> [--json-output]",
+        description="Show a failure classification report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a failure classification report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="failure-classification-export",
+        command="axiom failure-classification-export <report_id> [--json-output]",
+        description="Export a failure classification report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a failure classification report as markdown.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
