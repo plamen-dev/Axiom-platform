@@ -18601,6 +18601,178 @@ def _render_capability_relationship_report_rich(report: dict) -> None:
             console.print(_rich_escape(f"    [{cap_id}]"))
 
 
+@cli.command("capability-impact-create")
+@click.option(
+    "--impact-file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to a JSON file with capability impacts and opportunities.",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_impact_create(
+    impact_file: str | None, json_output: bool
+) -> None:
+    """Create a capability impact report (impacts + opportunities)."""
+    from axiom_core.capability_impact import CapabilityImpactEngine
+
+    try:
+        impacts_data: list = []
+        opportunities_data: list = []
+        raw_metadata: dict = {}
+        if impact_file:
+            with open(impact_file, encoding="utf-8") as f:
+                payload = json.loads(f.read())
+            impacts_data = payload.get("impacts", [])
+            opportunities_data = payload.get("opportunities", [])
+            raw_metadata = payload.get("raw_metadata", {})
+
+        engine = CapabilityImpactEngine()
+        report = engine.create(
+            impacts=impacts_data,
+            opportunities=opportunities_data,
+            raw_metadata=raw_metadata,
+        )
+
+        if json_output:
+            click.echo(json.dumps(report, indent=2, default=str))
+        else:
+            _render_capability_impact_report_rich(report)
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+
+@cli.command("capability-impacts")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_impacts(json_output: bool) -> None:
+    """List all persisted capability impact reports."""
+    from axiom_core.capability_impact import CapabilityImpactEngine
+
+    engine = CapabilityImpactEngine()
+    reports = engine.list_reports()
+
+    if json_output:
+        click.echo(json.dumps(reports, indent=2, default=str))
+        return
+
+    if not reports:
+        click.echo("No capability impact reports found.")
+        return
+
+    console.print("\n[bold]Capability Impact Reports[/bold]\n")
+    for r in reports:
+        console.print(
+            f"  {r.get('report_id', '')}  "
+            f"({r.get('impact_count', 0)} impacts, "
+            f"{r.get('opportunity_count', 0)} opportunities, "
+            f"created {r.get('created_at', '')})"
+        )
+
+
+@cli.command("capability-impact-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_impact_show(report_id: str, json_output: bool) -> None:
+    """Show a persisted capability impact report."""
+    from axiom_core.capability_impact import CapabilityImpactEngine
+
+    try:
+        engine = CapabilityImpactEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if report is None:
+        click.echo(f"Error: Report not found: {report_id}", err=True)
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_capability_impact_report_rich(report)
+
+
+@cli.command("capability-impact-export")
+@click.argument("report_id")
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["markdown", "json", "csv"]),
+    default="markdown",
+    help="Export format.",
+)
+def capability_impact_export(report_id: str, fmt: str) -> None:
+    """Export a capability impact report (markdown/json/csv)."""
+    from axiom_core.capability_impact import CapabilityImpactEngine
+
+    try:
+        engine = CapabilityImpactEngine()
+        output = engine.export_report(report_id, fmt=fmt)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        if "not found" in str(exc).lower():
+            raise SystemExit(2) from exc
+        raise SystemExit(1) from exc
+
+    click.echo(output)
+
+
+def _render_capability_impact_report_rich(report: dict) -> None:
+    """Rich text rendering for a capability impact report."""
+    console.print("\n[bold]Capability Impact Report[/bold]\n")
+    console.print(f"  Report ID:      {report.get('report_id', '')}")
+    console.print(f"  Impacts:        {report.get('impact_count', 0)}")
+    console.print(
+        f"  Opportunities:  {report.get('opportunity_count', 0)}"
+    )
+    console.print(
+        f"  Strategic:      "
+        f"{report.get('strategic_opportunity_count', 0)}"
+    )
+    console.print(
+        f"  Schema Version: {report.get('schema_version', '')}"
+    )
+
+    type_counts = report.get("impact_type_counts", {})
+    if type_counts:
+        console.print("\n  [bold]Impact Type Counts:[/bold]")
+        for impact_type in sorted(type_counts):
+            console.print(
+                f"    {_rich_escape(impact_type)}: {type_counts[impact_type]}"
+            )
+
+    area_counts = report.get("impact_area_counts", {})
+    if area_counts:
+        console.print("\n  [bold]Impact Area Counts:[/bold]")
+        for area in sorted(area_counts):
+            console.print(
+                f"    {_rich_escape(area)}: {area_counts[area]}"
+            )
+
+    impacts = report.get("impacts", [])
+    if impacts:
+        console.print("\n  [bold]Impacts:[/bold]")
+        for i in impacts:
+            cap = i.get("capability_id", "")
+            itype = i.get("impact_type", "")
+            area = i.get("impact_area", "")
+            console.print(
+                _rich_escape(f"    [{cap}] [{itype}] [{area}]")
+            )
+
+    opportunities = report.get("opportunities", [])
+    if opportunities:
+        console.print("\n  [bold]Opportunities:[/bold]")
+        for o in opportunities:
+            cap = o.get("capability_id", "")
+            priority = o.get("priority", "")
+            title = o.get("title", "")
+            console.print(
+                _rich_escape(f"    [{priority}] [{cap}] {title}")
+            )
+
+
 @cli.command("devin-session-import")
 @click.option(
     "--session-file",
