@@ -18304,5 +18304,131 @@ def _render_github_import_report_rich(report: dict) -> None:
             console.print(f"    [{seq}] {ts} [{etype}] {summary_text}")
 
 
+@cli.command("capability-summary-create")
+@click.option(
+    "--summary-file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to a JSON file with capability summaries and narratives.",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_summary_create(
+    summary_file: str | None, json_output: bool
+) -> None:
+    """Create a capability summary report from summaries and narratives."""
+    from axiom_core.capability_summary import CapabilitySummaryEngine
+
+    try:
+        summaries_data: list = []
+        narratives_data: list = []
+        raw_metadata: dict = {}
+        if summary_file:
+            with open(summary_file, encoding="utf-8") as f:
+                payload = json.loads(f.read())
+            summaries_data = payload.get("summaries", [])
+            narratives_data = payload.get("narratives", [])
+            raw_metadata = payload.get("raw_metadata", {})
+
+        engine = CapabilitySummaryEngine()
+        report = engine.create(
+            summaries=summaries_data,
+            narratives=narratives_data,
+            raw_metadata=raw_metadata,
+        )
+
+        if json_output:
+            click.echo(json.dumps(report, indent=2, default=str))
+        else:
+            _render_capability_summary_report_rich(report)
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+
+@cli.command("capability-summary-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_summary_show(report_id: str, json_output: bool) -> None:
+    """Show a persisted capability summary report."""
+    from axiom_core.capability_summary import CapabilitySummaryEngine
+
+    try:
+        engine = CapabilitySummaryEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if report is None:
+        click.echo(f"Error: Report not found: {report_id}", err=True)
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_capability_summary_report_rich(report)
+
+
+@cli.command("capability-summary-export")
+@click.argument("report_id")
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["markdown", "json", "csv"]),
+    default="markdown",
+    help="Export format.",
+)
+def capability_summary_export(report_id: str, fmt: str) -> None:
+    """Export a capability summary report (markdown/json/csv)."""
+    from axiom_core.capability_summary import CapabilitySummaryEngine
+
+    try:
+        engine = CapabilitySummaryEngine()
+        output = engine.export_report(report_id, fmt=fmt)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        if "not found" in str(exc).lower():
+            raise SystemExit(2) from exc
+        raise SystemExit(1) from exc
+
+    click.echo(output)
+
+
+def _render_capability_summary_report_rich(report: dict) -> None:
+    """Rich text rendering for a capability summary report."""
+    console.print("\n[bold]Capability Summary Report[/bold]\n")
+    console.print(f"  Report ID:    {report.get('report_id', '')}")
+    console.print(f"  Summaries:    {report.get('summary_count', 0)}")
+    console.print(f"  Narratives:   {report.get('narrative_count', 0)}")
+    console.print(
+        f"  Schema Version: {report.get('schema_version', '')}"
+    )
+
+    capability_counts = report.get("capability_counts", {})
+    if capability_counts:
+        console.print("\n  [bold]Capability Counts:[/bold]")
+        for cap_id in sorted(capability_counts):
+            console.print(
+                f"    {_rich_escape(cap_id)}: {capability_counts[cap_id]}"
+            )
+
+    summaries = report.get("summaries", [])
+    if summaries:
+        console.print("\n  [bold]Summaries:[/bold]")
+        for s in summaries:
+            name = _rich_escape(s.get("capability_name", ""))
+            cap_id = _rich_escape(s.get("capability_id", ""))
+            purpose = _rich_escape(s.get("purpose", ""))
+            console.print(f"    [{cap_id}] {name}: {purpose}")
+
+    narratives = report.get("narratives", [])
+    if narratives:
+        console.print("\n  [bold]Narratives:[/bold]")
+        for n in narratives:
+            cap_id = _rich_escape(n.get("capability_id", ""))
+            context = _rich_escape(n.get("context", ""))
+            console.print(f"    [{cap_id}] {context}")
+
+
 if __name__ == "__main__":
     cli()

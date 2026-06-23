@@ -6131,6 +6131,62 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="capability-summary-create",
+        command=(
+            "axiom capability-summary-create [--summary-file <sf>] "
+            "[--json-output]"
+        ),
+        description="Create a capability summary report (understanding).",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("capability_summary_request.json", required=True),
+            EvidenceOutput("capability_summary_result.json", required=True),
+            EvidenceOutput("capability_summary_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Deterministic, append-only understanding layer; no mutation.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-summary-show",
+        command="axiom capability-summary-show <report_id> [--json-output]",
+        description="Show a capability summary report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a persisted capability summary report by report ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-summary-export",
+        command=(
+            "axiom capability-summary-export <report_id> "
+            "[--format markdown|json|csv]"
+        ),
+        description="Export a capability summary report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a capability summary report as markdown/json/csv.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
