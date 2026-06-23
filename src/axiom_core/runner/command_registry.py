@@ -5685,6 +5685,61 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="skill-composition-create",
+        command=(
+            "axiom skill-composition-create "
+            "[--compositions-file <cf>] [--json-output]"
+        ),
+        description=(
+            "Create a skill composition report with composition-type counts."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("skill_composition_request.json", required=True),
+            EvidenceOutput("skill_composition_result.json", required=True),
+            EvidenceOutput("skill_composition_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Create and persist a skill composition report deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="skill-composition-show",
+        command="axiom skill-composition-show <report_id> [--json-output]",
+        description="Show a skill composition report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a skill composition report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="skill-composition-export",
+        command="axiom skill-composition-export <report_id> [--json-output]",
+        description="Export a skill composition report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a skill composition report as markdown.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object

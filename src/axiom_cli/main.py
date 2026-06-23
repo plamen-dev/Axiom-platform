@@ -17158,5 +17158,159 @@ def _render_session_memory_report_rich(report: dict) -> None:
             console.print(line)
 
 
+@cli.command("skill-composition-create")
+@click.option(
+    "--compositions-file",
+    default="",
+    help="Path to skill compositions JSON file",
+)
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def skill_composition_create_cmd(compositions_file: str, json_output: bool) -> None:
+    """Create a skill composition report."""
+    from axiom_core.skill_composition import SkillCompositionEngine
+
+    compositions: list = []
+    if compositions_file:
+        try:
+            data = json.loads(Path(compositions_file).read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                compositions = data
+            elif isinstance(data, dict):
+                compositions = data.get("compositions", [])
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    try:
+        engine = SkillCompositionEngine()
+        result = engine.create(compositions=compositions)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+    else:
+        _render_skill_composition_report_rich(result)
+
+
+@cli.command("skill-composition-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def skill_composition_show_cmd(report_id: str, json_output: bool) -> None:
+    """Show a skill composition report."""
+    from axiom_core.skill_composition import SkillCompositionEngine
+
+    try:
+        engine = SkillCompositionEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_skill_composition_report_rich(report)
+
+
+@cli.command("skill-composition-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def skill_composition_export_cmd(report_id: str, json_output: bool) -> None:
+    """Export a skill composition report as markdown."""
+    from axiom_core.skill_composition import SkillCompositionEngine
+
+    try:
+        engine = SkillCompositionEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_skill_composition_report_rich(report: dict) -> None:
+    """Rich text rendering for a skill composition report."""
+    console.print("\n[bold]Skill Composition Report[/bold]\n")
+    console.print(f"  Report ID:     {report.get('report_id', '')}")
+    console.print(f"  Compositions:  {report.get('composition_count', 0)}")
+
+    composition_type_counts = report.get("composition_type_counts", {})
+    if composition_type_counts:
+        console.print("\n  [bold]Type Counts:[/bold]")
+        for composition_type in sorted(composition_type_counts):
+            console.print(
+                f"    {composition_type.upper()}: "
+                f"{composition_type_counts[composition_type]}"
+            )
+
+    compositions = report.get("compositions", [])
+    if compositions:
+        console.print("\n  [bold]Compositions:[/bold]")
+        for c in compositions:
+            composition_type = c.get("composition_type", "").upper()
+            name = c.get("name", "")
+            console.print(f"    [{composition_type}] {name}")
+            for el in c.get("elements", []):
+                order_index = el.get("order_index", 0)
+                skill_id = el.get("skill_id", "")
+                console.print(f"      {order_index}. {skill_id}")
+
+
 if __name__ == "__main__":
     cli()
