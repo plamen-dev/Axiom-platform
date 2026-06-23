@@ -18955,6 +18955,204 @@ def _render_capability_file_report_rich(report: dict) -> None:
             )
 
 
+@cli.command("capability-validation-create")
+@click.option(
+    "--validation-file",
+    "validation_file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to a JSON file with capability validation records.",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_validation_create(
+    validation_file: str | None, json_output: bool
+) -> None:
+    """Create a capability validation knowledge report."""
+    from axiom_core.capability_validation_knowledge import (
+        CapabilityValidationKnowledgeEngine,
+    )
+
+    try:
+        records_data: list = []
+        findings_data: list = []
+        artifacts_data: list = []
+        knowledge_payloads: dict = {}
+        raw_metadata: dict = {}
+        if validation_file:
+            with open(validation_file, encoding="utf-8") as f:
+                payload = json.loads(f.read())
+            records_data = payload.get("validation_records", [])
+            findings_data = payload.get("validation_findings", [])
+            artifacts_data = payload.get("validation_artifacts", [])
+            knowledge_payloads = payload.get("knowledge_payloads", {})
+            raw_metadata = payload.get("raw_metadata", {})
+
+        engine = CapabilityValidationKnowledgeEngine()
+        report = engine.create(
+            validation_records=records_data,
+            validation_findings=findings_data,
+            validation_artifacts=artifacts_data,
+            knowledge_payloads=knowledge_payloads,
+            raw_metadata=raw_metadata,
+        )
+
+        if json_output:
+            click.echo(json.dumps(report, indent=2, default=str))
+        else:
+            _render_capability_validation_report_rich(report)
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+
+@cli.command("capability-validations")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_validations(json_output: bool) -> None:
+    """List all persisted capability validation knowledge reports."""
+    from axiom_core.capability_validation_knowledge import (
+        CapabilityValidationKnowledgeEngine,
+    )
+
+    engine = CapabilityValidationKnowledgeEngine()
+    reports = engine.list_reports()
+
+    if json_output:
+        click.echo(json.dumps(reports, indent=2, default=str))
+        return
+
+    if not reports:
+        click.echo("No capability validation knowledge reports found.")
+        return
+
+    console.print("\n[bold]Capability Validation Knowledge Reports[/bold]\n")
+    for r in reports:
+        console.print(
+            f"  {r.get('report_id', '')}  "
+            f"({r.get('validation_count', 0)} validations, "
+            f"{r.get('finding_count', 0)} findings, "
+            f"created {r.get('created_at', '')})"
+        )
+
+
+@cli.command("capability-validation-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_validation_show(report_id: str, json_output: bool) -> None:
+    """Show a persisted capability validation knowledge report."""
+    from axiom_core.capability_validation_knowledge import (
+        CapabilityValidationKnowledgeEngine,
+    )
+
+    try:
+        engine = CapabilityValidationKnowledgeEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if report is None:
+        click.echo(f"Error: Report not found: {report_id}", err=True)
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_capability_validation_report_rich(report)
+
+
+@cli.command("capability-validation-export")
+@click.argument("report_id")
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["markdown", "json", "csv"]),
+    default="markdown",
+    help="Export format.",
+)
+def capability_validation_export(report_id: str, fmt: str) -> None:
+    """Export a capability validation knowledge report (markdown/json/csv)."""
+    from axiom_core.capability_validation_knowledge import (
+        CapabilityValidationKnowledgeEngine,
+    )
+
+    try:
+        engine = CapabilityValidationKnowledgeEngine()
+        output = engine.export_report(report_id, fmt=fmt)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        if "not found" in str(exc).lower():
+            raise SystemExit(2) from exc
+        raise SystemExit(1) from exc
+
+    click.echo(output)
+
+
+def _render_capability_validation_report_rich(report: dict) -> None:
+    """Rich text rendering for a capability validation knowledge report."""
+    console.print(
+        "\n[bold]Capability Validation Knowledge Report[/bold]\n"
+    )
+    console.print(f"  Report ID:      {report.get('report_id', '')}")
+    console.print(f"  Capabilities:   {report.get('capability_count', 0)}")
+    console.print(f"  Validations:    {report.get('validation_count', 0)}")
+    console.print(f"  Findings:       {report.get('finding_count', 0)}")
+    console.print(f"  Unresolved:     {report.get('unresolved_count', 0)}")
+    console.print(
+        f"  Duplicates:     "
+        f"{report.get('duplicate_validation_count', 0)}"
+    )
+    console.print(f"  Schema Version: {report.get('schema_version', '')}")
+
+    type_counts = report.get("validation_type_counts", {})
+    if type_counts:
+        console.print("\n  [bold]Validation Type Counts:[/bold]")
+        for vtype in sorted(type_counts):
+            console.print(
+                f"    {_rich_escape(vtype)}: {type_counts[vtype]}"
+            )
+
+    status_counts = report.get("validation_status_counts", {})
+    if status_counts:
+        console.print("\n  [bold]Validation Status Counts:[/bold]")
+        for status in sorted(status_counts):
+            console.print(
+                f"    {_rich_escape(status)}: {status_counts[status]}"
+            )
+
+    severity_counts = report.get("finding_severity_counts", {})
+    if severity_counts:
+        console.print("\n  [bold]Finding Severity Counts:[/bold]")
+        for severity in sorted(severity_counts):
+            console.print(
+                f"    {_rich_escape(severity)}: {severity_counts[severity]}"
+            )
+
+    records = report.get("records", [])
+    if records:
+        console.print("\n  [bold]Validations:[/bold]")
+        for r in records:
+            cap = r.get("capability_id", "")
+            vtype = r.get("validation_type", "")
+            vstatus = r.get("validation_status", "")
+            validator = r.get("validator", "")
+            console.print(
+                _rich_escape(
+                    f"    [{cap}] [{vtype}] [{vstatus}] {validator}"
+                )
+            )
+
+    findings = report.get("findings", [])
+    if findings:
+        console.print("\n  [bold]Findings:[/bold]")
+        for f in findings:
+            severity = f.get("severity", "")
+            resolved = "resolved" if f.get("resolved") else "unresolved"
+            summary = f.get("summary", "")
+            console.print(
+                _rich_escape(f"    [{severity}] [{resolved}] {summary}")
+            )
+
+
 @cli.command("devin-session-import")
 @click.option(
     "--session-file",
