@@ -17956,5 +17956,201 @@ def _render_global_capability_report_rich(report: dict) -> None:
             console.print(f"    #{number} {name} [{status}] ({ref})")
 
 
+# ---------------------------------------------------------------------------
+# Capability Event Timeline Framework CLI
+# ---------------------------------------------------------------------------
+
+
+@cli.command("capability-event-create")
+@click.option(
+    "--timeline-file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to a JSON file with capability events.",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_event_create(
+    timeline_file: str | None, json_output: bool
+) -> None:
+    """Create a capability event timeline from events."""
+    from axiom_core.capability_event_timeline import (
+        CapabilityEventTimelineEngine,
+    )
+
+    try:
+        global_capability_id = ""
+        events_data: list = []
+        if timeline_file:
+            with open(timeline_file, encoding="utf-8") as f:
+                payload = json.loads(f.read())
+            global_capability_id = payload.get("global_capability_id", "")
+            events_data = payload.get("events", [])
+
+        engine = CapabilityEventTimelineEngine()
+        report = engine.create(
+            global_capability_id=global_capability_id, events=events_data
+        )
+
+        if json_output:
+            click.echo(json.dumps(report, indent=2, default=str))
+        else:
+            _render_capability_event_report_rich(report)
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+
+@cli.command("capability-event-append")
+@click.argument("timeline_id")
+@click.option(
+    "--timeline-file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to a JSON file with capability events to append.",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_event_append(
+    timeline_id: str, timeline_file: str | None, json_output: bool
+) -> None:
+    """Append events to an existing capability event timeline."""
+    from axiom_core.capability_event_timeline import (
+        CapabilityEventTimelineEngine,
+    )
+
+    try:
+        events_data: list = []
+        if timeline_file:
+            with open(timeline_file, encoding="utf-8") as f:
+                payload = json.loads(f.read())
+            events_data = payload.get("events", [])
+
+        engine = CapabilityEventTimelineEngine()
+        report = engine.append(timeline_id, events=events_data)
+
+        if json_output:
+            click.echo(json.dumps(report, indent=2, default=str))
+        else:
+            _render_capability_event_report_rich(report)
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        if "not found" in str(exc).lower():
+            raise SystemExit(2) from exc
+        raise SystemExit(1) from exc
+
+
+@cli.command("capability-event-list")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_event_list(json_output: bool) -> None:
+    """List all persisted capability event timelines."""
+    from axiom_core.capability_event_timeline import (
+        CapabilityEventTimelineEngine,
+    )
+
+    engine = CapabilityEventTimelineEngine()
+    reports = engine.list_reports()
+
+    if json_output:
+        click.echo(json.dumps(reports, indent=2, default=str))
+        return
+
+    if not reports:
+        click.echo("No capability event timelines found.")
+        return
+
+    console.print("\n[bold]Capability Event Timelines[/bold]\n")
+    for r in reports:
+        console.print(
+            f"  {r.get('timeline_id', '')}  "
+            f"({r.get('event_count', 0)} events, "
+            f"created {r.get('created_at', '')})"
+        )
+
+
+@cli.command("capability-event-show")
+@click.argument("timeline_id")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_event_show(timeline_id: str, json_output: bool) -> None:
+    """Show a persisted capability event timeline."""
+    from axiom_core.capability_event_timeline import (
+        CapabilityEventTimelineEngine,
+    )
+
+    try:
+        engine = CapabilityEventTimelineEngine()
+        report = engine.get_report(timeline_id)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if report is None:
+        click.echo(f"Error: Timeline not found: {timeline_id}", err=True)
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_capability_event_report_rich(report)
+
+
+@cli.command("capability-event-export")
+@click.argument("timeline_id")
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["markdown", "json", "csv"]),
+    default="markdown",
+    help="Export format.",
+)
+def capability_event_export(timeline_id: str, fmt: str) -> None:
+    """Export a capability event timeline (markdown/json/csv)."""
+    from axiom_core.capability_event_timeline import (
+        CapabilityEventTimelineEngine,
+    )
+
+    try:
+        engine = CapabilityEventTimelineEngine()
+        output = engine.export_report(timeline_id, fmt=fmt)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        if "not found" in str(exc).lower():
+            raise SystemExit(2) from exc
+        raise SystemExit(1) from exc
+
+    click.echo(output)
+
+
+def _render_capability_event_report_rich(report: dict) -> None:
+    """Rich text rendering for a capability event timeline."""
+    console.print("\n[bold]Capability Event Timeline[/bold]\n")
+    console.print(f"  Timeline ID:     {report.get('timeline_id', '')}")
+    console.print(
+        f"  Global Cap ID:   {report.get('global_capability_id', '')}"
+    )
+    console.print(f"  Events:          {report.get('event_count', 0)}")
+    console.print(
+        f"  Schema Version:  {report.get('schema_version', '')}"
+    )
+
+    summary = report.get("summary", {})
+    type_counts = summary.get("event_type_counts", {})
+    if type_counts:
+        console.print("\n  [bold]Event Type Counts:[/bold]")
+        for event_type in sorted(type_counts):
+            console.print(
+                f"    {_rich_escape(event_type.upper())}: "
+                f"{type_counts[event_type]}"
+            )
+
+    events = report.get("events", [])
+    if events:
+        console.print("\n  [bold]Timeline:[/bold]")
+        for e in events:
+            seq = e.get("event_sequence", 0)
+            etype = _rich_escape(e.get("event_type", "").upper())
+            ts = _rich_escape(e.get("timestamp", ""))
+            summary_text = _rich_escape(e.get("summary", ""))
+            console.print(f"    [{seq}] {ts} [{etype}] {summary_text}")
+
+
 if __name__ == "__main__":
     cli()
