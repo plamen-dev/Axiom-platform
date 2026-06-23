@@ -5795,6 +5795,61 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="capability-selection-create",
+        command=(
+            "axiom capability-selection-create "
+            "[--selection-file <sf>] [--json-output]"
+        ),
+        description=(
+            "Create a capability selection report with per-capability counts."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("capability_selection_request.json", required=True),
+            EvidenceOutput("capability_selection_result.json", required=True),
+            EvidenceOutput("capability_selection_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Create and persist a capability selection report deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-selection-show",
+        command="axiom capability-selection-show <report_id> [--json-output]",
+        description="Show a capability selection report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a capability selection report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-selection-export",
+        command="axiom capability-selection-export <report_id> [--json-output]",
+        description="Export a capability selection report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a capability selection report as markdown.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
