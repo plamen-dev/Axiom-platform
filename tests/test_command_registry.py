@@ -180,6 +180,7 @@ EXPECTED_AXIOM_COMMANDS = {
     "github-import", "github-import-show", "github-import-export",
     "capability-summary-create", "capability-summary-show",
     "capability-summary-export",
+    "devin-session-import", "devin-session-show", "devin-session-export",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 
