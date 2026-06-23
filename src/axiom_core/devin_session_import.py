@@ -1209,7 +1209,7 @@ class DevinSessionMetadataImportEngine:
                     "skill_proposal",
                     p.get("skill_id", ""),
                     p.get("status", ""),
-                    p.get("skill_name", ""),
+                    f"{p.get('skill_name', '')}: {p.get('proposal_summary', '')}",
                     "",
                     session_id,
                     gc_number,
