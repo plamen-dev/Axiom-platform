@@ -19153,6 +19153,188 @@ def _render_capability_validation_report_rich(report: dict) -> None:
             )
 
 
+@cli.command("capability-graph-create")
+@click.option(
+    "--graph-file",
+    "graph_file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to a JSON file with capability graph nodes and edges.",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_graph_create(graph_file: str | None, json_output: bool) -> None:
+    """Create a capability knowledge graph report."""
+    from axiom_core.capability_knowledge_graph import (
+        CapabilityKnowledgeGraphEngine,
+    )
+
+    try:
+        nodes_data: list = []
+        edges_data: list = []
+        graph_raw_payload: dict = {}
+        raw_metadata: dict = {}
+        if graph_file:
+            with open(graph_file, encoding="utf-8") as f:
+                payload = json.loads(f.read())
+            nodes_data = payload.get("nodes", [])
+            edges_data = payload.get("edges", [])
+            graph_raw_payload = payload.get("graph_raw_payload", {})
+            raw_metadata = payload.get("raw_metadata", {})
+
+        engine = CapabilityKnowledgeGraphEngine()
+        report = engine.create(
+            nodes=nodes_data,
+            edges=edges_data,
+            graph_raw_payload=graph_raw_payload,
+            raw_metadata=raw_metadata,
+        )
+
+        if json_output:
+            click.echo(json.dumps(report, indent=2, default=str))
+        else:
+            _render_capability_graph_report_rich(report)
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+
+@cli.command("capability-graphs")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_graphs(json_output: bool) -> None:
+    """List all persisted capability knowledge graph reports."""
+    from axiom_core.capability_knowledge_graph import (
+        CapabilityKnowledgeGraphEngine,
+    )
+
+    engine = CapabilityKnowledgeGraphEngine()
+    reports = engine.list_reports()
+
+    if json_output:
+        click.echo(json.dumps(reports, indent=2, default=str))
+        return
+
+    if not reports:
+        click.echo("No capability knowledge graph reports found.")
+        return
+
+    console.print("\n[bold]Capability Knowledge Graph Reports[/bold]\n")
+    for r in reports:
+        console.print(
+            f"  {r.get('report_id', '')}  "
+            f"({r.get('node_count', 0)} nodes, "
+            f"{r.get('edge_count', 0)} edges, "
+            f"created {r.get('created_at', '')})"
+        )
+
+
+@cli.command("capability-graph-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_graph_show(report_id: str, json_output: bool) -> None:
+    """Show a persisted capability knowledge graph report."""
+    from axiom_core.capability_knowledge_graph import (
+        CapabilityKnowledgeGraphEngine,
+    )
+
+    try:
+        engine = CapabilityKnowledgeGraphEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if report is None:
+        click.echo(f"Error: Report not found: {report_id}", err=True)
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_capability_graph_report_rich(report)
+
+
+@cli.command("capability-graph-export")
+@click.argument("report_id")
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["markdown", "json", "csv"]),
+    default="markdown",
+    help="Export format.",
+)
+def capability_graph_export(report_id: str, fmt: str) -> None:
+    """Export a capability knowledge graph report (markdown/json/csv)."""
+    from axiom_core.capability_knowledge_graph import (
+        CapabilityKnowledgeGraphEngine,
+    )
+
+    try:
+        engine = CapabilityKnowledgeGraphEngine()
+        output = engine.export_report(report_id, fmt=fmt)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        if "not found" in str(exc).lower():
+            raise SystemExit(2) from exc
+        raise SystemExit(1) from exc
+
+    click.echo(output)
+
+
+def _render_capability_graph_report_rich(report: dict) -> None:
+    """Rich text rendering for a capability knowledge graph report."""
+    console.print("\n[bold]Capability Knowledge Graph Report[/bold]\n")
+    console.print(f"  Report ID:       {report.get('report_id', '')}")
+    console.print(f"  Graph ID:        {report.get('graph_id', '')}")
+    console.print(f"  Nodes:           {report.get('node_count', 0)}")
+    console.print(f"  Edges:           {report.get('edge_count', 0)}")
+    console.print(f"  Orphan Nodes:    {report.get('orphan_node_count', 0)}")
+    console.print(
+        f"  Duplicate Nodes: {report.get('duplicate_node_count', 0)}"
+    )
+    console.print(
+        f"  Duplicate Edges: {report.get('duplicate_edge_count', 0)}"
+    )
+    console.print(f"  Schema Version:  {report.get('schema_version', '')}")
+
+    node_type_counts = report.get("node_type_counts", {})
+    if node_type_counts:
+        console.print("\n  [bold]Node Type Counts:[/bold]")
+        for ntype in sorted(node_type_counts):
+            console.print(
+                f"    {_rich_escape(ntype)}: {node_type_counts[ntype]}"
+            )
+
+    edge_type_counts = report.get("edge_type_counts", {})
+    if edge_type_counts:
+        console.print("\n  [bold]Edge Type Counts:[/bold]")
+        for etype in sorted(edge_type_counts):
+            console.print(
+                f"    {_rich_escape(etype)}: {edge_type_counts[etype]}"
+            )
+
+    nodes = report.get("nodes", [])
+    if nodes:
+        console.print("\n  [bold]Nodes:[/bold]")
+        for n in nodes:
+            ntype = n.get("node_type", "")
+            source_id = n.get("source_id", "")
+            label = n.get("label", "")
+            console.print(
+                _rich_escape(f"    [{ntype}] [{source_id}] {label}")
+            )
+
+    edges = report.get("edges", [])
+    if edges:
+        console.print("\n  [bold]Edges:[/bold]")
+        for e in edges:
+            src = e.get("source_node_id", "")
+            tgt = e.get("target_node_id", "")
+            etype = e.get("edge_type", "")
+            console.print(
+                _rich_escape(f"    [{src}] --[{etype}]--> [{tgt}]")
+            )
+
+
 @cli.command("devin-session-import")
 @click.option(
     "--session-file",
