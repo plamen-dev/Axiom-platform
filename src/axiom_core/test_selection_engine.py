@@ -229,6 +229,7 @@ _FILE_TO_TEST: dict[str, str] = {
         "tests/test_recovery_execution.py"
     ),
     "src/axiom_core/session_memory.py": "tests/test_session_memory.py",
+    "src/axiom_core/skill_composition.py": "tests/test_skill_composition.py",
     "src/axiom_cli/main.py": "tests/test_command_registry.py",
 }
 

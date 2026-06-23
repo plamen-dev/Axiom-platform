@@ -89,6 +89,8 @@ artifacts/recovery_recommendations/
 artifacts/recovery_executions/
 # Session Memory Framework bundles (generated run outputs; keep curated evidence)
 artifacts/session_memory/
+# Skill Composition Framework bundles (generated run outputs; keep curated evidence)
+artifacts/skill_compositions/
 
 # Visual Studio local state
 .vs/
