@@ -6187,6 +6187,67 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="devin-session-import",
+        command=(
+            "axiom devin-session-import [--session-file <sf>] "
+            "[--session-id <sid>] [--repo <owner/name>] [--pr <n>] "
+            "[--global-capability-number <n>] [--json-output]"
+        ),
+        description="Import Devin session metadata (worker/session context).",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput(
+                "devin_session_import_request.json", required=True
+            ),
+            EvidenceOutput(
+                "devin_session_import_result.json", required=True
+            ),
+            EvidenceOutput("devin_session_import_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only, deterministic; builds (never mutates) registry/timeline.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="devin-session-show",
+        command="axiom devin-session-show <report_id> [--json-output]",
+        description="Show a Devin session metadata import.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a persisted Devin session metadata import by report ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="devin-session-export",
+        command=(
+            "axiom devin-session-export <report_id> "
+            "[--format markdown|json|csv]"
+        ),
+        description="Export a Devin session metadata import.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a Devin session metadata import as markdown/json/csv.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
