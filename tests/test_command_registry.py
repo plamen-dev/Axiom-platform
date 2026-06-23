@@ -162,6 +162,8 @@ EXPECTED_AXIOM_COMMANDS = {
     "recovery-recommendation-export",
     "recovery-execution-create", "recovery-execution-show",
     "recovery-execution-export",
+    "session-memory-create", "session-memory-show",
+    "session-memory-export",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 

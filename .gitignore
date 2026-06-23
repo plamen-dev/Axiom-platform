@@ -87,6 +87,8 @@ artifacts/failure_classifications/
 artifacts/recovery_recommendations/
 # Recovery Execution Framework bundles (generated run outputs; keep curated evidence)
 artifacts/recovery_executions/
+# Session Memory Framework bundles (generated run outputs; keep curated evidence)
+artifacts/session_memory/
 
 # Visual Studio local state
 .vs/

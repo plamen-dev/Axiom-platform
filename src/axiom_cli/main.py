@@ -17004,5 +17004,159 @@ def _render_recovery_execution_report_rich(report: dict) -> None:
             console.print(line)
 
 
+@cli.command("session-memory-create")
+@click.option(
+    "--entries-file",
+    default="",
+    help="Path to memory entries JSON file",
+)
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def session_memory_create_cmd(entries_file: str, json_output: bool) -> None:
+    """Create a session memory report."""
+    from axiom_core.session_memory import SessionMemoryEngine
+
+    entries: list = []
+    if entries_file:
+        try:
+            data = json.loads(Path(entries_file).read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                entries = data
+            elif isinstance(data, dict):
+                entries = data.get("entries", [])
+        except Exception as exc:
+            if json_output:
+                click.echo(json.dumps({"error": str(exc)}, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise SystemExit(1)
+
+    try:
+        engine = SessionMemoryEngine()
+        result = engine.create(entries=entries)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+    else:
+        _render_session_memory_report_rich(result)
+
+
+@cli.command("session-memory-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def session_memory_show_cmd(report_id: str, json_output: bool) -> None:
+    """Show a session memory report."""
+    from axiom_core.session_memory import SessionMemoryEngine
+
+    try:
+        engine = SessionMemoryEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_session_memory_report_rich(report)
+
+
+@cli.command("session-memory-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, help="Output JSON")
+def session_memory_export_cmd(report_id: str, json_output: bool) -> None:
+    """Export a session memory report as markdown."""
+    from axiom_core.session_memory import SessionMemoryEngine
+
+    try:
+        engine = SessionMemoryEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+    except Exception as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1)
+
+    if report is None:
+        if json_output:
+            click.echo(
+                json.dumps({"error": f"Report not found: {report_id}"}, indent=2)
+            )
+        else:
+            console.print(f"[red]Error:[/red] Report not found: {report_id}")
+        raise SystemExit(2)
+
+    md = engine.export_report(report_id)
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {"report_id": report_id, "markdown": md},
+                indent=2,
+                default=str,
+            ),
+        )
+    else:
+        click.echo(md)
+
+
+def _render_session_memory_report_rich(report: dict) -> None:
+    """Rich text rendering for a session memory report."""
+    console.print("\n[bold]Session Memory Report[/bold]\n")
+    console.print(f"  Report ID:  {report.get('report_id', '')}")
+    console.print(f"  Memory ID:  {report.get('memory_id', '')}")
+    console.print(f"  Entries:    {report.get('entry_count', 0)}")
+
+    memory_type_counts = report.get("memory_type_counts", {})
+    if memory_type_counts:
+        console.print("\n  [bold]Type Counts:[/bold]")
+        for memory_type in sorted(memory_type_counts):
+            console.print(
+                f"    {memory_type.upper()}: {memory_type_counts[memory_type]}"
+            )
+
+    entries = report.get("entries", [])
+    if entries:
+        console.print("\n  [bold]Entries:[/bold]")
+        for e in entries:
+            memory_type = e.get("memory_type", "").upper()
+            source_id = e.get("source_id", "")
+            summary = e.get("summary", "")
+            line = f"    [{memory_type}] {source_id}"
+            if summary:
+                line += f" — {summary}"
+            console.print(line)
+
+
 if __name__ == "__main__":
     cli()

@@ -5631,6 +5631,60 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="session-memory-create",
+        command=(
+            "axiom session-memory-create [--entries-file <ef>] [--json-output]"
+        ),
+        description=(
+            "Create a session memory report with memory-type counts."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("session_memory_request.json", required=True),
+            EvidenceOutput("session_memory_result.json", required=True),
+            EvidenceOutput("session_memory_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Create and persist a session memory report deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="session-memory-show",
+        command="axiom session-memory-show <report_id> [--json-output]",
+        description="Show a session memory report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a session memory report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="session-memory-export",
+        command="axiom session-memory-export <report_id> [--json-output]",
+        description="Export a session memory report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a session memory report as markdown.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
