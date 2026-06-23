@@ -5851,6 +5851,62 @@ _register(
 )
 
 
+_register(
+    CommandSpec(
+        name="capability-chain-create",
+        command=(
+            "axiom capability-chain-create "
+            "[--chain-file <cf>] [--json-output]"
+        ),
+        description=(
+            "Create a capability chain report with per-chain type counts."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("capability_chain_request.json", required=True),
+            EvidenceOutput("capability_chain_result.json", required=True),
+            EvidenceOutput("capability_chain_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Create and persist a capability chain report deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-chain-show",
+        command="axiom capability-chain-show <report_id> [--json-output]",
+        description="Show a capability chain report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a capability chain report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-chain-export",
+        command="axiom capability-chain-export <report_id> [--json-output]",
+        description="Export a capability chain report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a capability chain report as markdown.",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------

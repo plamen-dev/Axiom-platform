@@ -17673,5 +17673,127 @@ def _render_capability_selection_report_rich(report: dict) -> None:
                 )
 
 
+# ---------------------------------------------------------------------------
+# Capability Chain Framework CLI
+# ---------------------------------------------------------------------------
+
+
+@cli.command("capability-chain-create")
+@click.option(
+    "--chain-file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to a JSON file with chain definitions.",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_chain_create(
+    chain_file: str | None, json_output: bool
+) -> None:
+    """Create a capability chain report from chain definitions."""
+    from axiom_core.capability_chain import CapabilityChainEngine
+
+    try:
+        chains_data: list = []
+        if chain_file:
+            with open(chain_file, encoding="utf-8") as f:
+                payload = json.loads(f.read())
+            chains_data = payload.get("chains", [])
+
+        engine = CapabilityChainEngine()
+        report = engine.create(chains=chains_data)
+
+        if json_output:
+            click.echo(json.dumps(report, indent=2, default=str))
+        else:
+            _render_capability_chain_report_rich(report)
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+
+@cli.command("capability-chain-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_chain_show(report_id: str, json_output: bool) -> None:
+    """Show a persisted capability chain report."""
+    from axiom_core.capability_chain import CapabilityChainEngine
+
+    try:
+        engine = CapabilityChainEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if report is None:
+        click.echo(f"Error: Report not found: {report_id}", err=True)
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_capability_chain_report_rich(report)
+
+
+@cli.command("capability-chain-export")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_chain_export(report_id: str, json_output: bool) -> None:
+    """Export a capability chain report as markdown."""
+    from axiom_core.capability_chain import CapabilityChainEngine
+
+    try:
+        engine = CapabilityChainEngine()
+        md = engine.export_report(report_id)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        if "not found" in str(exc).lower():
+            raise SystemExit(2) from exc
+        raise SystemExit(1) from exc
+
+    if json_output:
+        click.echo(
+            json.dumps({"report_id": report_id, "markdown": md}, indent=2)
+        )
+    else:
+        click.echo(md)
+
+
+def _render_capability_chain_report_rich(report: dict) -> None:
+    """Rich text rendering for a capability chain report."""
+    console.print("\n[bold]Capability Chain Report[/bold]\n")
+    console.print(f"  Report ID:     {report.get('report_id', '')}")
+    console.print(f"  Chains:        {report.get('chain_count', 0)}")
+    console.print(f"  Steps:         {report.get('step_count', 0)}")
+    console.print(f"  Empty chains:  {report.get('empty_step_count', 0)}")
+
+    chain_type_counts = report.get("chain_type_counts", {})
+    if chain_type_counts:
+        console.print("\n  [bold]Type Counts:[/bold]")
+        for chain_type in sorted(chain_type_counts):
+            console.print(
+                f"    {_rich_escape(chain_type.upper())}: "
+                f"{chain_type_counts[chain_type]}"
+            )
+
+    chains_data = report.get("chains", [])
+    if chains_data:
+        console.print("\n  [bold]Chains:[/bold]")
+        for c in chains_data:
+            chain_type = _rich_escape(c.get("chain_type", "").upper())
+            work_id = _rich_escape(f"[{c.get('work_id', '')}]")
+            steps = c.get("steps", [])
+            step_label = f"{len(steps)} steps" if steps else "(empty)"
+            console.print(f"    {work_id} {chain_type} ({step_label})")
+            for s in steps:
+                order_index = s.get("order_index", 0)
+                capability_id = _rich_escape(s.get("capability_id", ""))
+                description = s.get("description", "")
+                desc_suffix = f" - {_rich_escape(description)}" if description else ""
+                console.print(
+                    f"      {order_index}. {capability_id}{desc_suffix}"
+                )
+
+
 if __name__ == "__main__":
     cli()
