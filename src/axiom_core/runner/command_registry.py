@@ -5907,6 +5907,80 @@ _register(
 )
 
 
+_register(
+    CommandSpec(
+        name="global-capability-create",
+        command=(
+            "axiom global-capability-create "
+            "[--registry-file <rf>] [--json-output]"
+        ),
+        description=(
+            "Create a global capability registry report (canonical identity)."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("global_capability_request.json", required=True),
+            EvidenceOutput("global_capability_result.json", required=True),
+            EvidenceOutput("global_capability_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Create and persist a global capability registry deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="global-capability-list",
+        command="axiom global-capability-list [--json-output]",
+        description="List global capability registry reports.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List all persisted global capability registry reports.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="global-capability-show",
+        command="axiom global-capability-show <report_id> [--json-output]",
+        description="Show a global capability registry report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a global capability registry report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="global-capability-export",
+        command=(
+            "axiom global-capability-export <report_id> "
+            "[--format markdown|json|csv]"
+        ),
+        description="Export a global capability registry report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a global capability registry report as markdown/json/csv.",
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
 # ---------------------------------------------------------------------------

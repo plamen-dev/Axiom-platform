@@ -17795,5 +17795,166 @@ def _render_capability_chain_report_rich(report: dict) -> None:
                 )
 
 
+# ---------------------------------------------------------------------------
+# Global Capability Registry Framework CLI
+# ---------------------------------------------------------------------------
+
+
+@cli.command("global-capability-create")
+@click.option(
+    "--registry-file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to a JSON file with global capability entries.",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def global_capability_create(
+    registry_file: str | None, json_output: bool
+) -> None:
+    """Create a global capability registry report from entries."""
+    from axiom_core.global_capability_registry import (
+        GlobalCapabilityRegistryEngine,
+    )
+
+    try:
+        entries_data: list = []
+        if registry_file:
+            with open(registry_file, encoding="utf-8") as f:
+                payload = json.loads(f.read())
+            entries_data = payload.get("entries", [])
+
+        engine = GlobalCapabilityRegistryEngine()
+        report = engine.create(entries=entries_data)
+
+        if json_output:
+            click.echo(json.dumps(report, indent=2, default=str))
+        else:
+            _render_global_capability_report_rich(report)
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+
+@cli.command("global-capability-list")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def global_capability_list(json_output: bool) -> None:
+    """List all persisted global capability registry reports."""
+    from axiom_core.global_capability_registry import (
+        GlobalCapabilityRegistryEngine,
+    )
+
+    engine = GlobalCapabilityRegistryEngine()
+    reports = engine.list_reports()
+
+    if json_output:
+        click.echo(json.dumps(reports, indent=2, default=str))
+        return
+
+    if not reports:
+        click.echo("No global capability registry reports found.")
+        return
+
+    console.print("\n[bold]Global Capability Registry Reports[/bold]\n")
+    for r in reports:
+        console.print(
+            f"  {r.get('report_id', '')}  "
+            f"({r.get('entry_count', 0)} entries, "
+            f"created {r.get('created_at', '')})"
+        )
+
+
+@cli.command("global-capability-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def global_capability_show(report_id: str, json_output: bool) -> None:
+    """Show a persisted global capability registry report."""
+    from axiom_core.global_capability_registry import (
+        GlobalCapabilityRegistryEngine,
+    )
+
+    try:
+        engine = GlobalCapabilityRegistryEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if report is None:
+        click.echo(f"Error: Report not found: {report_id}", err=True)
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_global_capability_report_rich(report)
+
+
+@cli.command("global-capability-export")
+@click.argument("report_id")
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["markdown", "json", "csv"]),
+    default="markdown",
+    help="Export format.",
+)
+def global_capability_export(report_id: str, fmt: str) -> None:
+    """Export a global capability registry report (markdown/json/csv)."""
+    from axiom_core.global_capability_registry import (
+        GlobalCapabilityRegistryEngine,
+    )
+
+    try:
+        engine = GlobalCapabilityRegistryEngine()
+        output = engine.export_report(report_id, fmt=fmt)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        if "not found" in str(exc).lower():
+            raise SystemExit(2) from exc
+        raise SystemExit(1) from exc
+
+    click.echo(output)
+
+
+def _render_global_capability_report_rich(report: dict) -> None:
+    """Rich text rendering for a global capability registry report."""
+    console.print("\n[bold]Global Capability Registry[/bold]\n")
+    console.print(f"  Report ID:       {report.get('report_id', '')}")
+    console.print(f"  Entries:         {report.get('entry_count', 0)}")
+    console.print(
+        f"  Schema Version:  {report.get('schema_version', '')}"
+    )
+
+    status_counts = report.get("status_counts", {})
+    if status_counts:
+        console.print("\n  [bold]Status Counts:[/bold]")
+        for status in sorted(status_counts):
+            console.print(
+                f"    {_rich_escape(status.upper())}: {status_counts[status]}"
+            )
+
+    program_counts = report.get("program_counts", {})
+    if program_counts:
+        console.print("\n  [bold]Program Counts:[/bold]")
+        for program in sorted(program_counts):
+            console.print(
+                f"    {_rich_escape(program)}: {program_counts[program]}"
+            )
+
+    entries = report.get("entries", [])
+    if entries:
+        console.print("\n  [bold]Timeline:[/bold]")
+        for e in entries:
+            number = e.get("global_capability_number", 0)
+            name = _rich_escape(e.get("capability_name", ""))
+            status = _rich_escape(e.get("status", "").upper())
+            repo = e.get("repository", {})
+            owner = repo.get("repository_owner", "")
+            repo_name = repo.get("repository_name", "")
+            pr_number = repo.get("repository_pr_number", 0)
+            ref = _rich_escape(f"{owner}/{repo_name} PR #{pr_number}")
+            console.print(f"    #{number} {name} [{status}] ({ref})")
+
+
 if __name__ == "__main__":
     cli()
