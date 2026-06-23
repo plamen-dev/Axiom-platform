@@ -5416,6 +5416,56 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="execution-outcome-create",
+        command="axiom execution-outcome-create [--outcomes-file <of>] [--json-output]",
+        description="Create an execution outcome report with outcome-type/status counts.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("execution_outcome_request.json", required=True),
+            EvidenceOutput("execution_outcome_result.json", required=True),
+            EvidenceOutput("execution_outcome_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Create and persist an execution outcome report deterministically.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-outcome-show",
+        command="axiom execution-outcome-show <report_id> [--json-output]",
+        description="Show an execution outcome report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show an execution outcome report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-outcome-export",
+        command="axiom execution-outcome-export <report_id> [--json-output]",
+        description="Export an execution outcome report as markdown.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export an execution outcome report as markdown.",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
