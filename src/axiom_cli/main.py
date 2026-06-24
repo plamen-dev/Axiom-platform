@@ -20551,6 +20551,180 @@ def _render_execution_step_report_rich(report: dict) -> None:
                 console.print(_rich_escape(f"      [{rtype}] {rvalue}"))
 
 
+@cli.command("execution-attempt-v2-create")
+@click.option(
+    "--attempt-file",
+    "attempt_file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to a JSON file with execution attempts.",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_attempt_v2_create(
+    attempt_file: str | None, json_output: bool
+) -> None:
+    """Create an execution attempt (v2) report."""
+    from axiom_core.execution_attempt_v2 import ExecutionAttemptEngine
+
+    try:
+        attempts_data: list = []
+        raw_metadata: dict = {}
+        if attempt_file:
+            with open(attempt_file, encoding="utf-8") as f:
+                payload = json.loads(f.read())
+            attempts_data = payload.get("attempts", [])
+            raw_metadata = payload.get("raw_metadata", {})
+
+        engine = ExecutionAttemptEngine()
+        report = engine.create(
+            attempts=attempts_data,
+            raw_metadata=raw_metadata,
+        )
+
+        if json_output:
+            click.echo(json.dumps(report, indent=2, default=str))
+        else:
+            _render_execution_attempt_v2_report_rich(report)
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+
+@cli.command("execution-attempts-v2")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_attempts_v2(json_output: bool) -> None:
+    """List all persisted execution attempt (v2) reports."""
+    from axiom_core.execution_attempt_v2 import ExecutionAttemptEngine
+
+    engine = ExecutionAttemptEngine()
+    reports = engine.list_reports()
+
+    if json_output:
+        click.echo(json.dumps(reports, indent=2, default=str))
+        return
+
+    if not reports:
+        click.echo("No execution attempt reports found.")
+        return
+
+    console.print("\n[bold]Execution Attempt Reports[/bold]\n")
+    for r in reports:
+        console.print(
+            f"  {r.get('report_id', '')}  "
+            f"({r.get('attempt_count', 0)} attempts, "
+            f"{r.get('failed_count', 0)} failed, "
+            f"{r.get('timeout_count', 0)} timed out, "
+            f"created {r.get('created_at', '')})"
+        )
+
+
+@cli.command("execution-attempt-v2-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_attempt_v2_show(report_id: str, json_output: bool) -> None:
+    """Show a persisted execution attempt (v2) report."""
+    from axiom_core.execution_attempt_v2 import ExecutionAttemptEngine
+
+    try:
+        engine = ExecutionAttemptEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if report is None:
+        click.echo(f"Error: Report not found: {report_id}", err=True)
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_execution_attempt_v2_report_rich(report)
+
+
+@cli.command("execution-attempt-v2-export")
+@click.argument("report_id")
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["markdown", "json", "csv"]),
+    default="markdown",
+    help="Export format.",
+)
+def execution_attempt_v2_export(report_id: str, fmt: str) -> None:
+    """Export an execution attempt (v2) report (markdown/json/csv)."""
+    from axiom_core.execution_attempt_v2 import ExecutionAttemptEngine
+
+    try:
+        engine = ExecutionAttemptEngine()
+        output = engine.export_report(report_id, fmt=fmt)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        if "not found" in str(exc).lower():
+            raise SystemExit(2) from exc
+        raise SystemExit(1) from exc
+
+    click.echo(output)
+
+
+def _render_execution_attempt_v2_report_rich(report: dict) -> None:
+    """Rich text rendering for an execution attempt (v2) report."""
+    console.print("\n[bold]Execution Attempt Report[/bold]\n")
+    console.print(f"  Report ID:          {report.get('report_id', '')}")
+    console.print(f"  Attempts:           {report.get('attempt_count', 0)}")
+    console.print(f"  Failed:             {report.get('failed_count', 0)}")
+    console.print(f"  Timed Out:          {report.get('timeout_count', 0)}")
+    console.print(f"  Succeeded:          {report.get('success_count', 0)}")
+    console.print(
+        f"  Total Duration (s): "
+        f"{report.get('total_duration_seconds', 0.0)}"
+    )
+    console.print(
+        f"  Duplicate Attempts: {report.get('duplicate_attempt_count', 0)}"
+    )
+    console.print(
+        f"  Schema Version:     {report.get('schema_version', '')}"
+    )
+
+    status_counts = report.get("status_counts", {})
+    if status_counts:
+        console.print("\n  [bold]Status Counts:[/bold]")
+        for status in sorted(status_counts):
+            console.print(
+                f"    {_rich_escape(status)}: {status_counts[status]}"
+            )
+
+    result_counts = report.get("result_counts", {})
+    if result_counts:
+        console.print("\n  [bold]Result Counts:[/bold]")
+        for result in sorted(result_counts):
+            console.print(
+                f"    {_rich_escape(result)}: {result_counts[result]}"
+            )
+
+    attempts = report.get("attempts", [])
+    if attempts:
+        console.print("\n  [bold]Attempts:[/bold]")
+        for a in attempts:
+            status = a.get("status", "")
+            result = a.get("result", "")
+            duration = a.get("duration_seconds", 0.0)
+            step_id = a.get("step_id", "")
+            plan_id = a.get("plan_id", "")
+            capability_id = a.get("capability_id", "")
+            console.print(
+                _rich_escape(
+                    f"    [{status}] [{result}] [{duration}s] "
+                    f"step={step_id} plan={plan_id} "
+                    f"capability={capability_id}"
+                )
+            )
+            for ref in a.get("references", []):
+                rtype = ref.get("reference_type", "")
+                rvalue = ref.get("reference_value", "")
+                console.print(_rich_escape(f"      [{rtype}] {rvalue}"))
+
+
 @cli.command("devin-session-import")
 @click.option(
     "--session-file",

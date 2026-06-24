@@ -7146,6 +7146,77 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="execution-attempt-v2-create",
+        command=(
+            "axiom execution-attempt-v2-create "
+            "[--attempt-file <af>] [--json-output]"
+        ),
+        description="Create an execution attempt (v2) report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("execution_attempt_request.json", required=True),
+            EvidenceOutput("execution_attempt_result.json", required=True),
+            EvidenceOutput("execution_attempt_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Deterministic attempts; status/result + duration + refs.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-attempts-v2",
+        command="axiom execution-attempts-v2 [--json-output]",
+        description="List execution attempt (v2) reports.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List persisted execution attempt reports.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-attempt-v2-show",
+        command="axiom execution-attempt-v2-show <report_id> [--json-output]",
+        description="Show an execution attempt (v2) report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a persisted execution attempt (v2) report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-attempt-v2-export",
+        command=(
+            "axiom execution-attempt-v2-export <report_id> "
+            "[--format markdown|json|csv]"
+        ),
+        description="Export an execution attempt (v2) report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export an execution attempt (v2) report (md/json/csv).",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
