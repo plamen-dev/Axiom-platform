@@ -19853,6 +19853,184 @@ def _render_execution_resource_report_rich(report: dict) -> None:
                 console.print(_rich_escape(f"      [{rqtype}] {rqvalue}"))
 
 
+@cli.command("execution-constraint-create")
+@click.option(
+    "--constraint-file",
+    "constraint_file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to a JSON file with execution constraints.",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_constraint_create(
+    constraint_file: str | None, json_output: bool
+) -> None:
+    """Create an execution constraint report."""
+    from axiom_core.execution_constraint import ExecutionConstraintEngine
+
+    try:
+        constraints_data: list = []
+        raw_metadata: dict = {}
+        if constraint_file:
+            with open(constraint_file, encoding="utf-8") as f:
+                payload = json.loads(f.read())
+            constraints_data = payload.get("constraints", [])
+            raw_metadata = payload.get("raw_metadata", {})
+
+        engine = ExecutionConstraintEngine()
+        report = engine.create(
+            constraints=constraints_data,
+            raw_metadata=raw_metadata,
+        )
+
+        if json_output:
+            click.echo(json.dumps(report, indent=2, default=str))
+        else:
+            _render_execution_constraint_report_rich(report)
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+
+@cli.command("execution-constraints")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_constraints(json_output: bool) -> None:
+    """List all persisted execution constraint reports."""
+    from axiom_core.execution_constraint import ExecutionConstraintEngine
+
+    engine = ExecutionConstraintEngine()
+    reports = engine.list_reports()
+
+    if json_output:
+        click.echo(json.dumps(reports, indent=2, default=str))
+        return
+
+    if not reports:
+        click.echo("No execution constraint reports found.")
+        return
+
+    console.print("\n[bold]Execution Constraint Reports[/bold]\n")
+    for r in reports:
+        console.print(
+            f"  {r.get('report_id', '')}  "
+            f"({r.get('constraint_count', 0)} constraints, "
+            f"{r.get('critical_count', 0)} critical, "
+            f"{r.get('error_count', 0)} error, "
+            f"created {r.get('created_at', '')})"
+        )
+
+
+@cli.command("execution-constraint-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_constraint_show(report_id: str, json_output: bool) -> None:
+    """Show a persisted execution constraint report."""
+    from axiom_core.execution_constraint import ExecutionConstraintEngine
+
+    try:
+        engine = ExecutionConstraintEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if report is None:
+        click.echo(f"Error: Report not found: {report_id}", err=True)
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_execution_constraint_report_rich(report)
+
+
+@cli.command("execution-constraint-export")
+@click.argument("report_id")
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["markdown", "json", "csv"]),
+    default="markdown",
+    help="Export format.",
+)
+def execution_constraint_export(report_id: str, fmt: str) -> None:
+    """Export an execution constraint report (markdown/json/csv)."""
+    from axiom_core.execution_constraint import ExecutionConstraintEngine
+
+    try:
+        engine = ExecutionConstraintEngine()
+        output = engine.export_report(report_id, fmt=fmt)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        if "not found" in str(exc).lower():
+            raise SystemExit(2) from exc
+        raise SystemExit(1) from exc
+
+    click.echo(output)
+
+
+def _render_execution_constraint_report_rich(report: dict) -> None:
+    """Rich text rendering for an execution constraint report."""
+    console.print("\n[bold]Execution Constraint Report[/bold]\n")
+    console.print(f"  Report ID:              {report.get('report_id', '')}")
+    console.print(
+        f"  Constraints:            {report.get('constraint_count', 0)}"
+    )
+    console.print(
+        f"  Critical:               {report.get('critical_count', 0)}"
+    )
+    console.print(
+        f"  Error:                  {report.get('error_count', 0)}"
+    )
+    console.print(
+        "  Duplicate Constraints:  "
+        f"{report.get('duplicate_constraint_count', 0)}"
+    )
+    console.print(
+        f"  Schema Version:         {report.get('schema_version', '')}"
+    )
+
+    severity_counts = report.get("severity_counts", {})
+    if severity_counts:
+        console.print("\n  [bold]Severity Counts:[/bold]")
+        for severity in sorted(severity_counts):
+            console.print(
+                f"    {_rich_escape(severity)}: {severity_counts[severity]}"
+            )
+
+    constraint_type_counts = report.get("constraint_type_counts", {})
+    if constraint_type_counts:
+        console.print("\n  [bold]Constraint Type Counts:[/bold]")
+        for ctype in sorted(constraint_type_counts):
+            console.print(
+                f"    {_rich_escape(ctype)}: "
+                f"{constraint_type_counts[ctype]}"
+            )
+
+    constraints = report.get("constraints", [])
+    if constraints:
+        console.print("\n  [bold]Constraints:[/bold]")
+        for c in constraints:
+            severity = c.get("severity", "")
+            ctype = c.get("constraint_type", "")
+            context_id = c.get("context_id", "")
+            environment_id = c.get("environment_id", "")
+            resource_id = c.get("resource_id", "")
+            capability_id = c.get("capability_id", "")
+            console.print(
+                _rich_escape(
+                    f"    [{severity}] [{ctype}] context={context_id} "
+                    f"environment={environment_id} "
+                    f"resource={resource_id} "
+                    f"capability={capability_id}"
+                )
+            )
+            for ref in c.get("references", []):
+                rtype = ref.get("reference_type", "")
+                rvalue = ref.get("reference_value", "")
+                console.print(_rich_escape(f"      [{rtype}] {rvalue}"))
+
+
 @cli.command("devin-session-import")
 @click.option(
     "--session-file",

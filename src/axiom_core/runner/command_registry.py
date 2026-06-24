@@ -6848,6 +6848,85 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="execution-constraint-create",
+        command=(
+            "axiom execution-constraint-create "
+            "[--constraint-file <cf>] [--json-output]"
+        ),
+        description="Create an execution constraint report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput(
+                "execution_constraint_request.json", required=True
+            ),
+            EvidenceOutput(
+                "execution_constraint_result.json", required=True
+            ),
+            EvidenceOutput(
+                "execution_constraint_summary.md", required=True
+            ),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Deterministic constraints; type/severity + critical/error.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-constraints",
+        command="axiom execution-constraints [--json-output]",
+        description="List execution constraint reports.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List persisted execution constraint reports.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-constraint-show",
+        command=(
+            "axiom execution-constraint-show <report_id> [--json-output]"
+        ),
+        description="Show an execution constraint report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a persisted execution constraint report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-constraint-export",
+        command=(
+            "axiom execution-constraint-export <report_id> "
+            "[--format markdown|json|csv]"
+        ),
+        description="Export an execution constraint report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export an execution constraint report (md/json/csv).",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object

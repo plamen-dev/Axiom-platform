@@ -139,6 +139,9 @@ artifacts/execution_environment/
 # Execution Resource Framework bundles (generated run outputs; keep curated evidence)
 artifacts/execution_resource/
 
+# Execution Constraint Framework bundles (generated run outputs; keep curated evidence)
+artifacts/execution_constraint/
+
 # Visual Studio local state
 .vs/
 
