@@ -19500,6 +19500,180 @@ def _render_execution_context_report_rich(report: dict) -> None:
                 console.print(_rich_escape(f"      [{rtype}] {rvalue}"))
 
 
+@cli.command("execution-environment-create")
+@click.option(
+    "--environment-file",
+    "environment_file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to a JSON file with execution environments.",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_environment_create(
+    environment_file: str | None, json_output: bool
+) -> None:
+    """Create an execution environment report."""
+    from axiom_core.execution_environment import ExecutionEnvironmentEngine
+
+    try:
+        environments_data: list = []
+        raw_metadata: dict = {}
+        if environment_file:
+            with open(environment_file, encoding="utf-8") as f:
+                payload = json.loads(f.read())
+            environments_data = payload.get("environments", [])
+            raw_metadata = payload.get("raw_metadata", {})
+
+        engine = ExecutionEnvironmentEngine()
+        report = engine.create(
+            environments=environments_data,
+            raw_metadata=raw_metadata,
+        )
+
+        if json_output:
+            click.echo(json.dumps(report, indent=2, default=str))
+        else:
+            _render_execution_environment_report_rich(report)
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+
+@cli.command("execution-environments")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_environments(json_output: bool) -> None:
+    """List all persisted execution environment reports."""
+    from axiom_core.execution_environment import ExecutionEnvironmentEngine
+
+    engine = ExecutionEnvironmentEngine()
+    reports = engine.list_reports()
+
+    if json_output:
+        click.echo(json.dumps(reports, indent=2, default=str))
+        return
+
+    if not reports:
+        click.echo("No execution environment reports found.")
+        return
+
+    console.print("\n[bold]Execution Environment Reports[/bold]\n")
+    for r in reports:
+        console.print(
+            f"  {r.get('report_id', '')}  "
+            f"({r.get('environment_count', 0)} environments, "
+            f"{r.get('unavailable_count', 0)} unavailable, "
+            f"{r.get('degraded_count', 0)} degraded, "
+            f"created {r.get('created_at', '')})"
+        )
+
+
+@cli.command("execution-environment-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_environment_show(report_id: str, json_output: bool) -> None:
+    """Show a persisted execution environment report."""
+    from axiom_core.execution_environment import ExecutionEnvironmentEngine
+
+    try:
+        engine = ExecutionEnvironmentEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if report is None:
+        click.echo(f"Error: Report not found: {report_id}", err=True)
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_execution_environment_report_rich(report)
+
+
+@cli.command("execution-environment-export")
+@click.argument("report_id")
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["markdown", "json", "csv"]),
+    default="markdown",
+    help="Export format.",
+)
+def execution_environment_export(report_id: str, fmt: str) -> None:
+    """Export an execution environment report (markdown/json/csv)."""
+    from axiom_core.execution_environment import ExecutionEnvironmentEngine
+
+    try:
+        engine = ExecutionEnvironmentEngine()
+        output = engine.export_report(report_id, fmt=fmt)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        if "not found" in str(exc).lower():
+            raise SystemExit(2) from exc
+        raise SystemExit(1) from exc
+
+    click.echo(output)
+
+
+def _render_execution_environment_report_rich(report: dict) -> None:
+    """Rich text rendering for an execution environment report."""
+    console.print("\n[bold]Execution Environment Report[/bold]\n")
+    console.print(f"  Report ID:              {report.get('report_id', '')}")
+    console.print(
+        f"  Environments:           {report.get('environment_count', 0)}"
+    )
+    console.print(
+        f"  Unavailable:            {report.get('unavailable_count', 0)}"
+    )
+    console.print(
+        f"  Degraded:               {report.get('degraded_count', 0)}"
+    )
+    console.print(
+        "  Duplicate Environments: "
+        f"{report.get('duplicate_environment_count', 0)}"
+    )
+    console.print(
+        f"  Schema Version:         {report.get('schema_version', '')}"
+    )
+
+    status_counts = report.get("status_counts", {})
+    if status_counts:
+        console.print("\n  [bold]Status Counts:[/bold]")
+        for status in sorted(status_counts):
+            console.print(
+                f"    {_rich_escape(status)}: {status_counts[status]}"
+            )
+
+    environment_type_counts = report.get("environment_type_counts", {})
+    if environment_type_counts:
+        console.print("\n  [bold]Environment Type Counts:[/bold]")
+        for etype in sorted(environment_type_counts):
+            console.print(
+                f"    {_rich_escape(etype)}: "
+                f"{environment_type_counts[etype]}"
+            )
+
+    environments = report.get("environments", [])
+    if environments:
+        console.print("\n  [bold]Environments:[/bold]")
+        for e in environments:
+            status = e.get("status", "")
+            etype = e.get("environment_type", "")
+            context_id = e.get("context_id", "")
+            capability_id = e.get("capability_id", "")
+            console.print(
+                _rich_escape(
+                    f"    [{status}] [{etype}] context={context_id} "
+                    f"capability={capability_id}"
+                )
+            )
+            for r in e.get("references", []):
+                rtype = r.get("reference_type", "")
+                rvalue = r.get("reference_value", "")
+                console.print(_rich_escape(f"      [{rtype}] {rvalue}"))
+
+
 @cli.command("devin-session-import")
 @click.option(
     "--session-file",
