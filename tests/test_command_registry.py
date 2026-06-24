@@ -205,6 +205,8 @@ EXPECTED_AXIOM_COMMANDS = {
     "execution-plan-show", "execution-plan-export",
     "execution-step-create", "execution-steps",
     "execution-step-show", "execution-step-export",
+    "execution-attempt-v2-create", "execution-attempts-v2",
+    "execution-attempt-v2-show", "execution-attempt-v2-export",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 
