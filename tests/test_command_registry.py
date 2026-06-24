@@ -199,6 +199,8 @@ EXPECTED_AXIOM_COMMANDS = {
     "execution-resource-show", "execution-resource-export",
     "execution-constraint-create", "execution-constraints",
     "execution-constraint-show", "execution-constraint-export",
+    "execution-readiness-create", "execution-readinesses",
+    "execution-readiness-show", "execution-readiness-export",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 
