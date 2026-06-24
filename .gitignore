@@ -127,6 +127,9 @@ artifacts/capability_file_knowledge/
 # Capability Validation Knowledge Framework bundles (generated run outputs; keep curated evidence)
 artifacts/capability_validation_knowledge/
 
+# Capability Knowledge Graph Framework bundles (generated run outputs; keep curated evidence)
+artifacts/capability_knowledge_graph/
+
 # Visual Studio local state
 .vs/
 

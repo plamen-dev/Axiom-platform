@@ -242,6 +242,7 @@ _FILE_TO_TEST: dict[str, str] = {
     "src/axiom_core/capability_impact.py": "tests/test_capability_impact.py",
     "src/axiom_core/capability_file_knowledge.py": "tests/test_capability_file_knowledge.py",
     "src/axiom_core/capability_validation_knowledge.py": "tests/test_capability_validation_knowledge.py",
+    "src/axiom_core/capability_knowledge_graph.py": "tests/test_capability_knowledge_graph.py",
     "src/axiom_cli/main.py": "tests/test_command_registry.py",
 }
 

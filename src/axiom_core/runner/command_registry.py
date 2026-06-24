@@ -6548,6 +6548,77 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="capability-graph-create",
+        command=(
+            "axiom capability-graph-create "
+            "[--graph-file <gf>] [--json-output]"
+        ),
+        description="Create a capability knowledge graph report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("capability_graph_request.json", required=True),
+            EvidenceOutput("capability_graph_result.json", required=True),
+            EvidenceOutput("capability_graph_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Deterministic graph; dedup nodes/edges + orphan detection.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-graphs",
+        command="axiom capability-graphs [--json-output]",
+        description="List capability knowledge graph reports.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List persisted capability knowledge graph reports.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-graph-show",
+        command="axiom capability-graph-show <report_id> [--json-output]",
+        description="Show a capability knowledge graph report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a persisted capability knowledge graph report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-graph-export",
+        command=(
+            "axiom capability-graph-export <report_id> "
+            "[--format markdown|json|csv]"
+        ),
+        description="Export a capability knowledge graph report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export a capability knowledge graph report (md/json/csv).",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
