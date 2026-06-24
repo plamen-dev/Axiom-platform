@@ -20031,6 +20031,191 @@ def _render_execution_constraint_report_rich(report: dict) -> None:
                 console.print(_rich_escape(f"      [{rtype}] {rvalue}"))
 
 
+@cli.command("execution-readiness-create")
+@click.option(
+    "--readiness-file",
+    "readiness_file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to a JSON file with execution readiness records.",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_readiness_create(
+    readiness_file: str | None, json_output: bool
+) -> None:
+    """Create an execution readiness report."""
+    from axiom_core.execution_readiness import ExecutionReadinessEngine
+
+    try:
+        readinesses_data: list = []
+        raw_metadata: dict = {}
+        if readiness_file:
+            with open(readiness_file, encoding="utf-8") as f:
+                payload = json.loads(f.read())
+            readinesses_data = payload.get("readinesses", [])
+            raw_metadata = payload.get("raw_metadata", {})
+
+        engine = ExecutionReadinessEngine()
+        report = engine.create(
+            readinesses=readinesses_data,
+            raw_metadata=raw_metadata,
+        )
+
+        if json_output:
+            click.echo(json.dumps(report, indent=2, default=str))
+        else:
+            _render_execution_readiness_report_rich(report)
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+
+@cli.command("execution-readinesses")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_readinesses(json_output: bool) -> None:
+    """List all persisted execution readiness reports."""
+    from axiom_core.execution_readiness import ExecutionReadinessEngine
+
+    engine = ExecutionReadinessEngine()
+    reports = engine.list_reports()
+
+    if json_output:
+        click.echo(json.dumps(reports, indent=2, default=str))
+        return
+
+    if not reports:
+        click.echo("No execution readiness reports found.")
+        return
+
+    console.print("\n[bold]Execution Readiness Reports[/bold]\n")
+    for r in reports:
+        console.print(
+            f"  {r.get('report_id', '')}  "
+            f"({r.get('readiness_count', 0)} readinesses, "
+            f"{r.get('not_ready_count', 0)} not-ready, "
+            f"{r.get('degraded_count', 0)} degraded, "
+            f"created {r.get('created_at', '')})"
+        )
+
+
+@cli.command("execution-readiness-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_readiness_show(report_id: str, json_output: bool) -> None:
+    """Show a persisted execution readiness report."""
+    from axiom_core.execution_readiness import ExecutionReadinessEngine
+
+    try:
+        engine = ExecutionReadinessEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if report is None:
+        click.echo(f"Error: Report not found: {report_id}", err=True)
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_execution_readiness_report_rich(report)
+
+
+@cli.command("execution-readiness-export")
+@click.argument("report_id")
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["markdown", "json", "csv"]),
+    default="markdown",
+    help="Export format.",
+)
+def execution_readiness_export(report_id: str, fmt: str) -> None:
+    """Export an execution readiness report (markdown/json/csv)."""
+    from axiom_core.execution_readiness import ExecutionReadinessEngine
+
+    try:
+        engine = ExecutionReadinessEngine()
+        output = engine.export_report(report_id, fmt=fmt)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        if "not found" in str(exc).lower():
+            raise SystemExit(2) from exc
+        raise SystemExit(1) from exc
+
+    click.echo(output)
+
+
+def _render_execution_readiness_report_rich(report: dict) -> None:
+    """Rich text rendering for an execution readiness report."""
+    console.print("\n[bold]Execution Readiness Report[/bold]\n")
+    console.print(f"  Report ID:              {report.get('report_id', '')}")
+    console.print(
+        f"  Readinesses:            {report.get('readiness_count', 0)}"
+    )
+    console.print(
+        f"  Ready:                  {report.get('ready_count', 0)}"
+    )
+    console.print(
+        f"  Degraded:               {report.get('degraded_count', 0)}"
+    )
+    console.print(
+        f"  Not Ready:              {report.get('not_ready_count', 0)}"
+    )
+    console.print(
+        f"  Checks:                 {report.get('check_count', 0)}"
+    )
+    console.print(
+        "  Duplicate Readinesses:  "
+        f"{report.get('duplicate_readiness_count', 0)}"
+    )
+    console.print(
+        f"  Schema Version:         {report.get('schema_version', '')}"
+    )
+
+    status_counts = report.get("readiness_status_counts", {})
+    if status_counts:
+        console.print("\n  [bold]Readiness Status Counts:[/bold]")
+        for status in sorted(status_counts):
+            console.print(
+                f"    {_rich_escape(status)}: {status_counts[status]}"
+            )
+
+    check_type_counts = report.get("check_type_counts", {})
+    if check_type_counts:
+        console.print("\n  [bold]Check Type Counts:[/bold]")
+        for ctype in sorted(check_type_counts):
+            console.print(
+                f"    {_rich_escape(ctype)}: "
+                f"{check_type_counts[ctype]}"
+            )
+
+    readinesses = report.get("readinesses", [])
+    if readinesses:
+        console.print("\n  [bold]Readinesses:[/bold]")
+        for r in readinesses:
+            status = r.get("readiness_status", "")
+            context_id = r.get("context_id", "")
+            environment_id = r.get("environment_id", "")
+            resource_id = r.get("resource_id", "")
+            constraint_id = r.get("constraint_id", "")
+            capability_id = r.get("capability_id", "")
+            console.print(
+                _rich_escape(
+                    f"    [{status}] context={context_id} "
+                    f"environment={environment_id} "
+                    f"resource={resource_id} "
+                    f"constraint={constraint_id} "
+                    f"capability={capability_id}"
+                )
+            )
+            for check in r.get("checks", []):
+                ctype = check.get("check_type", "")
+                cstatus = check.get("status", "")
+                console.print(_rich_escape(f"      [{ctype}] {cstatus}"))
+
+
 @cli.command("devin-session-import")
 @click.option(
     "--session-file",

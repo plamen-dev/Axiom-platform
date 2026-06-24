@@ -6927,6 +6927,85 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="execution-readiness-create",
+        command=(
+            "axiom execution-readiness-create "
+            "[--readiness-file <rf>] [--json-output]"
+        ),
+        description="Create an execution readiness report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput(
+                "execution_readiness_request.json", required=True
+            ),
+            EvidenceOutput(
+                "execution_readiness_result.json", required=True
+            ),
+            EvidenceOutput(
+                "execution_readiness_summary.md", required=True
+            ),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Deterministic readiness; status/check + degraded/not-ready.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-readinesses",
+        command="axiom execution-readinesses [--json-output]",
+        description="List execution readiness reports.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List persisted execution readiness reports.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-readiness-show",
+        command=(
+            "axiom execution-readiness-show <report_id> [--json-output]"
+        ),
+        description="Show an execution readiness report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a persisted execution readiness report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-readiness-export",
+        command=(
+            "axiom execution-readiness-export <report_id> "
+            "[--format markdown|json|csv]"
+        ),
+        description="Export an execution readiness report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export an execution readiness report (md/json/csv).",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
