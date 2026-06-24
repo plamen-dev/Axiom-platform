@@ -19335,6 +19335,171 @@ def _render_capability_graph_report_rich(report: dict) -> None:
             )
 
 
+@cli.command("execution-context-create")
+@click.option(
+    "--context-file",
+    "context_file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to a JSON file with execution contexts.",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_context_create(
+    context_file: str | None, json_output: bool
+) -> None:
+    """Create an execution context report."""
+    from axiom_core.execution_context import ExecutionContextEngine
+
+    try:
+        contexts_data: list = []
+        raw_metadata: dict = {}
+        if context_file:
+            with open(context_file, encoding="utf-8") as f:
+                payload = json.loads(f.read())
+            contexts_data = payload.get("contexts", [])
+            raw_metadata = payload.get("raw_metadata", {})
+
+        engine = ExecutionContextEngine()
+        report = engine.create(
+            contexts=contexts_data,
+            raw_metadata=raw_metadata,
+        )
+
+        if json_output:
+            click.echo(json.dumps(report, indent=2, default=str))
+        else:
+            _render_execution_context_report_rich(report)
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+
+@cli.command("execution-contexts")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_contexts(json_output: bool) -> None:
+    """List all persisted execution context reports."""
+    from axiom_core.execution_context import ExecutionContextEngine
+
+    engine = ExecutionContextEngine()
+    reports = engine.list_reports()
+
+    if json_output:
+        click.echo(json.dumps(reports, indent=2, default=str))
+        return
+
+    if not reports:
+        click.echo("No execution context reports found.")
+        return
+
+    console.print("\n[bold]Execution Context Reports[/bold]\n")
+    for r in reports:
+        console.print(
+            f"  {r.get('report_id', '')}  "
+            f"({r.get('context_count', 0)} contexts, "
+            f"{r.get('blocked_count', 0)} blocked, "
+            f"{r.get('failed_count', 0)} failed, "
+            f"created {r.get('created_at', '')})"
+        )
+
+
+@cli.command("execution-context-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_context_show(report_id: str, json_output: bool) -> None:
+    """Show a persisted execution context report."""
+    from axiom_core.execution_context import ExecutionContextEngine
+
+    try:
+        engine = ExecutionContextEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if report is None:
+        click.echo(f"Error: Report not found: {report_id}", err=True)
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_execution_context_report_rich(report)
+
+
+@cli.command("execution-context-export")
+@click.argument("report_id")
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["markdown", "json", "csv"]),
+    default="markdown",
+    help="Export format.",
+)
+def execution_context_export(report_id: str, fmt: str) -> None:
+    """Export an execution context report (markdown/json/csv)."""
+    from axiom_core.execution_context import ExecutionContextEngine
+
+    try:
+        engine = ExecutionContextEngine()
+        output = engine.export_report(report_id, fmt=fmt)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        if "not found" in str(exc).lower():
+            raise SystemExit(2) from exc
+        raise SystemExit(1) from exc
+
+    click.echo(output)
+
+
+def _render_execution_context_report_rich(report: dict) -> None:
+    """Rich text rendering for an execution context report."""
+    console.print("\n[bold]Execution Context Report[/bold]\n")
+    console.print(f"  Report ID:          {report.get('report_id', '')}")
+    console.print(f"  Contexts:           {report.get('context_count', 0)}")
+    console.print(f"  Blocked:            {report.get('blocked_count', 0)}")
+    console.print(f"  Failed:             {report.get('failed_count', 0)}")
+    console.print(
+        f"  Duplicate Contexts: {report.get('duplicate_context_count', 0)}"
+    )
+    console.print(f"  Schema Version:     {report.get('schema_version', '')}")
+
+    state_counts = report.get("state_counts", {})
+    if state_counts:
+        console.print("\n  [bold]State Counts:[/bold]")
+        for state in sorted(state_counts):
+            console.print(
+                f"    {_rich_escape(state)}: {state_counts[state]}"
+            )
+
+    context_type_counts = report.get("context_type_counts", {})
+    if context_type_counts:
+        console.print("\n  [bold]Context Type Counts:[/bold]")
+        for ctype in sorted(context_type_counts):
+            console.print(
+                f"    {_rich_escape(ctype)}: {context_type_counts[ctype]}"
+            )
+
+    contexts = report.get("contexts", [])
+    if contexts:
+        console.print("\n  [bold]Contexts:[/bold]")
+        for c in contexts:
+            state = c.get("state", "")
+            ctype = c.get("context_type", "")
+            work_id = c.get("work_id", "")
+            capability_id = c.get("capability_id", "")
+            chain_id = c.get("chain_id", "")
+            console.print(
+                _rich_escape(
+                    f"    [{state}] [{ctype}] work={work_id} "
+                    f"capability={capability_id} chain={chain_id}"
+                )
+            )
+            for r in c.get("references", []):
+                rtype = r.get("reference_type", "")
+                rvalue = r.get("reference_value", "")
+                console.print(_rich_escape(f"      [{rtype}] {rvalue}"))
+
+
 @cli.command("devin-session-import")
 @click.option(
     "--session-file",
