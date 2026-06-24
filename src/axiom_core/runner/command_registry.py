@@ -7217,6 +7217,77 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="execution-result-create",
+        command=(
+            "axiom execution-result-create "
+            "[--result-file <rf>] [--json-output]"
+        ),
+        description="Create an execution result report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("execution_result_request.json", required=True),
+            EvidenceOutput("execution_result_result.json", required=True),
+            EvidenceOutput("execution_result_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Deterministic results; status/type aggregation + refs.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-results",
+        command="axiom execution-results [--json-output]",
+        description="List execution result reports.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List persisted execution result reports.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-result-show",
+        command="axiom execution-result-show <report_id> [--json-output]",
+        description="Show an execution result report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a persisted execution result report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-result-export",
+        command=(
+            "axiom execution-result-export <report_id> "
+            "[--format markdown|json|csv]"
+        ),
+        description="Export an execution result report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export an execution result report (md/json/csv).",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object

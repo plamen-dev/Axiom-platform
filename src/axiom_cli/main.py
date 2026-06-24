@@ -20725,6 +20725,176 @@ def _render_execution_attempt_v2_report_rich(report: dict) -> None:
                 console.print(_rich_escape(f"      [{rtype}] {rvalue}"))
 
 
+@cli.command("execution-result-create")
+@click.option(
+    "--result-file",
+    "result_file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to a JSON file with execution results.",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_result_create(
+    result_file: str | None, json_output: bool
+) -> None:
+    """Create an execution result report."""
+    from axiom_core.execution_result import ExecutionResultEngine
+
+    try:
+        results_data: list = []
+        raw_metadata: dict = {}
+        if result_file:
+            with open(result_file, encoding="utf-8") as f:
+                payload = json.loads(f.read())
+            results_data = payload.get("results", [])
+            raw_metadata = payload.get("raw_metadata", {})
+
+        engine = ExecutionResultEngine()
+        report = engine.create(
+            results=results_data,
+            raw_metadata=raw_metadata,
+        )
+
+        if json_output:
+            click.echo(json.dumps(report, indent=2, default=str))
+        else:
+            _render_execution_result_report_rich(report)
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+
+@cli.command("execution-results")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_results(json_output: bool) -> None:
+    """List all persisted execution result reports."""
+    from axiom_core.execution_result import ExecutionResultEngine
+
+    engine = ExecutionResultEngine()
+    reports = engine.list_reports()
+
+    if json_output:
+        click.echo(json.dumps(reports, indent=2, default=str))
+        return
+
+    if not reports:
+        click.echo("No execution result reports found.")
+        return
+
+    console.print("\n[bold]Execution Result Reports[/bold]\n")
+    for r in reports:
+        console.print(
+            f"  {r.get('report_id', '')}  "
+            f"({r.get('result_count', 0)} results, "
+            f"{r.get('failed_count', 0)} failed, "
+            f"{r.get('empty_count', 0)} empty, "
+            f"created {r.get('created_at', '')})"
+        )
+
+
+@cli.command("execution-result-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_result_show(report_id: str, json_output: bool) -> None:
+    """Show a persisted execution result report."""
+    from axiom_core.execution_result import ExecutionResultEngine
+
+    try:
+        engine = ExecutionResultEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if report is None:
+        click.echo(f"Error: Report not found: {report_id}", err=True)
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_execution_result_report_rich(report)
+
+
+@cli.command("execution-result-export")
+@click.argument("report_id")
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["markdown", "json", "csv"]),
+    default="markdown",
+    help="Export format.",
+)
+def execution_result_export(report_id: str, fmt: str) -> None:
+    """Export an execution result report (markdown/json/csv)."""
+    from axiom_core.execution_result import ExecutionResultEngine
+
+    try:
+        engine = ExecutionResultEngine()
+        output = engine.export_report(report_id, fmt=fmt)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        if "not found" in str(exc).lower():
+            raise SystemExit(2) from exc
+        raise SystemExit(1) from exc
+
+    click.echo(output)
+
+
+def _render_execution_result_report_rich(report: dict) -> None:
+    """Rich text rendering for an execution result report."""
+    console.print("\n[bold]Execution Result Report[/bold]\n")
+    console.print(f"  Report ID:        {report.get('report_id', '')}")
+    console.print(f"  Results:          {report.get('result_count', 0)}")
+    console.print(f"  Failed:           {report.get('failed_count', 0)}")
+    console.print(f"  Empty:            {report.get('empty_count', 0)}")
+    console.print(f"  Produced:         {report.get('produced_count', 0)}")
+    console.print(
+        f"  Duplicate Results: {report.get('duplicate_result_count', 0)}"
+    )
+    console.print(
+        f"  Schema Version:   {report.get('schema_version', '')}"
+    )
+
+    status_counts = report.get("status_counts", {})
+    if status_counts:
+        console.print("\n  [bold]Status Counts:[/bold]")
+        for status in sorted(status_counts):
+            console.print(
+                f"    {_rich_escape(status)}: {status_counts[status]}"
+            )
+
+    result_type_counts = report.get("result_type_counts", {})
+    if result_type_counts:
+        console.print("\n  [bold]Result Type Counts:[/bold]")
+        for result_type in sorted(result_type_counts):
+            console.print(
+                f"    {_rich_escape(result_type)}: "
+                f"{result_type_counts[result_type]}"
+            )
+
+    results = report.get("results", [])
+    if results:
+        console.print("\n  [bold]Results:[/bold]")
+        for r in results:
+            status = r.get("status", "")
+            result_type = r.get("result_type", "")
+            attempt_id = r.get("attempt_id", "")
+            step_id = r.get("step_id", "")
+            capability_id = r.get("capability_id", "")
+            console.print(
+                _rich_escape(
+                    f"    [{status}] [{result_type}] "
+                    f"attempt={attempt_id} step={step_id} "
+                    f"capability={capability_id}"
+                )
+            )
+            for ref in r.get("references", []):
+                rtype = ref.get("reference_type", "")
+                rvalue = ref.get("reference_value", "")
+                console.print(_rich_escape(f"      [{rtype}] {rvalue}"))
+
+
 @cli.command("devin-session-import")
 @click.option(
     "--session-file",
