@@ -245,6 +245,7 @@ _FILE_TO_TEST: dict[str, str] = {
     "src/axiom_core/capability_knowledge_graph.py": "tests/test_capability_knowledge_graph.py",
     "src/axiom_core/execution_context.py": "tests/test_execution_context.py",
     "src/axiom_core/execution_environment.py": "tests/test_execution_environment.py",
+    "src/axiom_core/execution_resource.py": "tests/test_execution_resource.py",
     "src/axiom_cli/main.py": "tests/test_command_registry.py",
 }
 

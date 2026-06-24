@@ -6769,6 +6769,85 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="execution-resource-create",
+        command=(
+            "axiom execution-resource-create "
+            "[--resource-file <rf>] [--json-output]"
+        ),
+        description="Create an execution resource report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput(
+                "execution_resource_request.json", required=True
+            ),
+            EvidenceOutput(
+                "execution_resource_result.json", required=True
+            ),
+            EvidenceOutput(
+                "execution_resource_summary.md", required=True
+            ),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Deterministic resources; type/status + unavail/degraded.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-resources",
+        command="axiom execution-resources [--json-output]",
+        description="List execution resource reports.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List persisted execution resource reports.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-resource-show",
+        command=(
+            "axiom execution-resource-show <report_id> [--json-output]"
+        ),
+        description="Show an execution resource report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a persisted execution resource report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-resource-export",
+        command=(
+            "axiom execution-resource-export <report_id> "
+            "[--format markdown|json|csv]"
+        ),
+        description="Export an execution resource report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export an execution resource report (md/json/csv).",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
