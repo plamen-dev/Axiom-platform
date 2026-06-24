@@ -195,6 +195,8 @@ EXPECTED_AXIOM_COMMANDS = {
     "execution-context-show", "execution-context-export",
     "execution-environment-create", "execution-environments",
     "execution-environment-show", "execution-environment-export",
+    "execution-resource-create", "execution-resources",
+    "execution-resource-show", "execution-resource-export",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 
