@@ -248,6 +248,7 @@ _FILE_TO_TEST: dict[str, str] = {
     "src/axiom_core/execution_resource.py": "tests/test_execution_resource.py",
     "src/axiom_core/execution_constraint.py": "tests/test_execution_constraint.py",
     "src/axiom_core/execution_readiness.py": "tests/test_execution_readiness.py",
+    "src/axiom_core/execution_plan.py": "tests/test_execution_plan.py",
     "src/axiom_cli/main.py": "tests/test_command_registry.py",
 }
 
