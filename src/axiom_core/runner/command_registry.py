@@ -7006,6 +7006,76 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="execution-plan-create",
+        command=(
+            "axiom execution-plan-create [--plan-file <pf>] [--json-output]"
+        ),
+        description="Create an execution plan report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("execution_plan_request.json", required=True),
+            EvidenceOutput("execution_plan_result.json", required=True),
+            EvidenceOutput("execution_plan_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Deterministic plans; status/type + blocked/failed + steps.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-plans",
+        command="axiom execution-plans [--json-output]",
+        description="List execution plan reports.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List persisted execution plan reports.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-plan-show",
+        command="axiom execution-plan-show <report_id> [--json-output]",
+        description="Show an execution plan report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a persisted execution plan report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-plan-export",
+        command=(
+            "axiom execution-plan-export <report_id> "
+            "[--format markdown|json|csv]"
+        ),
+        description="Export an execution plan report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export an execution plan report (md/json/csv).",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object

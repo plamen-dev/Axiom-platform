@@ -20216,6 +20216,175 @@ def _render_execution_readiness_report_rich(report: dict) -> None:
                 console.print(_rich_escape(f"      [{ctype}] {cstatus}"))
 
 
+@cli.command("execution-plan-create")
+@click.option(
+    "--plan-file",
+    "plan_file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to a JSON file with execution plan records.",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_plan_create(plan_file: str | None, json_output: bool) -> None:
+    """Create an execution plan report."""
+    from axiom_core.execution_plan import ExecutionPlanEngine
+
+    try:
+        plans_data: list = []
+        raw_metadata: dict = {}
+        if plan_file:
+            with open(plan_file, encoding="utf-8") as f:
+                payload = json.loads(f.read())
+            plans_data = payload.get("plans", [])
+            raw_metadata = payload.get("raw_metadata", {})
+
+        engine = ExecutionPlanEngine()
+        report = engine.create(
+            plans=plans_data,
+            raw_metadata=raw_metadata,
+        )
+
+        if json_output:
+            click.echo(json.dumps(report, indent=2, default=str))
+        else:
+            _render_execution_plan_report_rich(report)
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+
+@cli.command("execution-plans")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_plans(json_output: bool) -> None:
+    """List all persisted execution plan reports."""
+    from axiom_core.execution_plan import ExecutionPlanEngine
+
+    engine = ExecutionPlanEngine()
+    reports = engine.list_reports()
+
+    if json_output:
+        click.echo(json.dumps(reports, indent=2, default=str))
+        return
+
+    if not reports:
+        click.echo("No execution plan reports found.")
+        return
+
+    console.print("\n[bold]Execution Plan Reports[/bold]\n")
+    for r in reports:
+        console.print(
+            f"  {r.get('report_id', '')}  "
+            f"({r.get('plan_count', 0)} plans, "
+            f"{r.get('blocked_count', 0)} blocked, "
+            f"{r.get('failed_count', 0)} failed, "
+            f"created {r.get('created_at', '')})"
+        )
+
+
+@cli.command("execution-plan-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_plan_show(report_id: str, json_output: bool) -> None:
+    """Show a persisted execution plan report."""
+    from axiom_core.execution_plan import ExecutionPlanEngine
+
+    try:
+        engine = ExecutionPlanEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if report is None:
+        click.echo(f"Error: Report not found: {report_id}", err=True)
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_execution_plan_report_rich(report)
+
+
+@cli.command("execution-plan-export")
+@click.argument("report_id")
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["markdown", "json", "csv"]),
+    default="markdown",
+    help="Export format.",
+)
+def execution_plan_export(report_id: str, fmt: str) -> None:
+    """Export an execution plan report (markdown/json/csv)."""
+    from axiom_core.execution_plan import ExecutionPlanEngine
+
+    try:
+        engine = ExecutionPlanEngine()
+        output = engine.export_report(report_id, fmt=fmt)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        if "not found" in str(exc).lower():
+            raise SystemExit(2) from exc
+        raise SystemExit(1) from exc
+
+    click.echo(output)
+
+
+def _render_execution_plan_report_rich(report: dict) -> None:
+    """Rich text rendering for an execution plan report."""
+    console.print("\n[bold]Execution Plan Report[/bold]\n")
+    console.print(f"  Report ID:        {report.get('report_id', '')}")
+    console.print(f"  Plans:            {report.get('plan_count', 0)}")
+    console.print(f"  Blocked:          {report.get('blocked_count', 0)}")
+    console.print(f"  Failed:           {report.get('failed_count', 0)}")
+    console.print(f"  Steps:            {report.get('step_count', 0)}")
+    console.print(
+        f"  Duplicate Plans:  {report.get('duplicate_plan_count', 0)}"
+    )
+    console.print(
+        f"  Schema Version:   {report.get('schema_version', '')}"
+    )
+
+    status_counts = report.get("status_counts", {})
+    if status_counts:
+        console.print("\n  [bold]Status Counts:[/bold]")
+        for status in sorted(status_counts):
+            console.print(
+                f"    {_rich_escape(status)}: {status_counts[status]}"
+            )
+
+    plan_type_counts = report.get("plan_type_counts", {})
+    if plan_type_counts:
+        console.print("\n  [bold]Plan Type Counts:[/bold]")
+        for ptype in sorted(plan_type_counts):
+            console.print(
+                f"    {_rich_escape(ptype)}: {plan_type_counts[ptype]}"
+            )
+
+    plans = report.get("plans", [])
+    if plans:
+        console.print("\n  [bold]Plans:[/bold]")
+        for p in plans:
+            status = p.get("status", "")
+            plan_type = p.get("plan_type", "")
+            capability_id = p.get("capability_id", "")
+            readiness_id = p.get("readiness_id", "")
+            chain_id = p.get("chain_id", "")
+            console.print(
+                _rich_escape(
+                    f"    [{status}] [{plan_type}] "
+                    f"capability={capability_id} "
+                    f"readiness={readiness_id} chain={chain_id}"
+                )
+            )
+            for step in p.get("steps", []):
+                order_index = step.get("order_index", 0)
+                step_name = step.get("step_name", "")
+                console.print(
+                    _rich_escape(f"      [{order_index}] {step_name}")
+                )
+
+
 @cli.command("devin-session-import")
 @click.option(
     "--session-file",
