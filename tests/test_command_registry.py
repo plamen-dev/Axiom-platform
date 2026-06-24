@@ -193,6 +193,8 @@ EXPECTED_AXIOM_COMMANDS = {
     "capability-graph-show", "capability-graph-export",
     "execution-context-create", "execution-contexts",
     "execution-context-show", "execution-context-export",
+    "execution-environment-create", "execution-environments",
+    "execution-environment-show", "execution-environment-export",
 }
 TOOLCHAIN_COMMANDS = {"pytest", "ruff", "dotnet-build"}
 

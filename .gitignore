@@ -133,6 +133,9 @@ artifacts/capability_knowledge_graph/
 # Execution Context Framework bundles (generated run outputs; keep curated evidence)
 artifacts/execution_context/
 
+# Execution Environment Framework bundles (generated run outputs; keep curated evidence)
+artifacts/execution_environment/
+
 # Visual Studio local state
 .vs/
 

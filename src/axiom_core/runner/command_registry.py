@@ -6690,6 +6690,85 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="execution-environment-create",
+        command=(
+            "axiom execution-environment-create "
+            "[--environment-file <ef>] [--json-output]"
+        ),
+        description="Create an execution environment report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput(
+                "execution_environment_request.json", required=True
+            ),
+            EvidenceOutput(
+                "execution_environment_result.json", required=True
+            ),
+            EvidenceOutput(
+                "execution_environment_summary.md", required=True
+            ),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Deterministic environments; type/status + unavail/degraded.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-environments",
+        command="axiom execution-environments [--json-output]",
+        description="List execution environment reports.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List persisted execution environment reports.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-environment-show",
+        command=(
+            "axiom execution-environment-show <report_id> [--json-output]"
+        ),
+        description="Show an execution environment report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a persisted execution environment report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-environment-export",
+        command=(
+            "axiom execution-environment-export <report_id> "
+            "[--format markdown|json|csv]"
+        ),
+        description="Export an execution environment report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export an execution environment report (md/json/csv).",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
