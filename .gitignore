@@ -157,6 +157,9 @@ artifacts/execution_attempt_v2/
 # Execution Result Framework bundles (generated run outputs; keep curated evidence)
 artifacts/execution_result/
 
+# Execution Artifact Framework bundles (generated run outputs; keep curated evidence)
+artifacts/execution_artifact/
+
 # Visual Studio local state
 .vs/
 

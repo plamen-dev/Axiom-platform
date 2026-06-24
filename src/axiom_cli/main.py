@@ -20895,6 +20895,183 @@ def _render_execution_result_report_rich(report: dict) -> None:
                 console.print(_rich_escape(f"      [{rtype}] {rvalue}"))
 
 
+@cli.command("execution-artifact-create")
+@click.option(
+    "--artifact-file",
+    "artifact_file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to a JSON file with execution artifacts.",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_artifact_create(
+    artifact_file: str | None, json_output: bool
+) -> None:
+    """Create an execution artifact report."""
+    from axiom_core.execution_artifact import ExecutionArtifactEngine
+
+    try:
+        artifacts_data: list = []
+        raw_metadata: dict = {}
+        if artifact_file:
+            with open(artifact_file, encoding="utf-8") as f:
+                payload = json.loads(f.read())
+            artifacts_data = payload.get("artifacts", [])
+            raw_metadata = payload.get("raw_metadata", {})
+
+        engine = ExecutionArtifactEngine()
+        report = engine.create(
+            artifacts=artifacts_data,
+            raw_metadata=raw_metadata,
+        )
+
+        if json_output:
+            click.echo(json.dumps(report, indent=2, default=str))
+        else:
+            _render_execution_artifact_report_rich(report)
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+
+@cli.command("execution-artifacts")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_artifacts(json_output: bool) -> None:
+    """List all persisted execution artifact reports."""
+    from axiom_core.execution_artifact import ExecutionArtifactEngine
+
+    engine = ExecutionArtifactEngine()
+    reports = engine.list_reports()
+
+    if json_output:
+        click.echo(json.dumps(reports, indent=2, default=str))
+        return
+
+    if not reports:
+        click.echo("No execution artifact reports found.")
+        return
+
+    console.print("\n[bold]Execution Artifact Reports[/bold]\n")
+    for r in reports:
+        console.print(
+            f"  {r.get('report_id', '')}  "
+            f"({r.get('artifact_count', 0)} artifacts, "
+            f"{r.get('missing_count', 0)} missing, "
+            f"{r.get('invalid_count', 0)} invalid, "
+            f"created {r.get('created_at', '')})"
+        )
+
+
+@cli.command("execution-artifact-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_artifact_show(report_id: str, json_output: bool) -> None:
+    """Show a persisted execution artifact report."""
+    from axiom_core.execution_artifact import ExecutionArtifactEngine
+
+    try:
+        engine = ExecutionArtifactEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if report is None:
+        click.echo(f"Error: Report not found: {report_id}", err=True)
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_execution_artifact_report_rich(report)
+
+
+@cli.command("execution-artifact-export")
+@click.argument("report_id")
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["markdown", "json", "csv"]),
+    default="markdown",
+    help="Export format.",
+)
+def execution_artifact_export(report_id: str, fmt: str) -> None:
+    """Export an execution artifact report (markdown/json/csv)."""
+    from axiom_core.execution_artifact import ExecutionArtifactEngine
+
+    try:
+        engine = ExecutionArtifactEngine()
+        output = engine.export_report(report_id, fmt=fmt)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        if "not found" in str(exc).lower():
+            raise SystemExit(2) from exc
+        raise SystemExit(1) from exc
+
+    click.echo(output)
+
+
+def _render_execution_artifact_report_rich(report: dict) -> None:
+    """Rich text rendering for an execution artifact report."""
+    console.print("\n[bold]Execution Artifact Report[/bold]\n")
+    console.print(f"  Report ID:          {report.get('report_id', '')}")
+    console.print(f"  Artifacts:          {report.get('artifact_count', 0)}")
+    console.print(f"  Missing:            {report.get('missing_count', 0)}")
+    console.print(f"  Invalid:            {report.get('invalid_count', 0)}")
+    console.print(f"  Created:            {report.get('created_count', 0)}")
+    console.print(
+        f"  Referenced:         {report.get('referenced_count', 0)}"
+    )
+    console.print(
+        f"  Duplicate Artifacts: "
+        f"{report.get('duplicate_artifact_count', 0)}"
+    )
+    console.print(
+        f"  Schema Version:     {report.get('schema_version', '')}"
+    )
+
+    status_counts = report.get("status_counts", {})
+    if status_counts:
+        console.print("\n  [bold]Status Counts:[/bold]")
+        for status in sorted(status_counts):
+            console.print(
+                f"    {_rich_escape(status)}: {status_counts[status]}"
+            )
+
+    artifact_type_counts = report.get("artifact_type_counts", {})
+    if artifact_type_counts:
+        console.print("\n  [bold]Artifact Type Counts:[/bold]")
+        for artifact_type in sorted(artifact_type_counts):
+            console.print(
+                f"    {_rich_escape(artifact_type)}: "
+                f"{artifact_type_counts[artifact_type]}"
+            )
+
+    artifacts = report.get("artifacts", [])
+    if artifacts:
+        console.print("\n  [bold]Artifacts:[/bold]")
+        for a in artifacts:
+            status = a.get("status", "")
+            artifact_type = a.get("artifact_type", "")
+            result_id = a.get("result_id", "")
+            attempt_id = a.get("attempt_id", "")
+            capability_id = a.get("capability_id", "")
+            artifact_path = a.get("artifact_path", "")
+            artifact_url = a.get("artifact_url", "")
+            location = artifact_path or artifact_url or "-"
+            console.print(
+                _rich_escape(
+                    f"    [{status}] [{artifact_type}] "
+                    f"result={result_id} attempt={attempt_id} "
+                    f"capability={capability_id} location={location}"
+                )
+            )
+            for ref in a.get("references", []):
+                rtype = ref.get("reference_type", "")
+                rvalue = ref.get("reference_value", "")
+                console.print(_rich_escape(f"      [{rtype}] {rvalue}"))
+
+
 @cli.command("devin-session-import")
 @click.option(
     "--session-file",

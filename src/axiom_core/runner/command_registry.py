@@ -7288,6 +7288,77 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="execution-artifact-create",
+        command=(
+            "axiom execution-artifact-create "
+            "[--artifact-file <af>] [--json-output]"
+        ),
+        description="Create an execution artifact report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("execution_artifact_request.json", required=True),
+            EvidenceOutput("execution_artifact_result.json", required=True),
+            EvidenceOutput("execution_artifact_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Deterministic artifacts; status/type aggregation + refs.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-artifacts",
+        command="axiom execution-artifacts [--json-output]",
+        description="List execution artifact reports.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List persisted execution artifact reports.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-artifact-show",
+        command="axiom execution-artifact-show <report_id> [--json-output]",
+        description="Show an execution artifact report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a persisted execution artifact report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-artifact-export",
+        command=(
+            "axiom execution-artifact-export <report_id> "
+            "[--format markdown|json|csv]"
+        ),
+        description="Export an execution artifact report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export an execution artifact report (md/json/csv).",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
