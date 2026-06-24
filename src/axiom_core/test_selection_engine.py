@@ -256,6 +256,9 @@ _FILE_TO_TEST: dict[str, str] = {
     "src/axiom_core/execution_result.py": (
         "tests/test_execution_result.py"
     ),
+    "src/axiom_core/execution_artifact.py": (
+        "tests/test_execution_artifact.py"
+    ),
     "src/axiom_cli/main.py": "tests/test_command_registry.py",
 }
 
