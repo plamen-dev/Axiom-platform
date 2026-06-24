@@ -148,6 +148,9 @@ artifacts/execution_readiness/
 # Execution Plan Framework bundles (generated run outputs; keep curated evidence)
 artifacts/execution_plan/
 
+# Execution Step Framework bundles (generated run outputs; keep curated evidence)
+artifacts/execution_step/
+
 # Visual Studio local state
 .vs/
 

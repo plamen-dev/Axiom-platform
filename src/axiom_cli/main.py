@@ -20385,6 +20385,172 @@ def _render_execution_plan_report_rich(report: dict) -> None:
                 )
 
 
+@cli.command("execution-step-create")
+@click.option(
+    "--step-file",
+    "step_file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to a JSON file with execution steps.",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_step_create(step_file: str | None, json_output: bool) -> None:
+    """Create an execution step report."""
+    from axiom_core.execution_step import ExecutionStepEngine
+
+    try:
+        steps_data: list = []
+        raw_metadata: dict = {}
+        if step_file:
+            with open(step_file, encoding="utf-8") as f:
+                payload = json.loads(f.read())
+            steps_data = payload.get("steps", [])
+            raw_metadata = payload.get("raw_metadata", {})
+
+        engine = ExecutionStepEngine()
+        report = engine.create(
+            steps=steps_data,
+            raw_metadata=raw_metadata,
+        )
+
+        if json_output:
+            click.echo(json.dumps(report, indent=2, default=str))
+        else:
+            _render_execution_step_report_rich(report)
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+
+@cli.command("execution-steps")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_steps(json_output: bool) -> None:
+    """List all persisted execution step reports."""
+    from axiom_core.execution_step import ExecutionStepEngine
+
+    engine = ExecutionStepEngine()
+    reports = engine.list_reports()
+
+    if json_output:
+        click.echo(json.dumps(reports, indent=2, default=str))
+        return
+
+    if not reports:
+        click.echo("No execution step reports found.")
+        return
+
+    console.print("\n[bold]Execution Step Reports[/bold]\n")
+    for r in reports:
+        console.print(
+            f"  {r.get('report_id', '')}  "
+            f"({r.get('step_count', 0)} steps, "
+            f"{r.get('blocked_count', 0)} blocked, "
+            f"{r.get('failed_count', 0)} failed, "
+            f"created {r.get('created_at', '')})"
+        )
+
+
+@cli.command("execution-step-show")
+@click.argument("report_id")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_step_show(report_id: str, json_output: bool) -> None:
+    """Show a persisted execution step report."""
+    from axiom_core.execution_step import ExecutionStepEngine
+
+    try:
+        engine = ExecutionStepEngine()
+        report = engine.get_report(report_id)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if report is None:
+        click.echo(f"Error: Report not found: {report_id}", err=True)
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        _render_execution_step_report_rich(report)
+
+
+@cli.command("execution-step-export")
+@click.argument("report_id")
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["markdown", "json", "csv"]),
+    default="markdown",
+    help="Export format.",
+)
+def execution_step_export(report_id: str, fmt: str) -> None:
+    """Export an execution step report (markdown/json/csv)."""
+    from axiom_core.execution_step import ExecutionStepEngine
+
+    try:
+        engine = ExecutionStepEngine()
+        output = engine.export_report(report_id, fmt=fmt)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        if "not found" in str(exc).lower():
+            raise SystemExit(2) from exc
+        raise SystemExit(1) from exc
+
+    click.echo(output)
+
+
+def _render_execution_step_report_rich(report: dict) -> None:
+    """Rich text rendering for an execution step report."""
+    console.print("\n[bold]Execution Step Report[/bold]\n")
+    console.print(f"  Report ID:       {report.get('report_id', '')}")
+    console.print(f"  Steps:           {report.get('step_count', 0)}")
+    console.print(f"  Blocked:         {report.get('blocked_count', 0)}")
+    console.print(f"  Failed:          {report.get('failed_count', 0)}")
+    console.print(f"  Skipped:         {report.get('skipped_count', 0)}")
+    console.print(
+        f"  Duplicate Steps: {report.get('duplicate_step_count', 0)}"
+    )
+    console.print(
+        f"  Schema Version:  {report.get('schema_version', '')}"
+    )
+
+    status_counts = report.get("status_counts", {})
+    if status_counts:
+        console.print("\n  [bold]Status Counts:[/bold]")
+        for status in sorted(status_counts):
+            console.print(
+                f"    {_rich_escape(status)}: {status_counts[status]}"
+            )
+
+    step_type_counts = report.get("step_type_counts", {})
+    if step_type_counts:
+        console.print("\n  [bold]Step Type Counts:[/bold]")
+        for stype in sorted(step_type_counts):
+            console.print(
+                f"    {_rich_escape(stype)}: {step_type_counts[stype]}"
+            )
+
+    steps = report.get("steps", [])
+    if steps:
+        console.print("\n  [bold]Steps:[/bold]")
+        for s in steps:
+            status = s.get("status", "")
+            stype = s.get("step_type", "")
+            order_index = s.get("order_index", 0)
+            plan_id = s.get("plan_id", "")
+            capability_id = s.get("capability_id", "")
+            console.print(
+                _rich_escape(
+                    f"    [{status}] [{stype}] [{order_index}] "
+                    f"plan={plan_id} capability={capability_id}"
+                )
+            )
+            for ref in s.get("references", []):
+                rtype = ref.get("reference_type", "")
+                rvalue = ref.get("reference_value", "")
+                console.print(_rich_escape(f"      [{rtype}] {rvalue}"))
+
+
 @cli.command("devin-session-import")
 @click.option(
     "--session-file",

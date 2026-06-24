@@ -7076,6 +7076,76 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="execution-step-create",
+        command=(
+            "axiom execution-step-create [--step-file <sf>] [--json-output]"
+        ),
+        description="Create an execution step report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("execution_step_request.json", required=True),
+            EvidenceOutput("execution_step_result.json", required=True),
+            EvidenceOutput("execution_step_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Deterministic steps; status/type + blocked/failed + refs.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-steps",
+        command="axiom execution-steps [--json-output]",
+        description="List execution step reports.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List persisted execution step reports.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-step-show",
+        command="axiom execution-step-show <report_id> [--json-output]",
+        description="Show an execution step report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a persisted execution step report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-step-export",
+        command=(
+            "axiom execution-step-export <report_id> "
+            "[--format markdown|json|csv]"
+        ),
+        description="Export an execution step report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export an execution step report (md/json/csv).",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
