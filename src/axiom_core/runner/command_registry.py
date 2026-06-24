@@ -6619,6 +6619,77 @@ _register(
     )
 )
 
+_register(
+    CommandSpec(
+        name="execution-context-create",
+        command=(
+            "axiom execution-context-create "
+            "[--context-file <cf>] [--json-output]"
+        ),
+        description="Create an execution context report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("execution_context_request.json", required=True),
+            EvidenceOutput("execution_context_result.json", required=True),
+            EvidenceOutput("execution_context_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Deterministic contexts; state aggregation + blocked/failed.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-contexts",
+        command="axiom execution-contexts [--json-output]",
+        description="List execution context reports.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="List persisted execution context reports.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-context-show",
+        command="axiom execution-context-show <report_id> [--json-output]",
+        description="Show an execution context report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Show a persisted execution context report by ID.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="execution-context-export",
+        command=(
+            "axiom execution-context-export <report_id> "
+            "[--format markdown|json|csv]"
+        ),
+        description="Export an execution context report.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Export an execution context report (md/json/csv).",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # CommandRegistry — the governed catalog as an object
