@@ -160,6 +160,9 @@ artifacts/execution_result/
 # Execution Artifact Framework bundles (generated run outputs; keep curated evidence)
 artifacts/execution_artifact/
 
+# Execution Report Framework bundles (generated run outputs; keep curated evidence)
+artifacts/execution_report/
+
 # Visual Studio local state
 .vs/
 
