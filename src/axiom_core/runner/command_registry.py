@@ -6666,6 +6666,36 @@ _register(
 
 _register(
     CommandSpec(
+        name="self-model-gap-analysis",
+        command=(
+            "axiom self-model-gap-analysis --graph <report_id> "
+            "[--repo-root <p>] [--artifacts-root <p>] "
+            "[--export <p>] [--json-output]"
+        ),
+        description=(
+            "Enumerate and rank integration gaps from the populated "
+            "self-model graph (isolated/unconsumed/leaf/command-only modules, "
+            "declared-but-unwired execution chains, evidence producers without "
+            "consumers, missing purpose/layer, disconnected families)."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            "integration backlog written via --export (<path>.md + <path>.json)",
+        )
+        + EV_CONSOLE,
+        timeout_seconds=120,
+        failure_modes=(FM_NONZERO,),
+        notes=(
+            "Executable negative discovery over the self-model; emits a "
+            "ranked integration backlog. Read-only."
+        ),
+    )
+)
+
+_register(
+    CommandSpec(
         name="execution-context-create",
         command=(
             "axiom execution-context-create "
