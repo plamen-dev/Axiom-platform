@@ -326,6 +326,71 @@ class CodebaseInventory:
 
         return files, symbols, coverage_refs
 
+    def extract_import_edges(self) -> list[tuple[str, str]]:
+        """Return deterministic internal import edges ``(importer, imported)``.
+
+        Walks every ``src/`` Python module with :mod:`ast` and records an edge
+        whenever it imports another internal ``src/`` module. Standard-library
+        and third-party imports are ignored, as are self-edges and duplicates.
+        Read-only: never modifies any file. This makes the inventory the single
+        source of truth for the repository's real import relationships.
+        """
+        known: set[str] = set()
+        importer_files: list[tuple[str, str]] = []
+        for fpath in sorted(self.repo_root.rglob("*.py")):
+            if not fpath.is_file():
+                continue
+            rel = str(fpath.relative_to(self.repo_root))
+            if self._should_skip(rel) or not rel.startswith("src/"):
+                continue
+            module_name = self._module_name(rel)
+            if not module_name:
+                continue
+            known.add(module_name)
+            importer_files.append((rel, module_name))
+
+        edges: set[tuple[str, str]] = set()
+        for rel, src_module in importer_files:
+            try:
+                content = (self.repo_root / rel).read_text(
+                    encoding="utf-8", errors="replace"
+                )
+                tree = ast.parse(content, filename=rel)
+            except (OSError, SyntaxError):
+                continue
+            for node in ast.walk(tree):
+                for target in self._resolve_import_targets(node, known):
+                    if target != src_module:
+                        edges.add((src_module, target))
+        return sorted(edges)
+
+    @staticmethod
+    def _resolve_import_targets(
+        node: ast.AST, known: set[str]
+    ) -> list[str]:
+        """Resolve an AST import node to known internal module targets."""
+        targets: list[str] = []
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name in known:
+                    targets.append(alias.name)
+        elif isinstance(node, ast.ImportFrom):
+            if node.level:  # ignore relative imports
+                return targets
+            mod = node.module or ""
+            if not mod:
+                return targets
+            resolved_sub = [
+                f"{mod}.{a.name}"
+                for a in node.names
+                if f"{mod}.{a.name}" in known
+            ]
+            if resolved_sub:
+                targets.extend(resolved_sub)
+            elif mod in known:
+                targets.append(mod)
+        return targets
+
     def _should_skip(self, rel: str) -> bool:
         skip_prefixes = (
             ".git/", "__pycache__/", ".mypy_cache/", ".pytest_cache/",

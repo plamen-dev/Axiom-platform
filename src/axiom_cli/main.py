@@ -19335,6 +19335,181 @@ def _render_capability_graph_report_rich(report: dict) -> None:
             )
 
 
+@cli.command("self-model-build")
+@click.option(
+    "--repo-root",
+    "repo_root",
+    type=click.Path(exists=True, file_okay=False),
+    default=".",
+    help="Repository root to scan (default: current directory).",
+)
+@click.option(
+    "--artifacts-root",
+    "artifacts_root",
+    type=click.Path(),
+    default=None,
+    help="Artifacts root for the populated reports (default: ./artifacts).",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def self_model_build(
+    repo_root: str, artifacts_root: str | None, json_output: bool
+) -> None:
+    """Build Axiom's repository self-model and populate the existing graph.
+
+    Reuses ``code-inventory`` as the producer and feeds the existing capability
+    knowledge-graph and capability-relationship engines (no new framework).
+    """
+    from axiom_core.self_model import SelfModelBuilder
+
+    try:
+        builder = SelfModelBuilder(repo_root)
+        model = builder.build()
+        graph = builder.populate_graph(artifacts_root=artifacts_root, model=model)
+        rel = builder.populate_relationships(
+            artifacts_root=artifacts_root, model=model
+        )
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    result = {
+        "graph_report_id": graph.get("report_id", ""),
+        "relationship_report_id": rel.get("report_id", ""),
+        "module_count": graph.get("node_count", 0),
+        "import_edge_count": graph.get("edge_count", 0),
+        "isolated_module_count": graph.get("orphan_node_count", 0),
+        "relationship_count": rel.get("relationship_count", 0),
+    }
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+        return
+
+    console.print("\n[bold]Repository Self-Model Populated[/bold]\n")
+    console.print(f"  Graph report:        {result['graph_report_id']}")
+    console.print(f"  Relationship report: {result['relationship_report_id']}")
+    console.print(f"  Modules (nodes):     {result['module_count']}")
+    console.print(f"  Import edges:        {result['import_edge_count']}")
+    console.print(f"  Isolated modules:    {result['isolated_module_count']}")
+    console.print(f"  Relationships:       {result['relationship_count']}")
+    console.print(
+        "\n[dim]Query with: axiom self-model-query --graph "
+        f"{result['graph_report_id']} [--module MODULE][/dim]"
+    )
+
+
+@cli.command("self-model-query")
+@click.option(
+    "--graph",
+    "graph_report_id",
+    required=True,
+    help="Graph report id produced by self-model-build.",
+)
+@click.option(
+    "--module",
+    "module",
+    default=None,
+    help="Module to inspect (omit to list modules and isolated modules).",
+)
+@click.option(
+    "--artifacts-root",
+    "artifacts_root",
+    type=click.Path(),
+    default=None,
+    help="Artifacts root where the report lives (default: ./artifacts).",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def self_model_query(
+    graph_report_id: str,
+    module: str | None,
+    artifacts_root: str | None,
+    json_output: bool,
+) -> None:
+    """Answer repository dependency questions from the populated self-model graph.
+
+    Without ``--module``: lists modules, import edges, and isolated modules.
+    With ``--module``: lists what it depends on and what depends on it.
+    """
+    from axiom_core.capability_knowledge_graph import (
+        CapabilityKnowledgeGraphEngine,
+    )
+    from axiom_core.self_model import (
+        graph_dependencies,
+        graph_dependents,
+        graph_imports,
+        graph_isolated,
+        graph_modules,
+    )
+
+    try:
+        engine = CapabilityKnowledgeGraphEngine(artifacts_root=artifacts_root)
+        report = engine.get_report(graph_report_id)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if report is None:
+        click.echo(f"Error: Report not found: {graph_report_id}", err=True)
+        raise SystemExit(2)
+
+    if module is None:
+        modules = graph_modules(report)
+        imports = graph_imports(report)
+        isolated = graph_isolated(report)
+        result = {
+            "module_count": len(modules),
+            "import_edge_count": len(imports),
+            "isolated_module_count": len(isolated),
+            "modules": modules,
+            "isolated_modules": isolated,
+        }
+        if json_output:
+            click.echo(json.dumps(result, indent=2, default=str))
+            return
+        console.print("\n[bold]Repository Self-Model[/bold]\n")
+        console.print(f"  Modules:          {result['module_count']}")
+        console.print(f"  Import edges:     {result['import_edge_count']}")
+        console.print(f"  Isolated modules: {result['isolated_module_count']}")
+        if isolated:
+            console.print("\n  [bold]Isolated modules:[/bold]")
+            for m in isolated:
+                console.print(_rich_escape(f"    {m}"))
+        return
+
+    dependencies = graph_dependencies(report, module)
+    dependents = graph_dependents(report, module)
+    known = set(graph_modules(report))
+    result = {
+        "module": module,
+        "known": module in known,
+        "depends_on": dependencies,
+        "depended_on_by": dependents,
+        "is_isolated": module in set(graph_isolated(report)),
+    }
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+        return
+    console.print(f"\n[bold]Module:[/bold] {_rich_escape(module)}")
+    if module not in known:
+        console.print(
+            "  [yellow]Not present in the populated graph.[/yellow]"
+        )
+    console.print(
+        f"\n  [bold]Depends on ({len(dependencies)}):[/bold]"
+    )
+    for m in dependencies:
+        console.print(_rich_escape(f"    -> {m}"))
+    if not dependencies:
+        console.print("    (none)")
+    console.print(
+        f"\n  [bold]Depended on by ({len(dependents)}):[/bold]"
+    )
+    for m in dependents:
+        console.print(_rich_escape(f"    <- {m}"))
+    if not dependents:
+        console.print("    (none)")
+
+
 @cli.command("execution-context-create")
 @click.option(
     "--context-file",

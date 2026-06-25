@@ -6621,6 +6621,51 @@ _register(
 
 _register(
     CommandSpec(
+        name="self-model-build",
+        command=(
+            "axiom self-model-build [--repo-root <p>] "
+            "[--artifacts-root <p>] [--json-output]"
+        ),
+        description=(
+            "Build the repository self-model from code-inventory and populate "
+            "the existing capability graph + relationship engines."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=120,
+        failure_modes=(FM_NONZERO,),
+        notes=(
+            "Adapter only; reuses code-inventory + capability graph/"
+            "relationship engines. Deterministic; preserves orphan detection."
+        ),
+    )
+)
+
+_register(
+    CommandSpec(
+        name="self-model-query",
+        command=(
+            "axiom self-model-query --graph <report_id> "
+            "[--module <m>] [--artifacts-root <p>] [--json-output]"
+        ),
+        description=(
+            "Answer repository dependency questions from the populated "
+            "self-model graph (modules, imports, isolated, dependents)."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Reads answers from the persisted capability knowledge graph.",
+    )
+)
+
+_register(
+    CommandSpec(
         name="execution-context-create",
         command=(
             "axiom execution-context-create "
