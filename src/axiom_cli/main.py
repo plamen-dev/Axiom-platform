@@ -21247,6 +21247,184 @@ def _render_execution_artifact_report_rich(report: dict) -> None:
                 console.print(_rich_escape(f"      [{rtype}] {rvalue}"))
 
 
+@cli.command("execution-report-create")
+@click.option(
+    "--report-file",
+    "report_file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to a JSON file with execution reports.",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_report_create(
+    report_file: str | None, json_output: bool
+) -> None:
+    """Create an execution report summary."""
+    from axiom_core.execution_report import ExecutionReportEngine
+
+    try:
+        reports_data: list = []
+        raw_metadata: dict = {}
+        if report_file:
+            with open(report_file, encoding="utf-8") as f:
+                payload = json.loads(f.read())
+            reports_data = payload.get("reports", [])
+            raw_metadata = payload.get("raw_metadata", {})
+
+        engine = ExecutionReportEngine()
+        summary = engine.create(
+            reports=reports_data,
+            raw_metadata=raw_metadata,
+        )
+
+        if json_output:
+            click.echo(json.dumps(summary, indent=2, default=str))
+        else:
+            _render_execution_report_summary_rich(summary)
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+
+@cli.command("execution-reports")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_reports(json_output: bool) -> None:
+    """List all persisted execution report summaries."""
+    from axiom_core.execution_report import ExecutionReportEngine
+
+    engine = ExecutionReportEngine()
+    summaries = engine.list_reports()
+
+    if json_output:
+        click.echo(json.dumps(summaries, indent=2, default=str))
+        return
+
+    if not summaries:
+        click.echo("No execution report summaries found.")
+        return
+
+    console.print("\n[bold]Execution Report Summaries[/bold]\n")
+    for r in summaries:
+        console.print(
+            f"  {r.get('summary_id', '')}  "
+            f"({r.get('report_count', 0)} reports, "
+            f"{r.get('section_count', 0)} sections, "
+            f"{r.get('failed_count', 0)} failed, "
+            f"created {r.get('created_at', '')})"
+        )
+
+
+@cli.command("execution-report-show")
+@click.argument("summary_id")
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_report_show(summary_id: str, json_output: bool) -> None:
+    """Show a persisted execution report summary."""
+    from axiom_core.execution_report import ExecutionReportEngine
+
+    try:
+        engine = ExecutionReportEngine()
+        summary = engine.get_report(summary_id)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if summary is None:
+        click.echo(f"Error: Report not found: {summary_id}", err=True)
+        raise SystemExit(2)
+
+    if json_output:
+        click.echo(json.dumps(summary, indent=2, default=str))
+    else:
+        _render_execution_report_summary_rich(summary)
+
+
+@cli.command("execution-report-export")
+@click.argument("summary_id")
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["markdown", "json", "csv"]),
+    default="markdown",
+    help="Export format.",
+)
+def execution_report_export(summary_id: str, fmt: str) -> None:
+    """Export an execution report summary (markdown/json/csv)."""
+    from axiom_core.execution_report import ExecutionReportEngine
+
+    try:
+        engine = ExecutionReportEngine()
+        output = engine.export_report(summary_id, fmt=fmt)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        if "not found" in str(exc).lower():
+            raise SystemExit(2) from exc
+        raise SystemExit(1) from exc
+
+    click.echo(output)
+
+
+def _render_execution_report_summary_rich(summary: dict) -> None:
+    """Rich text rendering for an execution report summary."""
+    console.print("\n[bold]Execution Report Summary[/bold]\n")
+    console.print(f"  Summary ID:        {summary.get('summary_id', '')}")
+    console.print(f"  Reports:           {summary.get('report_count', 0)}")
+    console.print(f"  Sections:          {summary.get('section_count', 0)}")
+    console.print(f"  Failed:            {summary.get('failed_count', 0)}")
+    console.print(f"  Partial:           {summary.get('partial_count', 0)}")
+    console.print(f"  Complete:          {summary.get('complete_count', 0)}")
+    console.print(
+        f"  Duplicate Reports: {summary.get('duplicate_report_count', 0)}"
+    )
+    console.print(
+        f"  Schema Version:    {summary.get('schema_version', '')}"
+    )
+
+    status_counts = summary.get("status_counts", {})
+    if status_counts:
+        console.print("\n  [bold]Status Counts:[/bold]")
+        for status in sorted(status_counts):
+            console.print(
+                f"    {_rich_escape(status)}: {status_counts[status]}"
+            )
+
+    report_type_counts = summary.get("report_type_counts", {})
+    if report_type_counts:
+        console.print("\n  [bold]Report Type Counts:[/bold]")
+        for report_type in sorted(report_type_counts):
+            console.print(
+                f"    {_rich_escape(report_type)}: "
+                f"{report_type_counts[report_type]}"
+            )
+
+    reports = summary.get("reports", [])
+    if reports:
+        console.print("\n  [bold]Reports:[/bold]")
+        for r in reports:
+            status = r.get("status", "")
+            report_type = r.get("report_type", "")
+            capability_id = r.get("capability_id", "")
+            attempt_id = r.get("attempt_id", "")
+            result_id = r.get("result_id", "")
+            console.print(
+                _rich_escape(
+                    f"    [{status}] [{report_type}] "
+                    f"capability={capability_id} attempt={attempt_id} "
+                    f"result={result_id}"
+                )
+            )
+            for sec in r.get("sections", []):
+                stype = sec.get("section_type", "")
+                title = sec.get("title", "")
+                order_index = sec.get("order_index", 0)
+                console.print(
+                    _rich_escape(f"      [{order_index}] [{stype}] {title}")
+                )
+            for ref in r.get("references", []):
+                rtype = ref.get("reference_type", "")
+                rvalue = ref.get("reference_value", "")
+                console.print(_rich_escape(f"      [{rtype}] {rvalue}"))
+
+
 @cli.command("devin-session-import")
 @click.option(
     "--session-file",
