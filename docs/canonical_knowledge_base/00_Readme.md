@@ -71,6 +71,7 @@ base disagree, **this base wins**.
 | `40_Open_Investigations.md` | Open investigations and routed follow-ups | Program 5 / Program 6 (by topic) | New/closed investigation |
 | `50_Organizational_Communications.md` | Durable org communications and decisions | Program 0 / Program 7 | New durable comm/decision |
 | `60_Reasoning_Quality_Assurance.md` | Reasoning QA: self-audit, reconciliation gates | Program 6 | QA-gate change |
+| `impact_ledger/` | Canonical Impact Ledger and program inventory reconciliation | Program 1 (maintenance) / Program 6 (classification) | New reconciliation or classification batch |
 
 ## Update / review policy
 
