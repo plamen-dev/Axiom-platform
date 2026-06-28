@@ -22,8 +22,8 @@ per `00_Readme.md` update policy. Until classified, entries here are provisional
 
 ## 3. Ledger Status
 
-- Programs received: **0, 2, 5, 6, 7**
-- Programs pending: **3, 4** (inventories not received; entries must not be invented)
+- Programs reconciled: **0, 2, 5, 6, 7**
+- Programs out of scope: **3, 4** (not part of this reconciliation cycle)
 - Classification authority: **Program 6**
 - Strategic synthesis: **Program 0** (where strategy/milestone/product affected)
 - Operational review: **Program 7** (where Devin/worker/process affected)
@@ -149,21 +149,14 @@ per `00_Readme.md` update policy. Until classified, entries here are provisional
 | CIL-035 | M5 deferred — needs stronger integration evidence first | P1-ACC-08, P7-ACC-09 | P0, P1, P7 | 10 | No Canonical Change | Captured in Doc 10 M5 section | None — M5 kept cautious | Program 0 | None | Doc 10 v2; caution against premature abstraction | Related to CIL-034 | None | None | Captured |
 | CIL-036 | Trace/evidence index before mature M5 | P2-ARCH-03/05 | P2 | None directly | Open Investigation | Not formally captured | Future investigation when M5 approaches | Program 2 | Targeted | Organizational State underdefined (P2-ARCH-03) | None | Whether evidence index is M5 prerequisite | Program 0 sequencing | Open |
 
-### Cluster 13 — Program Coverage Gaps
+### Cluster 13 — Excluded / Not Carried Forward
 
-| CIL ID | Short Title | Source Program Flag IDs | Source Programs | Affected Docs | Proposed Classification | Current Capture Status | Recommended Handling | Owner | Review Tier | Evidence Summary | Duplicate/Overlap | Open Questions | Next Action | Status |
-|--------|-------------|------------------------|-----------------|---------------|------------------------|----------------------|---------------------|-------|-------------|-----------------|-------------------|----------------|-------------|--------|
-| CIL-037 | Program 3 inventory not received | None | N/A | All potentially | Program Owner Review Required | Not received | Do not invent; mark pending; request when ready | Program 3 | Targeted | No inventory submitted | None | When will Program 3 submit? | Request from Program 3 | Pending |
-| CIL-038 | Program 4 inventory not received | None | N/A | All potentially | Program Owner Review Required | Not received | Do not invent; mark pending; request when ready | Program 4 | Targeted | No inventory submitted | None | When will Program 4 submit? | Request from Program 4 | Pending |
+Program 3 and Program 4 were not part of this Canonical Impact Flag inventory cycle and are not represented in this ledger. No coverage gap items were created.
 
-## 7. Open Addenda / Missing Inventories
+## 7. Scope Boundary
 
-| Program | Status | Expected Content Areas |
-|---------|--------|----------------------|
-| Program 3 — Operator Cockpit Design | **Not received** | UI/UX canonical impacts, operator workflow, cockpit architecture |
-| Program 4 — BIM Intelligence Platform | **Not received** | Revit capabilities, BIM workflow, capability promotion, README ownership |
-
-These will be added as addenda when received. Do not invent content for missing programs.
+This ledger reconciles inventories from Programs 0, 2, 5, 6, and 7 only.
+Program 3 and Program 4 were outside the scope of this reconciliation cycle and are not represented in this ledger.
 
 ## 8. Routing Rules
 
@@ -195,5 +188,5 @@ These will be added as addenda when received. Do not invent content for missing 
 - This ledger does not implement GPR.
 - This ledger does not treat Devin compute mode as doctrine.
 - This ledger does not treat readiness thresholds as promotion doctrine.
-- This ledger does not invent Program 3 or Program 4 inventories.
+- Program 3 and Program 4 are out of scope for this reconciliation cycle.
 - This ledger does not perform one canonical update per flag.

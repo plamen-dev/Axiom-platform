@@ -37,8 +37,8 @@ This reconciliation finds:
 3. **No broad canonical rewrite is needed now.** The correct next step is targeted
    classification by Program 6, not a sweep of documents 10–60.
 
-4. **Programs 3 and 4 inventories are pending**, not absent forever. Their canonical
-   coverage gaps must not be invented.
+4. **Programs 3 and 4 were outside the scope of this reconciliation cycle** and are
+   not represented in this ledger.
 
 ---
 
@@ -58,14 +58,10 @@ follow-ups RF-001 through RF-005.
 
 ---
 
-## 3. Inputs Not Received
+## 3. Programs Outside Scope
 
-| Program | Status | Impact |
-|---------|--------|--------|
-| Program 3 — Operator Cockpit Design | **Not received** | UI/UX, operator workflow, and cockpit architecture canonical impacts are unknown. These must not be invented. |
-| Program 4 — BIM Intelligence Platform | **Not received** | Revit capability, BIM workflow, capability promotion, and README ownership impacts are unknown. RF-005 (README lag) is partially attributable to Program 4 but cannot be fully resolved without their inventory. |
-
-These will be added as addenda to the ledger when received.
+Program 3 and Program 4 were not part of this Canonical Impact Flag inventory cycle
+and are not represented in this ledger. No coverage gap items were created for them.
 
 ---
 
@@ -204,12 +200,13 @@ index may be needed before mature M5 work (CIL-036).
 
 **Canonical impact:** None. Already captured in Doc 10.
 
-### Cluster 13 — Program Coverage Gaps (CIL-037..038)
+### Cluster 13 — Excluded / Not Carried Forward
 
-**Summary:** Programs 3 and 4 have not submitted inventories. Their canonical coverage
-gaps are unknown and must not be invented.
+Program 3 and Program 4 were not part of this Canonical Impact Flag inventory cycle
+and are not represented in this ledger. No coverage gap items were created.
 
-**Canonical impact:** Future addendum when inventories are received.
+Superseded by operator clarification: Program 3 and Program 4 were not part of this
+reconciliation cycle and should not be represented as pending or missing.
 
 ---
 
@@ -308,9 +305,9 @@ flag IDs preserved in the cross-reference field.
 | 2 | Which evidence types should affect capability confidence? | Program 6 doctrine; Program 2 architecture |
 | 3 | Should Devin compute mode be formalized in Doc 60? | Program 7 propose; Program 6 classify |
 | 4 | Should Purpose-to-Workflow Reconciliation gate be in Doc 60? | Program 7 propose; Program 6 classify |
-| 5 | When will Programs 3 and 4 submit inventories? | Program 0 coordination |
-| 6 | Should evidence-lane separation (cloud/local/Windows) be formalized? | Program 5 investigate first |
-| 7 | Is a batched canonical maintenance PR needed now, or after classification? | Program 6 decision |
+
+| 5 | Should evidence-lane separation (cloud/local/Windows) be formalized? | Program 5 investigate first |
+| 6 | Is a batched canonical maintenance PR needed now, or after classification? | Program 6 decision |
 
 ---
 
@@ -320,8 +317,7 @@ flag IDs preserved in the cross-reference field.
 
 Wait for:
 1. Program 6 to classify the ~7 open items (CIL-012, 016, 018, 027, 029, 033, 036).
-2. Programs 3 and 4 to submit inventories (addendum).
-3. Program 0 to approve or defer the model-health consumer implementation (CIL-017).
+2. Program 0 to approve or defer the model-health consumer implementation (CIL-017).
 
 When classification is complete, a single batched canonical maintenance PR can update
 the relevant documents. This avoids one-PR-per-flag overhead and prevents premature
@@ -344,7 +340,7 @@ for the full batch.
 - No GPR/global registry implementation.
 - No canonical doctrine rewrite.
 - No broad edits to current canonical documents 10–60.
-- No Program 3 or Program 4 invented inventory.
+- Program 3 and Program 4 are out of scope for this reconciliation cycle.
 - No final Program 6 classification (this reconciliation provides inputs; Program 6 classifies).
 - No Program 0 strategic decision (this reconciliation surfaces questions; Program 0 decides).
 - No one-PR-per-flag maintenance process.
