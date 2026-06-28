@@ -179,6 +179,49 @@ The deterministic chain frameworks (#112–#119) each follow the same CLI patter
 
 ---
 
+## execution-chain-run verification checklist
+
+`axiom execution-chain-run --capability <id> [--artifacts-root <p>] [--json-output]` runs one deterministic capability through the full execution stack (Plan→Step→Attempt→Result→Artifact→Evidence→Report). Verify:
+
+- All 7 chain IDs present in output (plan, step, attempt, result, artifact, evidence, report).
+- `status: "PASS"` and `id_flow_status: "PASS"`.
+- `transitions` array shows 7/7 `[OK]` with `reference_value == upstream_id` at each stage.
+- `ids_distinct: true` (all 7 IDs are unique).
+- Use `--artifacts-root /tmp/testdir/artifacts` for isolated test runs.
+- Evidence file persisted at `artifacts/execution_chain/<run_id>/evidence.json` with `capability_id`, `result_id`, `artifact_id` in `references`.
+- Trace file at `artifacts/execution_chain/<run_id>/trace.json` with `status`, `report_id`, `created_at`.
+
+## capability-evidence-apply verification checklist
+
+`axiom capability-evidence-apply --evidence <path> [--capability-id <id>] [--max-age-seconds <n>] [--artifacts-root <p>] [--json-output]` routes evidence into existing capability confidence/readiness. Verify:
+
+### Passing evidence
+- `decision: "accepted"`, `evidence_outcome: "pass"`.
+- `prior_state` shows baseline (e.g. `very_low / 0.0 / blocked` for first application).
+- `updated_state` shows raised confidence (e.g. `very_high / 1.0 / ready` after first pass).
+- `state_changed: true`.
+
+### Failing evidence
+- Create synthetic evidence: write `evidence.json` with `capability_id` in `references` + `trace.json` with `status: "FAIL"`.
+- `decision: "accepted"`, `evidence_outcome: "fail"`.
+- Score drops (e.g. 2 pass + 1 fail = score 0.6667), confidence drops, readiness may drop to `provisional`.
+
+### Invalid/quarantined evidence
+- Evidence with empty `references` (no `capability_id`): `decision: "quarantined"`, `state_changed: false`.
+- Stale evidence with `--max-age-seconds 3600` and old `created_at`: `decision: "quarantined"`, reason includes "stale".
+
+### Cumulative behavior
+- Apply the same evidence twice: `execution_count` increments, `success_count` increments.
+
+### Queryability
+- `axiom capability-evidence-history --capability-id <id>`: shows all intakes with confidence transitions.
+- `axiom capability-evidence-show <intake_id>`: shows one full record.
+
+### Audit structure
+- Intake records persisted at `artifacts/capability_evidence_intake/<intake_id>/report.json` + `pass_fail.json`.
+- Exactly 2 files per intake (standard evidence convention).
+- Quarantined/rejected evidence produces NO new confidence reports (`accepted_count == confidence_report_count`).
+
 ## runner-commands (Command Registry, PR #22) verification checklist
 
 `axiom runner-commands` is read-only governance — it prints policy and never executes anything. Verify:
