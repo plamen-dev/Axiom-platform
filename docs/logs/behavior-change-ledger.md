@@ -489,3 +489,20 @@ See `docs/runbooks/behavior-regression-runbook.md` for philosophy and process.
 | **related_test_case** | `tests/test_evidence_promotion.py` (duplicate / conflict / distinct-run accumulation + existing matrix) |
 | **related_artifact_path** | `src/axiom_core/evidence_promotion.py`, `src/axiom_cli/main.py` (capability-evidence-apply renderer), `docs/architecture/integration/M2_Evidence_Promotion_Validation_Packet.md` |
 | **notes** | No new promotion framework, doctrine, registry, object family, or durable state separate from `CapabilityConfidenceEngine`. Intake records remain audit artifacts only. EVID-001 remains closed only for the narrow M2 execution-chain slice; `model_health` producer gap stays open. |
+
+## BHV-028: Windows artifact path containment compatibility fix (PR #151)
+
+| Field | Value |
+|-------|-------|
+| **behavior_id** | BHV-028 |
+| **date** | 2026-06-23 |
+| **capability** | Artifact sandbox path containment (shared persistence helper across execution-chain, evidence-promotion, capability-confidence, and all `execution_*`/registry engines; not a Revit capability) |
+| **observed_prompt** | `poetry run axiom execution-chain-run --capability self-model-build --artifacts-root <root> --json-output` (and `capability-evidence-apply`) run on Windows |
+| **previous_behavior** | Every artifact-persisting engine validated sandbox containment with the POSIX-only check `str(target).startswith(str(sandbox) + "/")`. On Windows, `Path.resolve()` yields `\\` separators, so a valid `<sandbox>\\<uuid>` never matched the hard-coded `/` and was wrongly rejected with `Error: Resolved path escapes artifacts root: '<uuid>'`. This false-failed `execution-chain-run`, `capability-evidence-apply`, and the targeted execution-chain / evidence-promotion tests on Windows (38 failed / 77 passed / 1 skipped on the operator's Windows run), with both relative and absolute artifact roots. POSIX behaviour was correct. |
+| **expected_behavior** | Sandbox containment must accept a valid id segment that resolves under the artifacts root on both Windows and POSIX, while still rejecting traversal (`../outside`, `..\\outside`), absolute/drive-root injection, UNC escapes, and separator-bearing ids. |
+| **current_behavior** | A single shared helper `axiom_core.artifact_paths.is_within_sandbox(target, sandbox)` performs containment via `Path.relative_to()` (pathlib semantics: separator-aware and, on Windows, case-insensitive; no hard-coded `/` or `\\`; cross-drive inputs return `False` rather than raising). All 124 previous inline POSIX checks across 63 modules (`_safe_path` helpers and `list_*`/scan loops) now route through it. Id-segment validation (`_validate_id_segment` rejecting `..`, `/`, `\\`, empty) is unchanged. Confidence math, evidence-promotion semantics, and execution-chain ID-flow are unchanged. Local Runner was inspected and contains no such helper, so it is untouched. |
+| **status** | implemented (Python; full pytest 5072 passed/1 skipped + ruff green on Ubuntu). Windows execution simulated via `PureWindowsPath` regression tests; true on-Windows re-run pending operator. |
+| **related_bug_id** | Program 5 Windows Local Runner Compatibility Probe — `Resolved path escapes artifacts root` |
+| **related_test_case** | `tests/test_artifact_paths.py` (Windows-simulated + POSIX + traversal/drive/UNC/sibling-prefix), plus existing `tests/test_execution_chain_orchestrator.py`, `tests/test_evidence_promotion.py` path-safety suites |
+| **related_artifact_path** | `src/axiom_core/artifact_paths.py` (new helper); 63 `src/axiom_core/*.py` engines updated to call it; `tests/test_artifact_paths.py` |
+| **notes** | Compatibility hardening only — no new framework or object family, no new runner, no retry/worker behavior, no canonical-seed work. Path-traversal protection preserved on both platforms. 2024 Revit baseline unaffected; no Revit live validation required. |

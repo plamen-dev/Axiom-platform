@@ -18,6 +18,8 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from axiom_core.artifact_paths import is_within_sandbox
+
 _logger = logging.getLogger(__name__)
 
 
@@ -38,7 +40,7 @@ class ParserCodingTrialRunner:
         """Resolve and validate the trial directory stays inside the sandbox."""
         target = (self._trials_dir / trial_id).resolve()
         sandbox = self._trials_dir.resolve()
-        if not str(target).startswith(str(sandbox) + "/") and target != sandbox:
+        if not is_within_sandbox(target, sandbox):
             raise ValueError(
                 f"Resolved path escapes artifacts root: {trial_id!r}"
             )

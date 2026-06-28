@@ -20,6 +20,8 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from axiom_core.artifact_paths import is_within_sandbox
+
 _logger = logging.getLogger(__name__)
 
 
@@ -153,7 +155,7 @@ class ConfigurationExecutionEngine:
     def _safe_execution_path(self, report_id: str) -> Path:
         target = (self._execution_dir / report_id).resolve()
         sandbox = self._execution_dir.resolve()
-        if not str(target).startswith(str(sandbox) + "/") and target != sandbox:
+        if not is_within_sandbox(target, sandbox):
             raise ValueError(
                 f"Resolved path escapes artifacts root: {report_id!r}"
             )
@@ -341,7 +343,7 @@ class ConfigurationExecutionEngine:
             if not entry.is_dir():
                 continue
             resolved = entry.resolve()
-            if not str(resolved).startswith(str(sandbox) + "/") and resolved != sandbox:
+            if not is_within_sandbox(resolved, sandbox):
                 continue
             report_file = entry / "report.json"
             if not report_file.exists():

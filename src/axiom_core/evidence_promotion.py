@@ -66,6 +66,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from axiom_core.artifact_paths import is_within_sandbox
 from axiom_core.capability_confidence import (
     CapabilityConfidenceEngine,
     _level_from_score,
@@ -586,7 +587,7 @@ class EvidencePromotionLoop:
             if not entry.is_dir():
                 continue
             resolved = entry.resolve()
-            if not str(resolved).startswith(str(sandbox) + "/") and resolved != sandbox:
+            if not is_within_sandbox(resolved, sandbox):
                 continue
             record_file = entry / "report.json"
             if not record_file.exists():
@@ -634,7 +635,7 @@ class EvidencePromotionLoop:
         self._validate_id_segment(intake_id, "intake_id")
         target = (self._intake_dir / intake_id).resolve()
         sandbox = self._intake_dir.resolve()
-        if not str(target).startswith(str(sandbox) + "/") and target != sandbox:
+        if not is_within_sandbox(target, sandbox):
             raise ValueError(f"Resolved path escapes artifacts root: {intake_id!r}")
         return target
 
