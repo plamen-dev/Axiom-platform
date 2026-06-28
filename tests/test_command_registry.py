@@ -193,6 +193,8 @@ EXPECTED_AXIOM_COMMANDS = {
     "capability-graph-show", "capability-graph-export",
     "self-model-build", "self-model-query", "self-model-gap-analysis",
     "execution-chain-run",
+    "capability-evidence-apply", "capability-evidence-history",
+    "capability-evidence-show",
     "execution-context-create", "execution-contexts",
     "execution-context-show", "execution-context-export",
     "execution-environment-create", "execution-environments",

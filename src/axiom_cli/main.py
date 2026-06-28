@@ -19477,6 +19477,186 @@ def execution_chain_run(
         )
 
 
+def _render_evidence_intake_rich(record: dict) -> None:
+    """Rich rendering for one evidence-to-state intake record."""
+    decision = record.get("decision", "")
+    color = {"accepted": "green", "rejected": "red", "quarantined": "yellow"}.get(
+        decision, "white"
+    )
+    prior = record.get("prior_state", {})
+    updated = record.get("updated_state", {})
+    links = record.get("links", {})
+    console.print("\n[bold]Capability Evidence Intake[/bold]\n")
+    console.print(f"  Capability:   {record.get('capability_id') or '<none>'}")
+    console.print(f"  Evidence:     {record.get('evidence_path', '')}")
+    console.print(f"  Outcome:      {record.get('evidence_outcome', '')}")
+    console.print(f"  Decision:     [{color}]{decision}[/{color}]")
+    console.print(f"  Reason:       {record.get('reason', '')}")
+    console.print(
+        f"  Confidence:   {prior.get('confidence_level', '')} "
+        f"(score {prior.get('score', 0.0)}) -> "
+        f"{updated.get('confidence_level', '')} (score {updated.get('score', 0.0)})"
+    )
+    console.print(
+        f"  Readiness:    {prior.get('readiness', '')} -> "
+        f"{updated.get('readiness', '')}"
+    )
+    console.print(
+        f"  Factors:      successes {updated.get('success_count', 0)} / "
+        f"executions {updated.get('execution_count', 0)} "
+        f"(failures {updated.get('failure_count', 0)})"
+    )
+    console.print(
+        f"  Linked to:    capability={record.get('capability_id') or '<none>'}, "
+        f"result={links.get('result_id', '')}, artifact={links.get('artifact_id', '')}, "
+        f"report={links.get('report_id', '')}"
+    )
+    console.print(f"  Intake id:    {record.get('intake_id', '')}")
+
+
+@cli.command("capability-evidence-apply")
+@click.option(
+    "--evidence",
+    "evidence_path",
+    required=True,
+    type=click.Path(),
+    help="Path to the evidence bundle (e.g. execution_chain/<run>/evidence.json).",
+)
+@click.option(
+    "--capability-id",
+    "capability_id",
+    default="",
+    help="Override the capability identity carried by the evidence bundle.",
+)
+@click.option(
+    "--max-age-seconds",
+    "max_age_seconds",
+    type=int,
+    default=None,
+    help="Quarantine evidence older than this many seconds (uses created_at).",
+)
+@click.option(
+    "--artifacts-root",
+    "artifacts_root",
+    type=click.Path(),
+    default=None,
+    help="Artifacts root for state + intake records (default: ./artifacts).",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_evidence_apply(
+    evidence_path: str,
+    capability_id: str,
+    max_age_seconds: int | None,
+    artifacts_root: str | None,
+    json_output: bool,
+) -> None:
+    """Route execution evidence into existing capability confidence/readiness.
+
+    Consumes the evidence bundle produced by ``execution-chain-run`` and feeds
+    its pass/fail outcome into the existing ``CapabilityConfidenceEngine``,
+    accumulating it onto the capability's prior state. Evidence without a
+    capability identity is quarantined; evidence with no determinable outcome is
+    rejected; stale evidence is quarantined when ``--max-age-seconds`` is set.
+    Reuses existing structures; introduces no new promotion framework.
+    """
+    from axiom_core.evidence_promotion import EvidencePromotionLoop
+
+    try:
+        loop = EvidencePromotionLoop(artifacts_root=artifacts_root)
+        record = loop.apply(
+            evidence_path,
+            capability_id=capability_id,
+            max_age_seconds=max_age_seconds,
+        )
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if json_output:
+        click.echo(json.dumps(record, indent=2, sort_keys=True, default=str))
+        return
+    _render_evidence_intake_rich(record)
+
+
+@cli.command("capability-evidence-history")
+@click.option(
+    "--capability-id",
+    "capability_id",
+    default="",
+    help="Filter intake records by capability id.",
+)
+@click.option(
+    "--artifacts-root",
+    "artifacts_root",
+    type=click.Path(),
+    default=None,
+    help="Artifacts root where intake records live (default: ./artifacts).",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_evidence_history(
+    capability_id: str,
+    artifacts_root: str | None,
+    json_output: bool,
+) -> None:
+    """List evidence-to-state intake records (the queryable state-change log)."""
+    from axiom_core.evidence_promotion import EvidencePromotionLoop
+
+    loop = EvidencePromotionLoop(artifacts_root=artifacts_root)
+    records = loop.list_intakes(capability_id=capability_id)
+
+    if json_output:
+        click.echo(json.dumps(records, indent=2, sort_keys=True, default=str))
+        return
+    if not records:
+        console.print("No evidence intake records found.")
+        return
+    console.print("\n[bold]Capability Evidence Intake History[/bold]\n")
+    for r in records:
+        prior = r.get("prior_state", {})
+        updated = r.get("updated_state", {})
+        console.print(
+            f"  {r.get('created_at', '')}  {r.get('capability_id') or '<none>'}  "
+            f"[{r.get('decision', '')}] {r.get('evidence_outcome', '')}  "
+            f"{prior.get('confidence_level', '')}->{updated.get('confidence_level', '')}  "
+            f"{r.get('intake_id', '')}"
+        )
+
+
+@cli.command("capability-evidence-show")
+@click.argument("intake_id")
+@click.option(
+    "--artifacts-root",
+    "artifacts_root",
+    type=click.Path(),
+    default=None,
+    help="Artifacts root where the intake record lives (default: ./artifacts).",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_evidence_show(
+    intake_id: str,
+    artifacts_root: str | None,
+    json_output: bool,
+) -> None:
+    """Show one evidence-to-state intake record by id."""
+    from axiom_core.evidence_promotion import EvidencePromotionLoop
+
+    try:
+        loop = EvidencePromotionLoop(artifacts_root=artifacts_root)
+        record = loop.get_intake(intake_id)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if record is None:
+        click.echo(f"Error: evidence intake record not found: {intake_id}", err=True)
+        raise SystemExit(1)
+
+    if json_output:
+        click.echo(json.dumps(record, indent=2, sort_keys=True, default=str))
+        return
+    _render_evidence_intake_rich(record)
+
+
 @cli.command("self-model-query")
 @click.option(
     "--graph",
