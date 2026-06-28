@@ -6732,6 +6732,84 @@ _register(
 
 _register(
     CommandSpec(
+        name="capability-evidence-apply",
+        command=(
+            "axiom capability-evidence-apply --evidence <path> "
+            "[--capability-id <id>] [--max-age-seconds <n>] "
+            "[--artifacts-root <p>] [--json-output]"
+        ),
+        description=(
+            "Route execution evidence (e.g. execution_chain/<run>/evidence.json) "
+            "into the existing capability confidence/readiness state: passing "
+            "evidence raises confidence, failing evidence lowers it, evidence "
+            "without a capability identity is quarantined, evidence with no "
+            "determinable outcome is rejected, and stale evidence is quarantined."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput(
+                "capability_evidence_intake/<intake_id>/report.json", required=True
+            ),
+            EvidenceOutput(
+                "capability_evidence_intake/<intake_id>/pass_fail.json", required=True
+            ),
+            EvidenceOutput(
+                "capability_confidence/<report_id>/report.json", required=False
+            ),
+        )
+        + EV_CONSOLE,
+        timeout_seconds=120,
+        failure_modes=(FM_NONZERO,),
+        notes=(
+            "M2 evidence-to-state loop: reuses CapabilityConfidenceEngine as the "
+            "durable state store; no new promotion framework or registry."
+        ),
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-evidence-history",
+        command=(
+            "axiom capability-evidence-history [--capability-id <id>] "
+            "[--artifacts-root <p>] [--json-output]"
+        ),
+        description=(
+            "List evidence-to-state intake records (the queryable log of how "
+            "evidence changed capability confidence/readiness)."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only query over capability_evidence_intake records.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-evidence-show",
+        command=(
+            "axiom capability-evidence-show <intake_id> "
+            "[--artifacts-root <p>] [--json-output]"
+        ),
+        description="Show one evidence-to-state intake record by id.",
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes="Read-only inspection of a single capability_evidence_intake record.",
+    )
+)
+
+_register(
+    CommandSpec(
         name="execution-context-create",
         command=(
             "axiom execution-context-create "
