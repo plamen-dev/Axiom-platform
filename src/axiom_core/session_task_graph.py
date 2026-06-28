@@ -20,6 +20,8 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from axiom_core.artifact_paths import is_within_sandbox
+
 _logger = logging.getLogger(__name__)
 
 
@@ -166,7 +168,7 @@ class SessionTaskGraphRegistry:
         """Resolve and validate the task directory stays inside the sandbox."""
         target = (self._tasks_dir / task_id).resolve()
         sandbox = self._tasks_dir.resolve()
-        if not str(target).startswith(str(sandbox) + "/") and target != sandbox:
+        if not is_within_sandbox(target, sandbox):
             raise ValueError(
                 f"Resolved path escapes artifacts root: {task_id!r}"
             )
@@ -231,7 +233,7 @@ class SessionTaskGraphRegistry:
             if not entry.is_dir():
                 continue
             resolved = entry.resolve()
-            if not str(resolved).startswith(str(sandbox) + "/") and resolved != sandbox:
+            if not is_within_sandbox(resolved, sandbox):
                 continue
             task_file = entry / "task.json"
             if not task_file.exists():
@@ -499,7 +501,7 @@ class SessionTaskGraphRegistry:
             if not entry.is_dir():
                 continue
             resolved = entry.resolve()
-            if not str(resolved).startswith(str(sandbox) + "/") and resolved != sandbox:
+            if not is_within_sandbox(resolved, sandbox):
                 continue
             deps_file = entry / "dependencies.json"
             if not deps_file.exists():

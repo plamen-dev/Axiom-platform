@@ -23,6 +23,8 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from axiom_core.artifact_paths import is_within_sandbox
+
 _logger = logging.getLogger(__name__)
 
 
@@ -176,7 +178,7 @@ class ConflictRegistry:
         """Resolve and validate the conflict directory stays inside the sandbox."""
         target = (self._conflicts_dir / conflict_id).resolve()
         sandbox = self._conflicts_dir.resolve()
-        if not str(target).startswith(str(sandbox) + "/") and target != sandbox:
+        if not is_within_sandbox(target, sandbox):
             raise ValueError(
                 f"Resolved path escapes artifacts root: {conflict_id!r}"
             )
@@ -257,7 +259,7 @@ class ConflictRegistry:
             if not entry.is_dir():
                 continue
             resolved = entry.resolve()
-            if not str(resolved).startswith(str(sandbox) + "/") and resolved != sandbox:
+            if not is_within_sandbox(resolved, sandbox):
                 continue
             conf_file = entry / "conflict.json"
             if not conf_file.exists():
