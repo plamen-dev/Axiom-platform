@@ -6771,6 +6771,46 @@ _register(
 
 _register(
     CommandSpec(
+        name="cli-validation-record",
+        command=(
+            "axiom cli-validation-record --plan <path> [--artifacts-root <p>] "
+            "[--name <run-name>] [--set KEY=VALUE] [--dry-run] [--json-output]"
+        ),
+        description=(
+            "Run an explicit validation plan (an ordered list of allowlisted CLI "
+            "commands) and write a durable evidence bundle under "
+            "artifacts/validation_evidence/<run_id>/ capturing each command's "
+            "inputs, stdout/stderr, exit code, timing, environment metadata, an "
+            "artifact manifest, and a human-readable report. Each plan command is "
+            "authorized against this registry; only safe, non-Revit commands run."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput(
+                "validation_evidence/<run_id>/validation_run.json", required=True
+            ),
+            EvidenceOutput(
+                "validation_evidence/<run_id>/report.md", required=True
+            ),
+            EvidenceOutput(
+                "validation_evidence/<run_id>/artifact_manifest.json", required=True
+            ),
+        )
+        + EV_CONSOLE,
+        timeout_seconds=600,
+        failure_modes=(FM_NONZERO,),
+        notes=(
+            "Validation evidence recorder: reuses the command registry for "
+            "governance and is_within_sandbox for path safety; no new runner, "
+            "retry loop, or promotion framework."
+        ),
+    )
+)
+
+_register(
+    CommandSpec(
         name="capability-evidence-history",
         command=(
             "axiom capability-evidence-history [--capability-id <id>] "
