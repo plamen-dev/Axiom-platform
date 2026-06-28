@@ -222,6 +222,17 @@ The deterministic chain frameworks (#112–#119) each follow the same CLI patter
 - Exactly 2 files per intake (standard evidence convention).
 - Quarantined/rejected evidence produces NO new confidence reports (`accepted_count == confidence_report_count`).
 
+## cli-validation-record verification checklist
+
+`axiom cli-validation-record --plan <path> [--artifacts-root <p>] [--name <run-name>] [--set KEY=VALUE] [--dry-run] [--json-output]` runs an explicit plan of allowlisted CLI commands and writes a durable evidence bundle. Verify:
+
+- **Dry run governance:** `--dry-run` on `docs/validation_plans/m4_execution_chain.json` resolves the argv and shows each command `[OK]` (safe) without executing; an unknown/unsafe command shows `[XX]` and the run exits non-zero.
+- **M4 plan:** `--plan docs/validation_plans/m4_execution_chain.json` -> `Status: PASSED`, `1/1 passed`, bundle under `artifacts/validation_evidence/<run_id>/`.
+- **M2 plan:** `--plan docs/validation_plans/m2_evidence_promotion.json --set evidence=<chain_evidence.json>` -> `Status: PASSED`, `2/2 passed`.
+- **Bundle shape:** `validation_run.json`, `commands.json`, `environment.json`, `artifact_manifest.json` (sha256 per file), `assertion_results.json`, `plan_snapshot.json`, `report.md`, and per-command `commands/NN_<id>.stdout.txt`/`.stderr.txt`.
+- **Failures first-class:** a failing command with `continue_on_failure=false` marks later commands `skipped`, sets run status `failed`, and exits 1; stdout/stderr/exit are still preserved.
+- Generated bundles stay under git-ignored `artifacts/validation_evidence/`.
+
 ## runner-commands (Command Registry, PR #22) verification checklist
 
 `axiom runner-commands` is read-only governance — it prints policy and never executes anything. Verify:

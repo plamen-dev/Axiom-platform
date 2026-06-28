@@ -1,0 +1,29 @@
+{
+  "plan_id": "m2_evidence_promotion",
+  "title": "M2 Evidence Promotion Validation",
+  "purpose": "Capture durable proof that evidence from an execution-chain run can be routed into capability state via 'capability-evidence-apply', and that the intake is queryable.",
+  "commands": [
+    {
+      "id": "evidence-apply",
+      "command": "capability-evidence-apply",
+      "args": [
+        "--evidence", "${evidence}",
+        "--artifacts-root", "${run_dir}/state",
+        "--json-output"
+      ],
+      "timeout_seconds": 120,
+      "expected_exit_code": 0,
+      "expect_stdout_contains": ["\"decision\""]
+    },
+    {
+      "id": "evidence-history",
+      "command": "capability-evidence-history",
+      "args": [
+        "--artifacts-root", "${run_dir}/state",
+        "--json-output"
+      ],
+      "timeout_seconds": 60,
+      "expected_exit_code": 0
+    }
+  ]
+}

@@ -195,6 +195,7 @@ EXPECTED_AXIOM_COMMANDS = {
     "execution-chain-run",
     "capability-evidence-apply", "capability-evidence-history",
     "capability-evidence-show",
+    "cli-validation-record",
     "execution-context-create", "execution-contexts",
     "execution-context-show", "execution-context-export",
     "execution-environment-create", "execution-environments",

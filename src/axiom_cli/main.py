@@ -19588,6 +19588,126 @@ def capability_evidence_apply(
     _render_evidence_intake_rich(record)
 
 
+@cli.command("cli-validation-record")
+@click.option(
+    "--plan",
+    "plan_path",
+    required=True,
+    type=click.Path(),
+    help="Path to a validation plan JSON file.",
+)
+@click.option(
+    "--artifacts-root",
+    "artifacts_root",
+    type=click.Path(),
+    default=None,
+    help="Artifacts root for the evidence bundle (default: ./artifacts).",
+)
+@click.option(
+    "--name",
+    "run_name",
+    default=None,
+    help="Optional human-readable run name (recorded in the bundle).",
+)
+@click.option(
+    "--set",
+    "set_vars",
+    multiple=True,
+    metavar="KEY=VALUE",
+    help="Plan variable substitution for ${KEY} in command args (repeatable).",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Validate governance and resolve commands without executing or writing.",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def cli_validation_record(
+    plan_path: str,
+    artifacts_root: str | None,
+    run_name: str | None,
+    set_vars: tuple[str, ...],
+    dry_run: bool,
+    json_output: bool,
+) -> None:
+    """Run an allowlisted CLI validation plan and write a durable evidence bundle.
+
+    Each plan command is authorized against the Runner Command Registry (only
+    ``safe`` non-Revit commands run by default), executed without a shell, and
+    its inputs/outputs/exit code/timing are captured. The bundle (validation_run
+    .json, commands.json, environment.json, artifact_manifest.json, report.md,
+    per-command stdout/stderr) is written under ``<artifacts-root>/
+    validation_evidence/<run_id>/``. Reuses existing governance and path-safety
+    helpers; introduces no new runner, retry loop, or promotion framework.
+    """
+    from axiom_core.validation.cli_validation_recorder import (
+        CliValidationRecorder,
+        PlanError,
+        load_plan,
+    )
+
+    extra_vars: dict[str, str] = {}
+    for item in set_vars:
+        if "=" not in item:
+            click.echo(f"Error: --set expects KEY=VALUE, got '{item}'", err=True)
+            raise SystemExit(1)
+        key, value = item.split("=", 1)
+        if not key.strip():
+            click.echo(f"Error: --set has an empty key in '{item}'", err=True)
+            raise SystemExit(1)
+        extra_vars[key.strip()] = value
+
+    try:
+        plan = load_plan(plan_path)
+    except PlanError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    recorder = CliValidationRecorder(artifacts_root=artifacts_root)
+
+    if dry_run:
+        preview = recorder.dry_run(plan, extra_vars=extra_vars)
+        if json_output:
+            click.echo(json.dumps(preview, indent=2, sort_keys=True, default=str))
+        else:
+            console.print(f"\n[bold]Validation Plan (dry run)[/bold] — {plan.plan_id}")
+            console.print(f"  {plan.title}")
+            for cmd in preview["commands"]:
+                mark = "OK" if cmd["allowed"] else "XX"
+                console.print(
+                    f"  [{mark}] {cmd['seq']}. {cmd['command']} "
+                    f"({cmd['safety_level']}) -> {' '.join(cmd['argv'])}"
+                )
+                if not cmd["allowed"]:
+                    console.print(f"       {cmd['governance_reason']}")
+        raise SystemExit(0 if preview["all_allowed"] else 1)
+
+    try:
+        result = recorder.record(plan, name=run_name, extra_vars=extra_vars)
+    except PlanError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if json_output:
+        click.echo(json.dumps(result.to_dict(), indent=2, sort_keys=True, default=str))
+    else:
+        payload = result.to_dict()
+        color = "green" if result.passed else "red"
+        console.print("\n[bold]CLI Validation Evidence[/bold]\n")
+        console.print(f"  Plan:     {result.plan_id}")
+        console.print(f"  Run id:   {result.run_id}")
+        console.print(f"  Status:   [{color}]{result.status.value.upper()}[/{color}]")
+        console.print(
+            f"  Commands: {payload['commands_passed']}/{payload['commands_total']} "
+            f"passed (failed {payload['commands_failed']}, "
+            f"blocked {payload['commands_blocked']}, "
+            f"skipped {payload['commands_skipped']})"
+        )
+        console.print(f"  Bundle:   {result.bundle_dir}")
+    raise SystemExit(result.exit_code)
+
+
 @cli.command("capability-evidence-history")
 @click.option(
     "--capability-id",

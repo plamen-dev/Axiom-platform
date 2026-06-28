@@ -1,0 +1,20 @@
+{
+  "plan_id": "m4_execution_chain",
+  "title": "M4 Execution Chain Validation",
+  "purpose": "Capture durable proof that 'execution-chain-run --capability self-model-build' threads ids end-to-end and emits an evidence bundle.",
+  "commands": [
+    {
+      "id": "chain-run",
+      "command": "execution-chain-run",
+      "args": [
+        "--capability", "self-model-build",
+        "--repo-root", "${repo_root}",
+        "--artifacts-root", "${run_dir}/chain",
+        "--json-output"
+      ],
+      "timeout_seconds": 120,
+      "expected_exit_code": 0,
+      "expect_stdout_contains": ["self-model-build", "\"status\""]
+    }
+  ]
+}
