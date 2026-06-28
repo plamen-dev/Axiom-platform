@@ -191,7 +191,7 @@ EXPECTED_AXIOM_COMMANDS = {
     "capability-validation-show", "capability-validation-export",
     "capability-graph-create", "capability-graphs",
     "capability-graph-show", "capability-graph-export",
-    "self-model-build", "self-model-query",
+    "self-model-build", "self-model-query", "self-model-gap-analysis",
     "execution-context-create", "execution-contexts",
     "execution-context-show", "execution-context-export",
     "execution-environment-create", "execution-environments",

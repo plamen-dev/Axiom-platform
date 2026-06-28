@@ -19510,6 +19510,165 @@ def self_model_query(
         console.print("    (none)")
 
 
+def _self_model_module_classes(repo_root: str) -> dict[str, list[str]]:
+    """Map each ``src/`` module to its class symbol names (evidence for the
+    artifact/evidence-producer gap category). Reuses ``code-inventory``."""
+    from axiom_core.codebase_inventory import CodebaseInventory, SymbolKind
+
+    inventory = CodebaseInventory(repo_root)
+    files, symbols, _ = inventory.scan()
+    path_to_module = {
+        f.path: f.module_name
+        for f in files
+        if f.module_name and f.path.startswith("src/")
+    }
+    module_classes: dict[str, list[str]] = {}
+    for s in symbols:
+        if s.kind is not SymbolKind.CLASS:
+            continue
+        module = path_to_module.get(s.file_path)
+        if module is not None:
+            module_classes.setdefault(module, []).append(s.name)
+    return module_classes
+
+
+def _self_model_documented_modules(artifacts_root: str | None) -> set[str] | None:
+    """Module ids that already have a capability summary (purpose/layer
+    linkage), or ``None`` if no summary metadata is available."""
+    from axiom_core.capability_summary import CapabilitySummaryEngine
+
+    try:
+        engine = CapabilitySummaryEngine(artifacts_root=artifacts_root)
+        reports = engine.list_reports()
+    except (ValueError, OSError):
+        return None
+    if not reports:
+        return None
+    documented: set[str] = set()
+    for report in reports:
+        for summary in report.get("summaries", []):
+            capability_id = summary.get("capability_id")
+            if capability_id:
+                documented.add(capability_id)
+    return documented
+
+
+@cli.command("self-model-gap-analysis")
+@click.option(
+    "--graph",
+    "graph_report_id",
+    required=True,
+    help="Graph report id produced by self-model-build.",
+)
+@click.option(
+    "--repo-root",
+    "repo_root",
+    type=click.Path(exists=True, file_okay=False),
+    default=".",
+    help="Repository root (for producer/class evidence; default: cwd).",
+)
+@click.option(
+    "--artifacts-root",
+    "artifacts_root",
+    type=click.Path(),
+    default=None,
+    help="Artifacts root where the report lives (default: ./artifacts).",
+)
+@click.option(
+    "--export",
+    "export_path",
+    type=click.Path(),
+    default=None,
+    help="Write the Markdown backlog here (a sibling .json is written too).",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def self_model_gap_analysis(
+    graph_report_id: str,
+    repo_root: str,
+    artifacts_root: str | None,
+    export_path: str | None,
+    json_output: bool,
+) -> None:
+    """Enumerate Axiom's own integration gaps from its populated self-model.
+
+    Executable negative discovery on top of self-model-build: classifies
+    isolated/unconsumed/leaf/command-only modules, declared-but-unwired
+    execution-chain transitions, evidence producers without consumers,
+    missing purpose/layer linkage, and disconnected framework families, then
+    emits a ranked integration backlog (JSON + Markdown). No new framework.
+    """
+    from pathlib import Path
+
+    from axiom_core.capability_knowledge_graph import (
+        CapabilityKnowledgeGraphEngine,
+    )
+    from axiom_core.self_model_gap_analysis import (
+        SelfModelGapAnalyzer,
+        to_markdown,
+    )
+
+    try:
+        engine = CapabilityKnowledgeGraphEngine(artifacts_root=artifacts_root)
+        report = engine.get_report(graph_report_id)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+    if report is None:
+        click.echo(f"Error: Report not found: {graph_report_id}", err=True)
+        raise SystemExit(2)
+
+    try:
+        module_classes = _self_model_module_classes(repo_root)
+    except (ValueError, OSError):
+        module_classes = None
+    documented_modules = _self_model_documented_modules(artifacts_root)
+
+    analyzer = SelfModelGapAnalyzer(
+        report,
+        module_classes=module_classes,
+        documented_modules=documented_modules,
+    )
+    result = analyzer.analyze()
+
+    if export_path is not None:
+        md_path = Path(export_path)
+        md_path.parent.mkdir(parents=True, exist_ok=True)
+        md_path.write_text(to_markdown(result), encoding="utf-8")
+        json_path = md_path.with_suffix(".json")
+        json_path.write_text(
+            json.dumps(result, indent=2, default=str), encoding="utf-8"
+        )
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+        return
+
+    console.print("\n[bold]Self-Model Gap Analysis[/bold]\n")
+    console.print(
+        f"  Modules: {result['module_count']}  "
+        f"Edges: {result['edge_count']}  "
+        f"Isolated: {result['isolated_module_count']}"
+    )
+    console.print(f"  Total gaps: {result['gap_count']}\n")
+    console.print("  [bold]Gap counts by type:[/bold]")
+    for gap_type, count in result["gap_counts_by_type"].items():
+        console.print(_rich_escape(f"    {gap_type}: {count}"))
+    console.print("\n  [bold]Ranked integration backlog:[/bold]")
+    for gap in result["gaps"]:
+        console.print(
+            _rich_escape(
+                f"    [{gap['priority'].upper()}] {gap['gap_id']} "
+                f"{gap['title']} "
+                f"(modules: {gap['affected_module_count']}, "
+                f"score: {gap['score']})"
+            )
+        )
+    if export_path is not None:
+        console.print(
+            _rich_escape(f"\n  Backlog written to: {export_path}")
+        )
+
+
 @cli.command("execution-context-create")
 @click.option(
     "--context-file",
