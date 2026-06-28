@@ -8,6 +8,10 @@ capability's prior confidence/readiness.
 
 Matrix covered: passing, failing, missing, invalid (no identity), repeated
 (cumulative), and stale evidence; plus linkage and queryability.
+
+PR #148 safety hardening adds: duplicate evidence (no second mutation, still
+queryable), distinct-run accumulation, conflicting outcome signals
+(quarantined, no mutation), and readiness/EVID-001 scope documentation checks.
 """
 
 from __future__ import annotations
@@ -50,19 +54,31 @@ def _write_chain_evidence(
     report_id: str = "REPORT-1",
     include_capability: bool = True,
     include_status: bool = True,
+    bundle_passed: bool | None = None,
+    bundle_status: str | None = None,
+    evidence_id: str | None = None,
 ) -> str:
-    """Write an evidence.json + sibling trace.json like execution-chain-run does."""
+    """Write an evidence.json + sibling trace.json like execution-chain-run does.
+
+    ``bundle_passed`` / ``bundle_status`` write outcome signals onto the
+    evidence bundle itself (the trace always carries ``status``), which lets a
+    test construct agreeing or *conflicting* signal sets.
+    """
     run_dir = Path(artifacts_root) / "execution_chain" / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     references: dict[str, Any] = {"result_id": result_id, "artifact_id": artifact_id}
     if include_capability:
         references["capability_id"] = capability_id
-    evidence = {
-        "evidence_id": f"EVID-{run_id}",
+    evidence: dict[str, Any] = {
+        "evidence_id": evidence_id if evidence_id is not None else f"EVID-{run_id}",
         "references": references,
         "metrics": {"module_count": 10, "import_edge_count": 20},
         "summary": "fixture evidence",
     }
+    if bundle_passed is not None:
+        evidence["passed"] = bundle_passed
+    if bundle_status is not None:
+        evidence["status"] = bundle_status
     if created_at is not None:
         evidence["created_at"] = created_at
     (run_dir / "evidence.json").write_text(json.dumps(evidence))
@@ -411,3 +427,200 @@ def test_cli_history_and_show(tmp_path: Any) -> None:
     )
     assert show.exit_code == 0, show.output
     assert json.loads(show.output)["intake_id"] == intake_id
+
+
+# ---------------------------------------------------------------------------
+# PR #148 — duplicate evidence handling
+# ---------------------------------------------------------------------------
+
+
+def test_duplicate_evidence_does_not_inflate_confidence(
+    loop: EvidencePromotionLoop, artifacts_root: str
+) -> None:
+    """The same evidence file applied twice must not mutate state again."""
+    evidence = _write_chain_evidence(artifacts_root, run_id="dup", status="PASS")
+
+    first = loop.apply(evidence)
+    assert first["decision"] == EvidenceDecision.ACCEPTED.value
+    assert first["updated_state"]["execution_count"] == 1
+    assert first["updated_state"]["success_count"] == 1
+
+    second = loop.apply(evidence)
+    assert second["decision"] == EvidenceDecision.DUPLICATE.value
+    assert second["state_changed"] is False
+    assert second["duplicate_of"] == first["intake_id"]
+    # Confidence factors are unchanged — no second accumulation.
+    assert second["updated_state"]["execution_count"] == 1
+    assert second["updated_state"]["success_count"] == 1
+    assert second["updated_state"]["score"] == first["updated_state"]["score"]
+
+    # The durable confidence store agrees: still a single execution.
+    assert loop.current_state("self-model-build")["execution_count"] == 1
+
+
+def test_duplicate_evidence_attempt_is_visible_in_history(
+    loop: EvidencePromotionLoop, artifacts_root: str
+) -> None:
+    evidence = _write_chain_evidence(artifacts_root, run_id="dup2", status="PASS")
+    loop.apply(evidence)
+    dup = loop.apply(evidence)
+
+    history = loop.list_intakes(capability_id="self-model-build")
+    decisions = [r["decision"] for r in history]
+    assert EvidenceDecision.DUPLICATE.value in decisions
+    fetched = loop.get_intake(dup["intake_id"])
+    assert fetched["decision"] == EvidenceDecision.DUPLICATE.value
+    assert fetched["evidence_fingerprint"] == "evidence_id:EVID-dup2"
+
+
+def test_distinct_runs_still_accumulate(
+    loop: EvidencePromotionLoop, artifacts_root: str
+) -> None:
+    """Distinct evidence from distinct runs is not treated as a duplicate."""
+    first_ev = _write_chain_evidence(artifacts_root, run_id="r1", status="PASS")
+    second_ev = _write_chain_evidence(artifacts_root, run_id="r2", status="PASS")
+
+    first = loop.apply(first_ev)
+    second = loop.apply(second_ev)
+
+    assert first["decision"] == EvidenceDecision.ACCEPTED.value
+    assert second["decision"] == EvidenceDecision.ACCEPTED.value
+    assert second["updated_state"]["execution_count"] == 2
+    assert second["updated_state"]["success_count"] == 2
+
+
+def test_previously_quarantined_evidence_can_still_apply(
+    loop: EvidencePromotionLoop, artifacts_root: str
+) -> None:
+    """Only *accepted* applications block re-application; a quarantine doesn't."""
+    old = (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()
+    evidence = _write_chain_evidence(
+        artifacts_root, run_id="requeue", status="PASS", created_at=old
+    )
+    quarantined = loop.apply(evidence, max_age_seconds=3600)
+    assert quarantined["decision"] == EvidenceDecision.QUARANTINED.value
+
+    accepted = loop.apply(evidence)  # no staleness gate this time
+    assert accepted["decision"] == EvidenceDecision.ACCEPTED.value
+    assert accepted["updated_state"]["execution_count"] == 1
+
+
+# ---------------------------------------------------------------------------
+# PR #148 — conflicting outcome signal handling
+# ---------------------------------------------------------------------------
+
+
+def test_conflicting_signals_are_quarantined(
+    loop: EvidencePromotionLoop, artifacts_root: str
+) -> None:
+    """bundle.passed=true but trace.status=FAIL must not be silently resolved."""
+    evidence = _write_chain_evidence(
+        artifacts_root, run_id="conflict", status="FAIL", bundle_passed=True
+    )
+    record = loop.apply(evidence)
+
+    assert record["evidence_outcome"] == EvidenceOutcome.CONFLICT.value
+    assert record["decision"] == EvidenceDecision.QUARANTINED.value
+    assert record["state_changed"] is False
+    assert "conflict" in record["reason"].lower()
+    # All detected signals are preserved for the audit record.
+    sources = {s["source"] for s in record["outcome_signals"]}
+    assert {"bundle.passed", "trace.status"} <= sources
+    assert {s["outcome"] for s in record["outcome_signals"]} == {"pass", "fail"}
+
+
+def test_conflicted_evidence_does_not_mutate_confidence(
+    loop: EvidencePromotionLoop, artifacts_root: str
+) -> None:
+    evidence = _write_chain_evidence(
+        artifacts_root, run_id="conflict2", bundle_status="PASS", status="FAIL"
+    )
+    record = loop.apply(evidence)
+
+    assert record["decision"] == EvidenceDecision.QUARANTINED.value
+    assert record["prior_state"] == record["updated_state"]
+    # Nothing was written to the confidence store.
+    assert loop.current_state("self-model-build")["execution_count"] == 0
+
+
+def test_agreeing_signals_are_accepted(
+    loop: EvidencePromotionLoop, artifacts_root: str
+) -> None:
+    """Multiple signals that agree are not a conflict."""
+    evidence = _write_chain_evidence(
+        artifacts_root, run_id="agree", bundle_passed=True, bundle_status="PASS",
+        status="PASS",
+    )
+    record = loop.apply(evidence)
+    assert record["evidence_outcome"] == EvidenceOutcome.PASS.value
+    assert record["decision"] == EvidenceDecision.ACCEPTED.value
+
+
+def test_cli_duplicate_and_conflict(tmp_path: Any) -> None:
+    root = str(tmp_path / "artifacts")
+    runner = CliRunner()
+
+    evidence = _write_chain_evidence(root, run_id="cli-dup", status="PASS")
+    first = runner.invoke(
+        cli,
+        ["capability-evidence-apply", "--evidence", evidence,
+         "--artifacts-root", root, "--json-output"],
+    )
+    assert json.loads(first.output)["decision"] == "accepted"
+    second = runner.invoke(
+        cli,
+        ["capability-evidence-apply", "--evidence", evidence,
+         "--artifacts-root", root, "--json-output"],
+    )
+    dup_payload = json.loads(second.output)
+    assert dup_payload["decision"] == "duplicate"
+    assert dup_payload["state_changed"] is False
+
+    conflict = _write_chain_evidence(
+        root, run_id="cli-conflict", status="FAIL", bundle_passed=True
+    )
+    conflict_result = runner.invoke(
+        cli,
+        ["capability-evidence-apply", "--evidence", conflict,
+         "--artifacts-root", root, "--json-output"],
+    )
+    conflict_payload = json.loads(conflict_result.output)
+    assert conflict_payload["decision"] == "quarantined"
+    assert conflict_payload["evidence_outcome"] == "conflict"
+    assert conflict_payload["state_changed"] is False
+
+
+# ---------------------------------------------------------------------------
+# PR #148 — readiness classification + EVID-001 scope language
+# ---------------------------------------------------------------------------
+
+
+def test_readiness_label_is_deterministic_and_local() -> None:
+    """Readiness is a pure deterministic projection of the score, documented
+    as implementation-local (not promotion doctrine)."""
+    from axiom_core import evidence_promotion
+
+    assert evidence_promotion._readiness_from_score(0.95) == "ready"
+    assert evidence_promotion._readiness_from_score(0.7) == "ready"
+    assert evidence_promotion._readiness_from_score(0.5) == "provisional"
+    assert evidence_promotion._readiness_from_score(0.3) == "provisional"
+    assert evidence_promotion._readiness_from_score(0.1) == "blocked"
+    # Deterministic: same input -> same label.
+    assert evidence_promotion._readiness_from_score(0.5) == (
+        evidence_promotion._readiness_from_score(0.5)
+    )
+
+    doc = evidence_promotion._readiness_from_score.__doc__ or ""
+    assert "implementation-local" in doc.lower()
+    assert "not promotion" in doc.lower()
+    assert "program 6" in doc.lower()
+
+
+def test_evid001_language_is_scoped_to_m2_slice() -> None:
+    """The module must not overclaim full EVID-001 closure."""
+    from axiom_core import evidence_promotion
+
+    module_doc = (evidence_promotion.__doc__ or "").lower()
+    assert "narrow m2 slice" in module_doc
+    assert "model_health" in module_doc
+    assert "remains" in module_doc and "open" in module_doc

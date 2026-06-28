@@ -18,16 +18,36 @@ Decision handling (reusing existing timestamp/state structures):
 * failing evidence lowers / does not raise confidence (failure factor
   accumulates), and can drop readiness to ``blocked``;
 * evidence without a capability identity is **quarantined** (no state change);
+* evidence whose available outcome signals disagree (``bundle.passed`` vs
+  ``bundle.status`` vs the sibling ``trace.status``) is **quarantined** as a
+  conflict rather than silently resolved by source priority (no state change);
 * evidence with no determinable outcome is treated as **missing** and rejected
   (no state change);
 * stale evidence (older than an opt-in ``max_age_seconds``, measured from the
-  existing ``created_at`` timestamp) is **quarantined** (no state change).
+  existing ``created_at`` timestamp) is **quarantined** (no state change);
+* evidence whose stable fingerprint was **already accepted** for the capability
+  is recorded as a **duplicate** and does **not** mutate confidence/readiness a
+  second time (distinct evidence from distinct runs still accumulates).
 
 A small intake record is persisted per application so the decision
-(accepted / rejected / quarantined), the reason, the before/after state and the
-links back to the capability / result / artifact / report are queryable. This
-record is an audit artifact following the repository's standard per-engine
-``report.json`` + evidence convention; it is **not** a new promotion registry.
+(accepted / rejected / quarantined / duplicate), the reason, the detected
+outcome signals, the before/after state and the links back to the capability /
+result / artifact / report are queryable. This record is an audit artifact
+following the repository's standard per-engine ``report.json`` + evidence
+convention; it is **not** a new promotion registry, doctrine layer, or durable
+capability state separate from ``CapabilityConfidenceEngine``.
+
+Readiness labelling: the ``ready``/``provisional``/``blocked`` label is an
+**implementation-local** deterministic projection of the confidence score (see
+:func:`_readiness_from_score`). It is not promotion doctrine and gates no
+registry state transition; the canonical home/thresholds for readiness are an
+open doctrine question routed to Program 6.
+
+EVID-001 scope: this loop closes the **narrow M2 slice** of PR #144 gap
+EVID-001 — execution-chain ``evidence.json`` is no longer orphaned from
+capability confidence/readiness. The broader EVID-001 finding (other evidence
+producers, notably ``axiom_core.model_health``, lacking consumer paths) remains
+open and is **not** fully closed here.
 
 Non-goals: no promotion doctrine, no full Evidence-to-Promotion architecture,
 no new object family, no Execution Graph Synthesizer, no Organizational State
@@ -36,6 +56,7 @@ schema, no Purpose/Layer Index implementation (M3 is recorded as a hook only).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from dataclasses import dataclass
@@ -63,6 +84,7 @@ class EvidenceOutcome(str, Enum):
     PASS = "pass"
     FAIL = "fail"
     MISSING = "missing"
+    CONFLICT = "conflict"
 
 
 class EvidenceDecision(str, Enum):
@@ -71,6 +93,7 @@ class EvidenceDecision(str, Enum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"
     QUARANTINED = "quarantined"
+    DUPLICATE = "duplicate"
 
 
 # Tokens that map an evidence ``status`` string onto a pass/fail outcome.
@@ -79,10 +102,21 @@ _FAIL_TOKENS = {"fail", "failed", "failure", "error", "errored", "false"}
 
 
 def _readiness_from_score(score: float) -> str:
-    """Map a confidence score onto a deterministic readiness flag.
+    """Project a confidence score onto a deterministic readiness label.
 
-    Reuses the confidence score thresholds rather than defining a new scale:
-    ``ready`` mirrors high/very-high confidence, ``blocked`` mirrors very-low.
+    **Classification: implementation-local readiness labelling — NOT promotion
+    doctrine.** This is a pure, deterministic function of the confidence score
+    already computed by :class:`CapabilityConfidenceEngine`; it introduces no
+    new durable state and reuses the engine's own score thresholds
+    (``>= 0.7`` mirrors high/very-high confidence, ``>= 0.3`` mirrors low,
+    below that mirrors very-low). The label exists only to make intake records
+    human-readable.
+
+    It is deliberately *not* used to gate any registry/capability state
+    transition, and it does not define accepted promotion doctrine. The
+    canonical owner of readiness (whether it belongs in the confidence engine,
+    and what the official thresholds should be) is an unresolved doctrine
+    question routed to **Program 6**; it is intentionally not decided here.
     """
     if score >= 0.7:
         return "ready"
@@ -166,32 +200,66 @@ class EvidencePromotionLoop:
                 EvidenceDecision.REJECTED, load_error, links, now,
             )
 
+        # Collect every available outcome signal once; used for conflict
+        # detection and preserved in the intake record for auditability.
+        outcome, outcome_reason, signals = self._outcome(bundle)
+
         # 2. No capability identity -> quarantine.
         if not resolved_capability:
             return self._record(
-                "", evidence_path, self._outcome(bundle)[0],
+                "", evidence_path, outcome,
                 EvidenceDecision.QUARANTINED,
                 "evidence lacks a capability identity", links, now,
+                signals=signals,
             )
 
-        # 3. Stale evidence -> quarantine (opt-in).
+        # 3. Conflicting outcome signals -> quarantine. Do NOT silently resolve
+        # disagreeing signals by source priority when state would be mutated.
+        if outcome is EvidenceOutcome.CONFLICT:
+            return self._record(
+                resolved_capability, evidence_path, outcome,
+                EvidenceDecision.QUARANTINED, outcome_reason, links, now,
+                signals=signals,
+            )
+
+        # 4. Stale evidence -> quarantine (opt-in).
         if max_age_seconds is not None:
             stale_reason = self._staleness_reason(bundle, max_age_seconds, now)
             if stale_reason is not None:
                 return self._record(
-                    resolved_capability, evidence_path, self._outcome(bundle)[0],
+                    resolved_capability, evidence_path, outcome,
                     EvidenceDecision.QUARANTINED, stale_reason, links, now,
+                    signals=signals,
                 )
 
-        # 4. Determine pass/fail outcome.
-        outcome, outcome_reason = self._outcome(bundle)
+        # 5. No determinable outcome -> reject.
         if outcome is EvidenceOutcome.MISSING:
             return self._record(
                 resolved_capability, evidence_path, outcome,
                 EvidenceDecision.REJECTED, outcome_reason, links, now,
+                signals=signals,
             )
 
-        # 5. Accepted: accumulate the outcome onto prior confidence state.
+        # 6. Duplicate of already-accepted evidence -> record, do NOT mutate
+        # confidence/readiness a second time. Distinct evidence from distinct
+        # runs has a distinct fingerprint and still accumulates.
+        fingerprint = self._fingerprint(bundle, evidence_path)
+        duplicate_of = self._already_accepted(resolved_capability, fingerprint)
+        if duplicate_of is not None:
+            prior = self._current_state(resolved_capability)
+            reason = (
+                f"duplicate evidence (fingerprint {fingerprint}) was already "
+                f"accepted for {resolved_capability} in intake {duplicate_of}; "
+                f"confidence/readiness not mutated again"
+            )
+            return self._record(
+                resolved_capability, evidence_path, outcome,
+                EvidenceDecision.DUPLICATE, reason, links, now,
+                prior=prior, updated=prior, signals=signals,
+                fingerprint=fingerprint, duplicate_of=duplicate_of,
+            )
+
+        # 7. Accepted: accumulate the outcome onto prior confidence state.
         prior = self._current_state(resolved_capability)
         execution_count = prior.execution_count + 1
         success_count = prior.success_count + (1 if outcome is EvidenceOutcome.PASS else 0)
@@ -223,7 +291,8 @@ class EvidencePromotionLoop:
         return self._record(
             resolved_capability, evidence_path, outcome,
             EvidenceDecision.ACCEPTED, reason, links, now,
-            prior=prior, updated=updated,
+            prior=prior, updated=updated, signals=signals,
+            fingerprint=fingerprint,
         )
 
     # ------------------------------------------------------------------
@@ -291,34 +360,108 @@ class EvidencePromotionLoop:
             return {}
         return data if isinstance(data, dict) else {}
 
-    def _outcome(self, bundle: dict[str, Any]) -> tuple[EvidenceOutcome, str]:
-        """Derive pass/fail from the bundle, then its sibling chain trace."""
+    def _collect_signals(self, bundle: dict[str, Any]) -> list[dict[str, str]]:
+        """Collect every interpretable pass/fail signal from bundle + trace.
+
+        Returns one entry per *recognised* signal (unrecognised status tokens
+        are ignored, preserving the prior "no determinable outcome" behaviour).
+        Each entry records its source so conflicts are fully auditable.
+        """
+        signals: list[dict[str, str]] = []
+
         if "passed" in bundle and isinstance(bundle["passed"], bool):
-            if bundle["passed"]:
-                return EvidenceOutcome.PASS, "bundle.passed is true"
-            return EvidenceOutcome.FAIL, "bundle.passed is false"
+            signals.append(
+                {
+                    "source": "bundle.passed",
+                    "value": str(bundle["passed"]),
+                    "outcome": EvidenceOutcome.PASS.value
+                    if bundle["passed"]
+                    else EvidenceOutcome.FAIL.value,
+                }
+            )
 
-        status = bundle.get("status")
-        if isinstance(status, str) and status.strip():
-            token = status.strip().lower()
+        for source, raw in (
+            ("bundle.status", bundle.get("status")),
+            ("trace.status", self._pending_trace.get("status")),
+        ):
+            if not (isinstance(raw, str) and raw.strip()):
+                continue
+            token = raw.strip().lower()
             if token in _PASS_TOKENS:
-                return EvidenceOutcome.PASS, f"bundle.status={status!r}"
-            if token in _FAIL_TOKENS:
-                return EvidenceOutcome.FAIL, f"bundle.status={status!r}"
+                signals.append(
+                    {"source": source, "value": raw, "outcome": EvidenceOutcome.PASS.value}
+                )
+            elif token in _FAIL_TOKENS:
+                signals.append(
+                    {"source": source, "value": raw, "outcome": EvidenceOutcome.FAIL.value}
+                )
 
-        trace = self._pending_trace
-        trace_status = trace.get("status")
-        if isinstance(trace_status, str) and trace_status.strip():
-            token = trace_status.strip().lower()
-            if token in _PASS_TOKENS:
-                return EvidenceOutcome.PASS, f"chain trace.status={trace_status!r}"
-            if token in _FAIL_TOKENS:
-                return EvidenceOutcome.FAIL, f"chain trace.status={trace_status!r}"
+        return signals
 
-        return (
-            EvidenceOutcome.MISSING,
-            "no determinable pass/fail outcome in evidence or chain trace",
-        )
+    def _outcome(
+        self, bundle: dict[str, Any]
+    ) -> tuple[EvidenceOutcome, str, list[dict[str, str]]]:
+        """Derive a pass/fail outcome across all available signals.
+
+        Unlike a priority pick, this reconciles ``bundle.passed``,
+        ``bundle.status`` and the sibling ``trace.status``: agreement yields
+        that outcome, disagreement yields :attr:`EvidenceOutcome.CONFLICT` (so
+        the caller can quarantine rather than silently trusting one source),
+        and no recognised signal yields :attr:`EvidenceOutcome.MISSING`.
+        """
+        signals = self._collect_signals(bundle)
+        if not signals:
+            return (
+                EvidenceOutcome.MISSING,
+                "no determinable pass/fail outcome in evidence or chain trace",
+                signals,
+            )
+
+        detail = ", ".join(f"{s['source']}={s['value']!r}->{s['outcome']}" for s in signals)
+        distinct = {s["outcome"] for s in signals}
+        if len(distinct) > 1:
+            return (
+                EvidenceOutcome.CONFLICT,
+                f"conflicting outcome signals ({detail}); evidence quarantined "
+                f"rather than resolved by source priority",
+                signals,
+            )
+
+        resolved = distinct.pop()
+        if resolved == EvidenceOutcome.PASS.value:
+            return EvidenceOutcome.PASS, f"pass from {detail}", signals
+        return EvidenceOutcome.FAIL, f"fail from {detail}", signals
+
+    @staticmethod
+    def _fingerprint(bundle: dict[str, Any], evidence_path: str) -> str:
+        """Return a stable identity for one evidence record.
+
+        Prefers the bundle's ``evidence_id`` (which execution-chain-run mints
+        fresh per run, so distinct runs are distinct); falls back to a content
+        hash so a hand-authored bundle without an id still de-duplicates when
+        re-applied. The fingerprint is independent of the on-disk path.
+        """
+        evidence_id = str(bundle.get("evidence_id", "")).strip()
+        if evidence_id:
+            return f"evidence_id:{evidence_id}"
+        canonical = json.dumps(bundle, sort_keys=True, default=str)
+        digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        return f"sha256:{digest}"
+
+    def _already_accepted(self, capability_id: str, fingerprint: str) -> str | None:
+        """Return the intake id of a prior *accepted* application of the same
+        evidence fingerprint for this capability, else ``None``.
+
+        Only accepted applications block re-application: an evidence record that
+        was previously quarantined/rejected never mutated state, so a later
+        legitimate application of it must still be allowed to accumulate.
+        """
+        for record in self.list_intakes(capability_id=capability_id):
+            if record.get("decision") != EvidenceDecision.ACCEPTED.value:
+                continue
+            if record.get("evidence_fingerprint") == fingerprint:
+                return str(record.get("intake_id", ""))
+        return None
 
     @staticmethod
     def _created_at(bundle: dict[str, Any], trace: dict[str, Any]) -> str:
@@ -369,6 +512,9 @@ class EvidencePromotionLoop:
         now: datetime,
         prior: CapabilityStateSnapshot | None = None,
         updated: CapabilityStateSnapshot | None = None,
+        signals: list[dict[str, str]] | None = None,
+        fingerprint: str = "",
+        duplicate_of: str = "",
     ) -> dict[str, Any]:
         prior = prior or CapabilityStateSnapshot(capability_id=capability_id)
         updated = updated or prior
@@ -385,9 +531,12 @@ class EvidencePromotionLoop:
             "created_at": now.isoformat(),
             "capability_id": capability_id,
             "evidence_path": evidence_path,
+            "evidence_fingerprint": fingerprint,
             "evidence_outcome": outcome.value,
+            "outcome_signals": signals or [],
             "decision": decision.value,
             "accepted": decision is EvidenceDecision.ACCEPTED,
+            "duplicate_of": duplicate_of,
             "reason": reason,
             "links": links,
             "prior_state": prior.to_dict(),

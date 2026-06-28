@@ -472,3 +472,20 @@ See `docs/runbooks/behavior-regression-runbook.md` for philosophy and process.
 | **related_test_case** | `tests/test_automation_bridge.py` (classifier + driver + CLI vs mock PipeClient) |
 | **related_artifact_path** | `src/axiom_core/automation_bridge.py`, `src/axiom_cli/main.py` (bridge-execute), `.github/workflows/windows-revit-validation.yml`, `docs/architecture/revit-automation-bridge-v0.md` |
 | **notes** | No new Revit capability; no change to CreateGrids/CreateLevels/InventoryModel/SetParameterValue behavior. No new transport (Option A only; no Job Queue / Local HTTP). No UI automation. Establishes the Axiom-outside <-> Axiom-inside communication boundary for the verification factory. |
+
+## BHV-027: Evidence Promotion safety hardening — duplicate + conflict handling (PR #148)
+
+| Field | Value |
+|-------|-------|
+| **behavior_id** | BHV-027 |
+| **date** | 2026-06-23 |
+| **capability** | EvidencePromotionLoop (M2 evidence-to-confidence/readiness coordinator; not a Revit capability) |
+| **observed_prompt** | `poetry run axiom capability-evidence-apply --evidence artifacts/execution_chain/<run>/evidence.json --json-output` (same evidence applied twice; or evidence whose `evidence.json` and sibling `trace.json` disagree on PASS/FAIL) |
+| **previous_behavior** | (PR #147) Re-applying the exact same evidence record always accumulated again — `execution_count`/`success_count`/`failure_count` incremented every time, silently inflating confidence. Outcome was resolved by source **priority** (`bundle.passed` → `bundle.status` → `trace.status`), so when signals disagreed the highest-priority source silently won and mutated confidence/readiness. |
+| **expected_behavior** | Re-applying an already-accepted evidence record must not mutate confidence/readiness a second time, and must remain queryable. Disagreeing outcome signals must be quarantined (no mutation) rather than silently resolved by priority. Distinct evidence from distinct runs must still accumulate. |
+| **current_behavior** | `apply()` computes a stable per-record fingerprint (`evidence_id`, else a content `sha256`). If that fingerprint was already **accepted** for the capability, the application is recorded with decision `duplicate`, `state_changed: false`, and `duplicate_of: <prior intake_id>` — no confidence write. `_outcome()` now collects **all** recognised signals (`bundle.passed`, `bundle.status`, `trace.status`); agreement → that outcome, disagreement → outcome `conflict` → decision `quarantined` with `state_changed: false` and the detected `outcome_signals` preserved in the intake record. Accepted/failing/missing/no-identity/stale behaviour is unchanged. Confidence math in `CapabilityConfidenceEngine` is unchanged; readiness labelling stays an implementation-local projection of the score (not promotion doctrine; doctrine routed to Program 6). |
+| **status** | implemented (Python; targeted + full pytest + ruff green) |
+| **related_bug_id** | post-merge self-audit of PR #147 (duplicate inflation; silent priority resolution) |
+| **related_test_case** | `tests/test_evidence_promotion.py` (duplicate / conflict / distinct-run accumulation + existing matrix) |
+| **related_artifact_path** | `src/axiom_core/evidence_promotion.py`, `src/axiom_cli/main.py` (capability-evidence-apply renderer), `docs/architecture/integration/M2_Evidence_Promotion_Validation_Packet.md` |
+| **notes** | No new promotion framework, doctrine, registry, object family, or durable state separate from `CapabilityConfidenceEngine`. Intake records remain audit artifacts only. EVID-001 remains closed only for the narrow M2 execution-chain slice; `model_health` producer gap stays open. |
