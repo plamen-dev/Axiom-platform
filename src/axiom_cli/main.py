@@ -19480,9 +19480,12 @@ def execution_chain_run(
 def _render_evidence_intake_rich(record: dict) -> None:
     """Rich rendering for one evidence-to-state intake record."""
     decision = record.get("decision", "")
-    color = {"accepted": "green", "rejected": "red", "quarantined": "yellow"}.get(
-        decision, "white"
-    )
+    color = {
+        "accepted": "green",
+        "rejected": "red",
+        "quarantined": "yellow",
+        "duplicate": "cyan",
+    }.get(decision, "white")
     prior = record.get("prior_state", {})
     updated = record.get("updated_state", {})
     links = record.get("links", {})
@@ -19490,6 +19493,13 @@ def _render_evidence_intake_rich(record: dict) -> None:
     console.print(f"  Capability:   {record.get('capability_id') or '<none>'}")
     console.print(f"  Evidence:     {record.get('evidence_path', '')}")
     console.print(f"  Outcome:      {record.get('evidence_outcome', '')}")
+    signals = record.get("outcome_signals") or []
+    if signals:
+        rendered = ", ".join(
+            f"{s.get('source', '')}={s.get('value', '')}->{s.get('outcome', '')}"
+            for s in signals
+        )
+        console.print(f"  Signals:      {rendered}")
     console.print(f"  Decision:     [{color}]{decision}[/{color}]")
     console.print(f"  Reason:       {record.get('reason', '')}")
     console.print(

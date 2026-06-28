@@ -62,8 +62,20 @@ derive `CapabilityConfidenceFactors` from the validation summary and call
 - Tests H1–H5 green (fixtures: one passing bundle, one failing bundle).
 - A before/after assertion: a capability's confidence level (or status/readiness) **differs**
   purely because evidence was ingested — demonstrating evidence changes state.
-- Re-run gap analysis: EVID-001 producer now has a downstream consumer edge (orphan cleared).
 - Full `pytest -q` green; `ruff` clean.
+
+### EVID-001 closure scope (corrected)
+
+PR #147 closes the **narrow M2 slice** of EVID-001: execution-chain `evidence.json` is no
+longer orphaned — it now has a downstream consumer in `CapabilityConfidenceEngine`
+(confidence/readiness) via `EvidencePromotionLoop`. PR #148 hardens that loop (duplicate /
+conflict handling) but does **not** widen the closure.
+
+EVID-001 as a whole is **not fully closed**: the original gap is
+`artifact_or_evidence_producers_without_consumers` for `axiom_core.model_health`, whose
+`HealthRunResult`/`CapabilityReadiness` output still has no consumer path. Full closure
+requires `model_health` (and any other orphaned producer) to gain a consumer edge and a
+re-run of gap analysis confirming it — explicitly out of scope for M2/PR #147/PR #148.
 
 ## 8. Relationship to M4 (why this does not block M4)
 
