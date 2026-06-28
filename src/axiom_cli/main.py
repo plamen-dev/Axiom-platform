@@ -19398,6 +19398,85 @@ def self_model_build(
     )
 
 
+@cli.command("execution-chain-run")
+@click.option(
+    "--capability",
+    "capability",
+    default="self-model-build",
+    help=(
+        "Deterministic capability to run through the chain "
+        "(self-model-build | code-inventory)."
+    ),
+)
+@click.option(
+    "--repo-root",
+    "repo_root",
+    type=click.Path(exists=True, file_okay=False),
+    default=".",
+    help="Repository root to scan (default: current directory).",
+)
+@click.option(
+    "--artifacts-root",
+    "artifacts_root",
+    type=click.Path(),
+    default=None,
+    help="Artifacts root for the chain objects (default: ./artifacts).",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def execution_chain_run(
+    capability: str,
+    repo_root: str,
+    artifacts_root: str | None,
+    json_output: bool,
+) -> None:
+    """Run one deterministic capability through the full execution chain.
+
+    Drives the selected capability through ExecutionPlan -> ExecutionStep ->
+    ExecutionAttempt -> ExecutionResult -> ExecutionArtifact -> Evidence ->
+    ExecutionReport, preserving the prior stage's real id at every transition
+    (``downstream.reference_value == upstream.id``). Reuses the existing
+    execution engines; introduces no new execution object family.
+    """
+    from axiom_core.execution_chain_orchestrator import (
+        ExecutionChainError,
+        ExecutionChainOrchestrator,
+    )
+
+    try:
+        orchestrator = ExecutionChainOrchestrator(
+            repo_root=repo_root, artifacts_root=artifacts_root
+        )
+        trace = orchestrator.run(capability)
+    except (ExecutionChainError, ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if json_output:
+        click.echo(json.dumps(trace.to_dict(), indent=2, sort_keys=True, default=str))
+        return
+
+    summary = trace.summary()
+    console.print("\n[bold]Execution Chain Run[/bold]\n")
+    console.print(f"  Capability:   {summary['capability_id']}")
+    console.print(f"  Plan id:      {summary['plan_id']}")
+    console.print(f"  Step id:      {summary['step_id']}")
+    console.print(f"  Attempt id:   {summary['attempt_id']}")
+    console.print(f"  Result id:    {summary['result_id']}")
+    console.print(f"  Artifact id:  {summary['artifact_id']}")
+    console.print(f"  Evidence ref: {summary['evidence_reference']}")
+    console.print(f"  Report id:    {summary['report_id']}")
+    status = summary["status"]
+    color = "green" if status == "PASS" else "red"
+    console.print(f"\n  ID-flow status: [{color}]{status}[/{color}]")
+    console.print("\n  [dim]Transitions (downstream.reference == upstream.id):[/dim]")
+    for t in trace.transitions:
+        mark = "OK" if t.ok else "XX"
+        console.print(
+            f"    [{mark}] {t.upstream_stage} -> {t.downstream_stage} "
+            f"({t.reference_type})"
+        )
+
+
 @cli.command("self-model-query")
 @click.option(
     "--graph",

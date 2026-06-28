@@ -6696,6 +6696,42 @@ _register(
 
 _register(
     CommandSpec(
+        name="execution-chain-run",
+        command=(
+            "axiom execution-chain-run [--capability <id>] "
+            "[--repo-root <p>] [--artifacts-root <p>] [--json-output]"
+        ),
+        description=(
+            "Run one deterministic capability (self-model-build) through the "
+            "full execution chain (ExecutionPlan -> ExecutionStep -> "
+            "ExecutionAttempt -> ExecutionResult -> ExecutionArtifact -> "
+            "Evidence -> ExecutionReport), preserving the prior stage's real "
+            "id at every transition."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("execution_chain/<run_id>/trace.json", required=True),
+            EvidenceOutput(
+                "execution_chain/<run_id>/evidence.json", required=True
+            ),
+            EvidenceOutput(
+                "execution_chain/<run_id>/self_model.json", required=True
+            ),
+        )
+        + EV_CONSOLE,
+        timeout_seconds=120,
+        failure_modes=(FM_NONZERO,),
+        notes=(
+            "Thin orchestrator (M4): reuses the existing execution engines and "
+            "threads real upstream ids forward; no new execution object family."
+        ),
+    )
+)
+
+_register(
+    CommandSpec(
         name="execution-context-create",
         command=(
             "axiom execution-context-create "
