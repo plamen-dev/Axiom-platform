@@ -43,7 +43,12 @@ From `README.md`, validated using five Snowdon Towers source models
 `CreateGrids`, `CreateLevels`, `InventoryModel`, `SetParameterValue`.
 
 - `InventoryModel` is the base for Category / Parameter Discovery.
-- `SetParameterValue` is the first Primitive Action Validation candidate.
+- `SetParameterValue` is the first Primitive Action Validation candidate. It is a
+  registered, wired capability (`SetParameterValueCapability.cs`,
+  `ParameterEditService.cs`, `docs/runbooks/set-parameter-value-runbook.md`,
+  ledger BHV-023/BHV-024). Note: `README.md` currently lists only the first three
+  capabilities and lags this canonical state — routed as RF-005 in
+  `40_Open_Investigations.md`.
 
 ## Recent implementation state (merged PRs)
 

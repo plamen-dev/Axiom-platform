@@ -53,6 +53,7 @@ traceability ledger in `docs/logs/`, not kept here indefinitely.
 | RF-002 | Live program staffing and current cycle commitments | Program 7 | `20_Current_Organizational_State.md` |
 | RF-003 | Durable organizational communications / decision log content | Program 0 / 7 | `50_Organizational_Communications.md` |
 | RF-004 | Whether prior Program 5 investigation reports should be canonicalized | Program 5 / 6 | this file / new docs PR |
+| RF-005 | `README.md` "Current Capabilities" lists only `CreateGrids`/`CreateLevels`/`InventoryModel` and omits `SetParameterValue`, which is a registered, wired capability (`SetParameterValueCapability.cs`, `ParameterEditService.cs`, `docs/runbooks/set-parameter-value-runbook.md`, ledger BHV-023/BHV-024). Canonical state is correct; README lags. | Program 4 / 7 | `README.md` (separate PR; out of scope for this docs seed) |
 
 ## Current Status / Source Needed
 
