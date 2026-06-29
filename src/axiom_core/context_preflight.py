@@ -131,6 +131,15 @@ _INTEGRATION_DOCS = {
     "M4_Execution_Chain_Validation_Packet": (
         "docs/architecture/integration/M4_Execution_Chain_Validation_Packet.md"
     ),
+    "PR_Purpose_Map_v0": (
+        "docs/architecture/integration/PR_Purpose_Map_v0.md"
+    ),
+    "Duplicate_Alias_Map_v0": (
+        "docs/architecture/integration/Duplicate_Alias_Map_v0.md"
+    ),
+    "Axiom_Current_Context_Pack": (
+        "docs/architecture/integration/Axiom_Current_Context_Pack.md"
+    ),
 }
 
 
@@ -462,6 +471,374 @@ def _overlap_guardrails() -> list[dict[str, Any]]:
     return list(_OVERLAP_AREAS)
 
 
+# ── Section 10: System Atlas ─────────────────────────────────────────────
+
+# Hardcoded from direct repo inspection (PR #157 design pass).
+# Each family is a dict with: name, aliases, primary_files, purpose,
+# workflow_edge, related_prs, status, overlap_risk, notes.
+
+_COMPONENT_FAMILIES: list[dict[str, Any]] = [
+    {
+        "name": "Prompt / Input Normalization",
+        "aliases": ["NormalizationReport", "FirmMapping", "NormalizationWarning"],
+        "primary_files": [
+            "src/axiom_core/input_normalization.py",
+            "src/axiom_core/prompt_resolver.py",
+            "src/axiom_core/word_numbers.py",
+        ],
+        "purpose": "Transform raw prompts and Excel inputs into NormalizedJob objects.",
+        "workflow_edge": "User input → NormalizedJob",
+        "related_prs": [],
+        "status": "active",
+        "overlap_risk": "low",
+        "notes": "Stable entry point for all user prompts.",
+    },
+    {
+        "name": "Job / NormalizedJob / Plan / ToolStep / QAReport",
+        "aliases": ["Job", "NormalizedJob", "Plan", "ToolStep", "ToolResult", "QAReport", "Violation", "Anomaly"],
+        "primary_files": ["src/axiom_core/schemas.py"],
+        "purpose": "Core Pydantic data models for the older job→plan→execution→QA pipeline.",
+        "workflow_edge": "NormalizedJob → Plan → ToolStep → ToolResult → QAReport",
+        "related_prs": [],
+        "status": "active",
+        "overlap_risk": "medium — overlaps with WorkItem/WorkQueue and ExecutionPlan/Step families",
+        "notes": "Older pipeline; coexists with newer execution-chain models.",
+    },
+    {
+        "name": "Orchestrator (legacy job→plan→MCP)",
+        "aliases": ["Orchestrator"],
+        "primary_files": ["src/axiom_core/orchestrator.py"],
+        "purpose": "Convert NormalizedJob into Plan, generate ToolSteps, and execute via MCP bridge.",
+        "workflow_edge": "NormalizedJob → Plan → MCP execution → QAReport",
+        "related_prs": [],
+        "status": "active (legacy pipeline)",
+        "overlap_risk": "high — 6+ orchestrator/runner variants exist",
+        "notes": "Original execution path. See Duplicate/Alias Map Cluster 2.",
+    },
+    {
+        "name": "Execution Chain Orchestrator (M4)",
+        "aliases": ["ExecutionChainOrchestrator"],
+        "primary_files": [
+            "src/axiom_core/execution_chain_orchestrator.py",
+            "tests/test_execution_chain_orchestrator.py",
+        ],
+        "purpose": "Prove 7-stage linked execution chain: Plan→Step→Attempt→Result→Artifact→Evidence→Report.",
+        "workflow_edge": "M4: capability → 7-stage ID flow → evidence bundle",
+        "related_prs": ["PR #146"],
+        "status": "active / implemented runtime behavior",
+        "overlap_risk": "high naming overlap (see Cluster 2) but distinct scope (M4 proof)",
+        "notes": "Coordinates existing execution_plan..execution_report modules. Does not replace them.",
+    },
+    {
+        "name": "Execution Plan / Step / Attempt / Result / Artifact / Report",
+        "aliases": [
+            "ExecutionPlan", "ExecutionStep", "ExecutionAttempt", "ExecutionAttemptV2",
+            "ExecutionResult", "ExecutionArtifact", "ExecutionReport",
+        ],
+        "primary_files": [
+            "src/axiom_core/execution_plan.py",
+            "src/axiom_core/execution_step.py",
+            "src/axiom_core/execution_attempt.py",
+            "src/axiom_core/execution_attempt_v2.py",
+            "src/axiom_core/execution_result.py",
+            "src/axiom_core/execution_artifact.py",
+            "src/axiom_core/execution_report.py",
+        ],
+        "purpose": "Individual execution-chain stage engines. Each manages one stage with is_within_sandbox artifact safety.",
+        "workflow_edge": "Plan→Step→Attempt→Result→Artifact→Report (consumed by ExecutionChainOrchestrator)",
+        "related_prs": ["PR #137 (Plan)", "PR #138 (Step)", "PR #139 (Attempt v2)", "PR #140 (Result)", "PR #141 (Artifact)", "PR #142 (Report)"],
+        "status": "active",
+        "overlap_risk": "low within their family; v1 (execution_attempt.py) vs v2 (execution_attempt_v2.py) coexist",
+        "notes": "execution_attempt.py (v1, on top of Work Prioritization) and execution_attempt_v2.py (v2, on top of execution_step) coexist.",
+    },
+    {
+        "name": "Evidence Promotion Loop (M2)",
+        "aliases": ["EvidencePromotionLoop"],
+        "primary_files": [
+            "src/axiom_core/evidence_promotion.py",
+            "tests/test_evidence_promotion.py",
+        ],
+        "purpose": "Route execution evidence into CapabilityConfidenceEngine (state mutation). Narrow M2 EVID-001 slice.",
+        "workflow_edge": "M2: evidence bundle → pass/fail → confidence state mutation",
+        "related_prs": ["PR #147", "PR #148 (hardening)"],
+        "status": "active / implemented runtime behavior",
+        "overlap_risk": "low — only M2 evidence consumer that mutates confidence",
+        "notes": "Does not close broader EVID-001. Duplicate/conflict/stale quarantining via PR #148.",
+    },
+    {
+        "name": "Capability Confidence",
+        "aliases": ["CapabilityConfidenceEngine", "CapabilityConfidenceLevel", "CapabilityConfidenceFactors"],
+        "primary_files": [
+            "src/axiom_core/capability_confidence.py",
+            "tests/test_capability_confidence.py",
+        ],
+        "purpose": "Deterministic confidence scoring from execution pass/fail history.",
+        "workflow_edge": "EvidencePromotionLoop → CapabilityConfidenceEngine (terminal state mutator)",
+        "related_prs": [],
+        "status": "active",
+        "overlap_risk": "medium — readiness vs confidence boundary is an open doctrine question (Program 6)",
+        "notes": "Execution-derived score. Readiness intake (PR #156) does NOT feed into this.",
+    },
+    {
+        "name": "Model Health / Readiness",
+        "aliases": ["ModelHealth", "axiom_capability_readiness.json", "ReadinessCheck"],
+        "primary_files": [
+            "src/axiom_core/model_health.py",
+        ],
+        "purpose": "Produce readiness report for active Revit model. Precondition assessment, not execution outcome.",
+        "workflow_edge": "Revit model → readiness checks per capability → axiom_capability_readiness.json",
+        "related_prs": [],
+        "status": "active (producer); real execute_health_run invocation not proven via durable evidence",
+        "overlap_risk": "medium — readiness vs confidence doctrine pending (see Cluster 6)",
+        "notes": "Read-only consumers exist in server_tools. State-mutating consumer added by PR #156.",
+    },
+    {
+        "name": "Model Health Readiness Consumer",
+        "aliases": ["ModelHealthReadinessConsumer"],
+        "primary_files": [
+            "src/axiom_core/model_health_evidence.py",
+            "tests/test_model_health_evidence.py",
+        ],
+        "purpose": "Ingest, validate, dedup, and record readiness evidence. confidence_mutated=false always.",
+        "workflow_edge": "axiom_capability_readiness.json → validate → dedup → intake record (no confidence mutation)",
+        "related_prs": ["PR #156"],
+        "status": "active / implemented runtime behavior",
+        "overlap_risk": "low",
+        "notes": "Closes narrow Model Health EVID-001 slice. Broader EVID-001 remains open.",
+    },
+    {
+        "name": "CLI Validation Recorder",
+        "aliases": ["CLIValidationRecorder", "cli-validation-record"],
+        "primary_files": [
+            "src/axiom_core/validation/cli_validation_recorder.py",
+            "tests/test_cli_validation_recorder.py",
+            "docs/validation_plans/",
+        ],
+        "purpose": "Run explicit, ordered plans of allowlisted CLI commands; write durable evidence bundles.",
+        "workflow_edge": "Validation plan → governed command execution → evidence bundle (traceability-first)",
+        "related_prs": ["PR #153"],
+        "status": "active / implemented runtime behavior (no consumer yet by design)",
+        "overlap_risk": "low if CommandRegistry governance is respected",
+        "notes": "Complementary to EvidenceRunner. Consumer deferred intentionally.",
+    },
+    {
+        "name": "Command Registry / Runner Governance",
+        "aliases": ["CommandRegistry", "AllowedCommand", "runner-commands"],
+        "primary_files": [
+            "src/axiom_core/runner/command_registry.py",
+            "src/axiom_core/runner/promotion_eligibility.py",
+            "src/axiom_core/runner/failure_classification.py",
+        ],
+        "purpose": "Static catalog of allowed CLI commands with safety classification, timeouts, evidence outputs.",
+        "workflow_edge": "Cross-cutting: all CLI command execution must check CommandRegistry",
+        "related_prs": [],
+        "status": "active",
+        "overlap_risk": "low",
+        "notes": "369 entries. Safety levels: SAFE, READ_ONLY, MUTATING, DESTRUCTIVE.",
+    },
+    {
+        "name": "Local Runner",
+        "aliases": ["LocalRunner", "local-runner"],
+        "primary_files": [
+            "tools/local_runner/local_runner.py",
+            "tools/local_runner/workspace_policy.json",
+        ],
+        "purpose": "Restricted local subprocess executor with workspace policy, timeout handling, artifact capture.",
+        "workflow_edge": "Named allowlisted action → subprocess → stdout/stderr capture → artifact",
+        "related_prs": [],
+        "status": "active; Windows revalidation pending (post-PR #151)",
+        "overlap_risk": "high naming overlap (see Cluster 2) but lowest-level executor",
+        "notes": "Security model: no arbitrary shell, allowlisted actions only, workspace restricted.",
+    },
+    {
+        "name": "Failure Classification / Recovery",
+        "aliases": [
+            "FailureClassificationFramework", "CapabilityFailure",
+            "RecoveryRecommendation", "RecoveryExecution",
+        ],
+        "primary_files": [
+            "src/axiom_core/failure_classification_framework.py",
+            "src/axiom_core/capability_failure.py",
+            "src/axiom_core/recovery_recommendation.py",
+            "src/axiom_core/recovery_execution.py",
+            "src/axiom_core/runner/failure_classification.py",
+        ],
+        "purpose": "Classify execution failures and recommend/track recovery actions.",
+        "workflow_edge": "Execution outcome → failure classification → recovery recommendation → recovery execution",
+        "related_prs": ["PR #113 (classification)", "PR #114 (recommendation)", "PR #115 (execution)"],
+        "status": "active",
+        "overlap_risk": "medium — two failure classification modules (framework-level + runner-level)",
+        "notes": "See Duplicate/Alias Map Cluster 7.",
+    },
+    {
+        "name": "Work Queue / Work Item / Prioritization / Dependency",
+        "aliases": [
+            "WorkItem", "WorkQueue", "WorkPrioritization", "WorkDependency",
+            "WorkItemRegistry", "WorkStatus", "WorkPriority",
+        ],
+        "primary_files": [
+            "src/axiom_core/work_queue.py",
+            "src/axiom_core/work_item_registry.py",
+            "src/axiom_core/work_prioritization.py",
+            "src/axiom_core/work_dependency.py",
+        ],
+        "purpose": "Autonomous-engineering work backlog: items, priorities, dependencies, SQLite persistence.",
+        "workflow_edge": "Gap analysis / review findings → work items → prioritization → dependency tracking",
+        "related_prs": [],
+        "status": "active (framework exists; no autonomous scheduler or worker dispatches from it)",
+        "overlap_risk": "medium — overlaps conceptually with Job/Plan family (Cluster 1)",
+        "notes": "Non-goals stated in code: no schedulers, no worker orchestration, no autonomous planning.",
+    },
+    {
+        "name": "Session Memory / State / Task Graph",
+        "aliases": [
+            "SessionMemory", "SessionStateMachine", "SessionTaskGraph",
+            "SessionPlanRegistry",
+        ],
+        "primary_files": [
+            "src/axiom_core/session_memory.py",
+            "src/axiom_core/session_state_machine.py",
+            "src/axiom_core/session_task_graph.py",
+            "src/axiom_core/session_plan_registry.py",
+        ],
+        "purpose": "Short-term session-scope memory, state management, task dependency graph, plan registry.",
+        "workflow_edge": "Attempts/outcomes/failures/recommendations/recoveries → session memory entries",
+        "related_prs": ["PR #116 (session memory)"],
+        "status": "active (framework exists; no autonomous session manager dispatches from it)",
+        "overlap_risk": "low within session scope",
+        "notes": "Non-goals: no long-term memory, no autonomous learning.",
+    },
+    {
+        "name": "Capability Knowledge Ecosystem",
+        "aliases": [
+            "CapabilityKnowledgeGraph", "CapabilityRelationship",
+            "CapabilityImpact", "CapabilityFileKnowledge",
+            "CapabilityValidationKnowledge", "CapabilitySummary",
+            "CapabilityEventTimeline", "CapabilityChain",
+            "GlobalCapabilityRegistry",
+        ],
+        "primary_files": [
+            "src/axiom_core/capability_knowledge_graph.py",
+            "src/axiom_core/capability_relationship.py",
+            "src/axiom_core/capability_impact.py",
+            "src/axiom_core/capability_file_knowledge.py",
+            "src/axiom_core/capability_validation_knowledge.py",
+            "src/axiom_core/capability_summary.py",
+            "src/axiom_core/capability_event_timeline.py",
+            "src/axiom_core/capability_chain.py",
+            "src/axiom_core/global_capability_registry.py",
+        ],
+        "purpose": "Multi-layer capability knowledge: graph nodes/edges, relationships, impacts, file locations, validation history, summaries, event timeline, chains, global identity.",
+        "workflow_edge": "CodebaseInventory → self-model → knowledge graph / relationship / impact / file / validation / summary layers",
+        "related_prs": ["PR #121 (registry)", "PR #122 (event timeline)", "PR #123 (summary)", "PR #131 (knowledge graph)"],
+        "status": "active (structure exists; consumption depth varies per layer)",
+        "overlap_risk": "low (each layer is a distinct concern) but the ecosystem is large",
+        "notes": "Read-only knowledge layers. GlobalCapabilityRegistry provides canonical identity.",
+    },
+    {
+        "name": "Self-Model / Gap Analysis / CodebaseInventory",
+        "aliases": ["SelfModel", "SelfModelGapAnalysis", "CodebaseInventory"],
+        "primary_files": [
+            "src/axiom_core/self_model.py",
+            "src/axiom_core/self_model_gap_analysis.py",
+            "src/axiom_core/codebase_inventory.py",
+        ],
+        "purpose": "Live repo self-discovery: AST scan → module graph → gap detection → ranked integration backlog.",
+        "workflow_edge": "M1: repo files → CodebaseInventory → self-model → gap analysis → backlog",
+        "related_prs": ["PR #143 (self-model population)", "PR #144 (gap analysis)"],
+        "status": "active / implemented runtime behavior",
+        "overlap_risk": "low — unique self-awareness layer",
+        "notes": "Adapter/analyzer only. Reuses existing knowledge graph and relationship engines.",
+    },
+    {
+        "name": "Canonical KB / Impact Ledger / Docs",
+        "aliases": ["canonical_knowledge_base", "impact_ledger", "behavior-change-ledger", "pr-review-ledger"],
+        "primary_files": [
+            "docs/canonical_knowledge_base/",
+            "docs/canonical_knowledge_base/impact_ledger/",
+            "docs/logs/behavior-change-ledger.md",
+            "docs/logs/pr-review-ledger.md",
+            "docs/runbooks/",
+            "docs/architecture/",
+        ],
+        "purpose": "Durable organizational context, cross-program reconciliation, behavior history, PR audit trail, operational procedures, design specs.",
+        "workflow_edge": "Context source for all programs and future PRs",
+        "related_prs": ["PR #152 (KB seed)", "PR #155 (impact ledger)"],
+        "status": "active",
+        "overlap_risk": "medium — multiple context/knowledge docs exist (see Cluster 8)",
+        "notes": "Canonical KB is accepted truth. Ledgers are historical records. See Duplicate/Alias Map Cluster 8.",
+    },
+]
+
+
+def _system_atlas(repo_root: Path) -> dict[str, Any]:
+    """Build a component-family map from hardcoded families + live file presence checks."""
+    families: list[dict[str, Any]] = []
+    for family in _COMPONENT_FAMILIES:
+        entry = dict(family)
+        # Check which primary files actually exist
+        present: list[str] = []
+        missing: list[str] = []
+        for rel in family["primary_files"]:
+            path = repo_root / rel
+            if path.is_file() or path.is_dir():
+                present.append(rel)
+            else:
+                missing.append(rel)
+        entry["files_present"] = present
+        entry["files_missing"] = missing
+        families.append(entry)
+
+    return {
+        "family_count": len(families),
+        "families": families,
+        "data_source": "Hardcoded from PR #157 design pass + live file presence check",
+        "reference_docs": [
+            "docs/architecture/integration/Duplicate_Alias_Map_v0.md",
+            "docs/architecture/integration/PR_Purpose_Map_v0.md",
+            "docs/architecture/integration/Evidence_Producer_Inventory_and_Consumer_Mapping_v1.md",
+        ],
+    }
+
+
+def _render_atlas_markdown(atlas: dict[str, Any]) -> str:
+    """Render the system atlas as human-readable Markdown."""
+    lines: list[str] = []
+    lines.append("# Axiom System Atlas")
+    lines.append("")
+    lines.append("Live-generated component-family map. Reflects current repo file presence.")
+    lines.append("For curated reconciliation, see the tracked reference docs:")
+    lines.append("")
+    for ref in atlas.get("reference_docs", []):
+        lines.append(f"- `{ref}`")
+    lines.append("")
+    lines.append(f"**Component families:** {atlas.get('family_count', 0)}")
+    lines.append("")
+
+    for family in atlas.get("families", []):
+        lines.append(f"## {family['name']}")
+        lines.append("")
+        lines.append(f"**Aliases:** {', '.join(family.get('aliases', []))}")
+        lines.append(f"**Purpose:** {family.get('purpose', 'unknown')}")
+        lines.append(f"**Workflow edge:** {family.get('workflow_edge', 'unknown')}")
+        lines.append(f"**Status:** {family.get('status', 'unknown')}")
+        lines.append(f"**Overlap risk:** {family.get('overlap_risk', 'unknown')}")
+        if family.get("related_prs"):
+            lines.append(f"**Related PRs:** {', '.join(family['related_prs'])}")
+        if family.get("notes"):
+            lines.append(f"**Notes:** {family['notes']}")
+        lines.append("")
+        lines.append("**Files:**")
+        lines.append("")
+        for f in family.get("files_present", []):
+            lines.append(f"- `{f}` (present)")
+        for f in family.get("files_missing", []):
+            lines.append(f"- `{f}` (missing)")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 # ── Section 9: Context Basis template ────────────────────────────────────
 
 def _context_basis_template(report: dict[str, Any]) -> dict[str, Any]:
@@ -706,6 +1083,9 @@ def run_preflight(
     report["overlap_guardrails"] = _overlap_guardrails()
     report["context_basis_template"] = _context_basis_template(report)
 
+    # System Atlas (Deliverable 2)
+    atlas = _system_atlas(repo)
+
     # Persist artifacts
     out_dir = art / "context_preflight" / run_id
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -717,9 +1097,23 @@ def run_preflight(
     md_path = out_dir / "context_preflight.md"
     md_path.write_text(md_text, encoding="utf-8")
 
+    atlas_json_path = out_dir / "system_atlas.json"
+    atlas_json_path.write_text(json.dumps(atlas, indent=2, default=str), encoding="utf-8")
+
+    atlas_md_text = _render_atlas_markdown(atlas)
+    atlas_md_path = out_dir / "system_atlas.md"
+    atlas_md_path.write_text(atlas_md_text, encoding="utf-8")
+
+    report["system_atlas_summary"] = {
+        "family_count": atlas["family_count"],
+        "data_source": atlas["data_source"],
+    }
+
     report["artifact_paths"] = {
         "json": str(json_path),
         "markdown": str(md_path),
+        "system_atlas_json": str(atlas_json_path),
+        "system_atlas_markdown": str(atlas_md_path),
     }
 
     return report

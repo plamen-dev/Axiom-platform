@@ -19,6 +19,7 @@ from pathlib import Path
 from axiom_core.context_preflight import (
     _CANONICAL_DOCS,
     _CANONICAL_ROOT,
+    _COMPONENT_FAMILIES,
     _IMPACT_LEDGER_FILES,
     _INTEGRATION_DOCS,
     _canonical_context,
@@ -26,8 +27,10 @@ from axiom_core.context_preflight import (
     _integration_context,
     _known_caveats,
     _overlap_guardrails,
+    _render_atlas_markdown,
     _render_markdown,
     _runner_substrate,
+    _system_atlas,
     run_preflight,
 )
 
@@ -392,3 +395,107 @@ class TestMarkdownRendering:
             "## 9. Context Basis Template",
         ]:
             assert section in md, f"Missing section: {section}"
+
+
+# ---------------------------------------------------------------------------
+# Section 10: System Atlas
+# ---------------------------------------------------------------------------
+
+
+class TestSystemAtlas:
+    def test_component_families_count(self) -> None:
+        """At least 18 component families are defined."""
+        assert len(_COMPONENT_FAMILIES) >= 18
+
+    def test_families_have_required_fields(self) -> None:
+        required = {"name", "aliases", "primary_files", "purpose", "workflow_edge", "status", "overlap_risk"}
+        for family in _COMPONENT_FAMILIES:
+            missing = required - set(family.keys())
+            assert not missing, f"Family {family.get('name', '?')} missing: {missing}"
+
+    def test_atlas_file_presence_detection(self, tmp_path: Path) -> None:
+        """Atlas checks file presence against repo root."""
+        # Seed a subset of files
+        (tmp_path / "src" / "axiom_core").mkdir(parents=True)
+        (tmp_path / "src" / "axiom_core" / "schemas.py").write_text("# stub\n")
+        (tmp_path / "src" / "axiom_core" / "orchestrator.py").write_text("# stub\n")
+
+        atlas = _system_atlas(tmp_path)
+        assert atlas["family_count"] >= 18
+
+        # schemas.py should be detected as present for the Job/Plan family
+        job_family = next(
+            f for f in atlas["families"]
+            if "Job" in f["name"]
+        )
+        assert "src/axiom_core/schemas.py" in job_family["files_present"]
+
+    def test_atlas_missing_files_reported(self, tmp_path: Path) -> None:
+        """Files that don't exist are reported in files_missing."""
+        atlas = _system_atlas(tmp_path)
+        total_missing = sum(len(f["files_missing"]) for f in atlas["families"])
+        assert total_missing > 0, "Empty repo should have many missing files"
+
+    def test_atlas_markdown_rendering(self, tmp_path: Path) -> None:
+        atlas = _system_atlas(tmp_path)
+        md = _render_atlas_markdown(atlas)
+        assert "# Axiom System Atlas" in md
+        assert "Component families:" in md
+        # Each family should appear as a heading
+        for family in _COMPONENT_FAMILIES:
+            assert f"## {family['name']}" in md
+
+    def test_atlas_reference_docs_listed(self, tmp_path: Path) -> None:
+        atlas = _system_atlas(tmp_path)
+        refs = atlas.get("reference_docs", [])
+        assert len(refs) >= 3
+        assert any("Duplicate_Alias_Map" in r for r in refs)
+        assert any("PR_Purpose_Map" in r for r in refs)
+
+    def test_atlas_data_source_documented(self, tmp_path: Path) -> None:
+        atlas = _system_atlas(tmp_path)
+        assert "data_source" in atlas
+        assert "design pass" in atlas["data_source"].lower()
+
+
+# ---------------------------------------------------------------------------
+# System Atlas in full preflight run
+# ---------------------------------------------------------------------------
+
+
+class TestPreflightWithAtlas:
+    def test_atlas_artifacts_generated(self, tmp_path: Path) -> None:
+        """Full preflight generates system_atlas.json + .md alongside preflight."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        _seed_full(repo)
+        art = tmp_path / "art"
+
+        report = run_preflight(repo_root=str(repo), artifacts_root=str(art))
+
+        assert "system_atlas_json" in report["artifact_paths"]
+        assert "system_atlas_markdown" in report["artifact_paths"]
+
+        atlas_json_path = Path(report["artifact_paths"]["system_atlas_json"])
+        atlas_md_path = Path(report["artifact_paths"]["system_atlas_markdown"])
+        assert atlas_json_path.is_file()
+        assert atlas_md_path.is_file()
+
+        # Atlas JSON is valid
+        atlas = json.loads(atlas_json_path.read_text(encoding="utf-8"))
+        assert atlas["family_count"] >= 18
+        assert len(atlas["families"]) >= 18
+
+        # Atlas Markdown has expected content
+        atlas_md = atlas_md_path.read_text(encoding="utf-8")
+        assert "Axiom System Atlas" in atlas_md
+
+    def test_preflight_report_includes_atlas_summary(self, tmp_path: Path) -> None:
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        art = tmp_path / "art"
+
+        report = run_preflight(repo_root=str(repo), artifacts_root=str(art))
+
+        assert "system_atlas_summary" in report
+        assert report["system_atlas_summary"]["family_count"] >= 18
