@@ -19787,6 +19787,124 @@ def capability_evidence_show(
     _render_evidence_intake_rich(record)
 
 
+@cli.command("model-health-evidence-apply")
+@click.option(
+    "--readiness",
+    "readiness_path",
+    required=True,
+    type=click.Path(),
+    help="Path to axiom_capability_readiness.json produced by a ModelHealth run.",
+)
+@click.option(
+    "--max-age-seconds",
+    "max_age_seconds",
+    type=int,
+    default=None,
+    help="Quarantine readiness older than this many seconds (uses generated_at_utc).",
+)
+@click.option(
+    "--artifacts-root",
+    "artifacts_root",
+    type=click.Path(),
+    default=None,
+    help="Artifacts root for the readiness intake records (default: ./artifacts).",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def model_health_evidence_apply(
+    readiness_path: str,
+    max_age_seconds: int | None,
+    artifacts_root: str | None,
+    json_output: bool,
+) -> None:
+    """Consume Model Health readiness evidence into durable, queryable state.
+
+    Reads the existing ``axiom_capability_readiness.json`` produced by a
+    ModelHealth run, validates each capability entry, preserves provenance, and
+    records a durable intake per capability (accepted / duplicate / quarantined
+    / rejected). This is the state/evidence consumer that closes the Model
+    Health slice of EVID-001 — the readiness producer is no longer orphaned to
+    read-only helpers. Readiness is NOT mapped onto confidence math (that
+    readiness-doctrine question is open and routed to Program 6).
+    """
+    from axiom_core.model_health_evidence import ModelHealthReadinessConsumer
+
+    try:
+        consumer = ModelHealthReadinessConsumer(artifacts_root=artifacts_root)
+        result = consumer.apply(readiness_path, max_age_seconds=max_age_seconds)
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    payload = result.to_dict()
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True, default=str))
+        raise SystemExit(1 if result.error else 0)
+
+    console.print("\n[bold]Model Health Readiness Evidence[/bold]\n")
+    console.print(f"  Source:   {payload['source_path']}")
+    console.print(f"  Snapshot: {payload['generated_at_utc'] or '<none>'}")
+    if result.error:
+        console.print(f"  [red]Error:[/red]    {result.error}")
+    console.print(
+        f"  Outcome:  {payload['accepted']} accepted, "
+        f"{payload['duplicate']} duplicate, "
+        f"{payload['quarantined']} quarantined, "
+        f"{payload['rejected']} rejected "
+        f"(of {payload['capabilities_seen']} seen)"
+    )
+    for r in payload["records"]:
+        color = "green" if r["decision"] == "accepted" else "yellow"
+        if r["decision"] == "rejected":
+            color = "red"
+        console.print(
+            f"  [{color}]{r['decision']}[/{color}] "
+            f"{r.get('capability') or '<none>'} -> {r.get('readiness', '')}  "
+            f"({r.get('reason', '')})"
+        )
+    raise SystemExit(1 if result.error else 0)
+
+
+@cli.command("model-health-evidence-history")
+@click.option(
+    "--capability",
+    "capability",
+    default="",
+    help="Filter readiness intake records by capability.",
+)
+@click.option(
+    "--artifacts-root",
+    "artifacts_root",
+    type=click.Path(),
+    default=None,
+    help="Artifacts root where readiness intake records live (default: ./artifacts).",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def model_health_evidence_history(
+    capability: str,
+    artifacts_root: str | None,
+    json_output: bool,
+) -> None:
+    """List Model Health readiness intake records (the queryable state log)."""
+    from axiom_core.model_health_evidence import ModelHealthReadinessConsumer
+
+    consumer = ModelHealthReadinessConsumer(artifacts_root=artifacts_root)
+    records = consumer.list_intakes(capability=capability)
+
+    if json_output:
+        click.echo(json.dumps(records, indent=2, sort_keys=True, default=str))
+        return
+    if not records:
+        console.print("No model health readiness intake records found.")
+        return
+    console.print("\n[bold]Model Health Readiness Intake History[/bold]\n")
+    for r in records:
+        console.print(
+            f"  {r.get('created_at', '')}  {r.get('capability') or '<none>'}  "
+            f"[{r.get('decision', '')}] {r.get('readiness', '')}  "
+            f"{r.get('intake_id', '')}"
+        )
+
+
 @cli.command("self-model-query")
 @click.option(
     "--graph",
