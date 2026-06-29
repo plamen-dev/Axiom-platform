@@ -5,6 +5,34 @@ docs, and direct code inspection. Does not fabricate missing facts — unknown
 items are marked.
 
 Last updated: PR #157 (Axiom Context Preflight, PR Purpose Map, and Live System Atlas v0).
+Old-foundation section (pre-#112 components) added by the required old-foundation scan.
+
+---
+
+## Old-foundation components (pre-#112) — repo-visible, creating PR unknown
+
+The required old-foundation scan surfaced foundational modules that predate the
+PR #112+ framework series. Their original creating-PR numbers are **not** repo-visible,
+so they are **not invented** — components are cited by file. Mapped here so future PRs
+do not rebuild these under new names. (Code docstrings reference an early "PR #2" for the
+named-pipe bridge; treated as a docstring claim, not a verified ledger fact.)
+
+| Component (repo-visible) | Files | Workflow edge | Classification |
+|--------------------------|-------|---------------|----------------|
+| Prompt / Input Normalization | `src/axiom_core/input_normalization.py`, `prompt_resolver.py` | User prompt/Excel → NormalizedJob | active / distinct responsibility |
+| Job / Plan / ToolStep / QAReport schemas | `src/axiom_core/schemas.py` | NormalizedJob → Plan → ToolStep → QAReport | active (legacy pipeline) |
+| Orchestrator (job→plan→MCP) | `src/axiom_core/orchestrator.py` | Job → Plan → ToolStep → MCP execution | active; overlaps newer orchestrators (Cluster 2/12) |
+| MCP Layer (mock tool boundary) | `src/axiom_core/mcp_layer.py` | Plan/ToolStep → ToolResult (simulated) | partial (mock only; real Revit-connected impl unproven) |
+| Automation Bridge / Pipe Client | `src/axiom_core/automation_bridge.py`, `pipe_client.py` | Capability request → named pipe → Revit | active; Windows revalidation pending (PR #151) |
+| Revit Add-in Bridge (C#) | `src/axiom_revit/Axiom.Core/Bridge/AxiomPipeServer.cs`, `PromptDispatcher.cs`, `Axiom.RevitAddin/PromptCommand.cs` | Pipe → AxiomPipeServer → PromptDispatcher → Revit capability | active (C#); not exercised by Python pytest |
+| Run Spine (audit/evidence backbone) | `src/axiom_core/run_spine.py` | Any action → run ID + artifact folder + audit log | active (cross-cutting backbone) |
+| Automation Planner (event→lane) | `src/axiom_core/automation_planner.py` | Change event → dry-run plan + policy gate | active (planning/recommendation only) |
+| Persistence / ExecutionTrace | `src/axiom_core/persistence.py` | Execution → ExecutionTrace → SQLite store | active; duplicate-candidate vs ExecutionReport (Cluster 11) |
+| Agents Layer (coordinate-only) | `src/axiom_core/agents/orchestrator_agent.py`, `execution_agent.py`, `telemetry_agent.py` | Prompt → coordinate → capability → telemetry | active; overlaps coordinators (Cluster 12) |
+| Work backlog (WorkItem/WorkQueue) | `src/axiom_core/work_item_registry.py`, `work_queue.py`, `work_prioritization.py` | Backlog of "what to do" | active; overlaps Job/Plan (Cluster 1) |
+| Execution-attempt / recovery chain | `src/axiom_core/execution_attempt.py`, `execution_attempt_v2.py`, `recovery_recommendation.py`, `recovery_execution.py` | Attempt → failure classification → recommendation → execution | active; check before any new retry executor (Cluster 7) |
+
+See the Duplicate / Alias Map (Clusters 1, 2, 4, 7, 10, 11, 12) and its **Old-foundation scan result** section for overlap analysis and the rules future PRs must follow before adding a task-packet consumer, local worker loop, or retry executor.
 
 ---
 

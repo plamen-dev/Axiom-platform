@@ -457,6 +457,20 @@ class TestSystemAtlas:
         assert "data_source" in atlas
         assert "design pass" in atlas["data_source"].lower()
 
+    def test_atlas_includes_old_foundation_components(self) -> None:
+        """Old-foundation scan: pipe/spine/bridge/MCP/agents families are present."""
+        all_aliases = {a.lower() for f in _COMPONENT_FAMILIES for a in f["aliases"]}
+        for alias in ("pipeclient", "mcplayer", "automationbridge", "run spine", "axiompipeserver"):
+            assert alias in all_aliases, f"Old-foundation alias missing from atlas: {alias}"
+        all_files = {p for f in _COMPONENT_FAMILIES for p in f["primary_files"]}
+        for rel in (
+            "src/axiom_core/run_spine.py",
+            "src/axiom_core/mcp_layer.py",
+            "src/axiom_core/automation_bridge.py",
+            "src/axiom_core/pipe_client.py",
+        ):
+            assert rel in all_files, f"Old-foundation file missing from atlas: {rel}"
+
 
 # ---------------------------------------------------------------------------
 # System Atlas in full preflight run
