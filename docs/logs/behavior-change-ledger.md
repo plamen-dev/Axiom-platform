@@ -540,3 +540,20 @@ See `docs/runbooks/behavior-regression-runbook.md` for philosophy and process.
 | **related_test_case** | `tests/test_model_health_evidence.py` (valid / missing / invalid-JSON / missing-fields / invalid-label / duplicate / distinct-run / conflict / stale / provenance / confidence-untouched / read-only / CLI) |
 | **related_artifact_path** | `src/axiom_core/model_health_evidence.py` (new), `src/axiom_cli/main.py` (`model-health-evidence-apply`, `model-health-evidence-history`) |
 | **notes** | Adapter/coordinator only — no new evidence framework, no new registry, no readiness/promotion doctrine, no confidence-math change, no implementation-worker / retry / GPR / Revit behavior. Closes EVID-001 **only** for the Model Health readiness evidence slice implemented here; broader EVID-001 remains open. Whether readiness should influence confidence is an open Program 6 doctrine question, intentionally left open. Intake records stay under git-ignored `artifacts/`. |
+
+## BHV-031: Context Preflight and Live System Map (PR #157)
+
+| Field | Value |
+|-------|-------|
+| **behavior_id** | BHV-031 |
+| **date** | 2026-06-29 |
+| **capability** | Context Preflight (`axiom context-preflight`; live repo-derived system map, not a Revit capability) |
+| **observed_prompt** | `poetry run axiom context-preflight --artifacts-root <path> [--json-output]` |
+| **previous_behavior** | No live context-loading mechanism existed. Program 1, Devin, and other programs reasoned from partial chat memory, stale summaries, or the most recent PR only. No single command could report what Axiom knows about itself, what evidence exists, what remains unknown, or what existing components must be checked before adding anything new. |
+| **expected_behavior** | A bounded context preflight that inspects the current repo and reports: git state, canonical context, integration docs, CLI/command map, evidence topology, runner/execution substrate, known caveats, overlap guardrails, and a reusable Context Basis template — without mutating canonical docs, without creating a new knowledge framework, and without committing generated artifacts. |
+| **current_behavior** | `context_preflight.run_preflight(repo_root, artifacts_root)` inspects the repo and emits a 9-section report as both JSON and Markdown under gitignored `artifacts/context_preflight/<run_id>/`. Reuses existing `CodebaseInventory` (CLI command AST scan) and `command_registry.command_names()` for command discovery. Missing optional docs are reported as `unknown`, never as errors. Known caveats include EVID-001 partially closed, GPR unimplemented, Windows revalidation pending, confidence math untouched by Model Health, Program 3/4 out of scope. Overlap guardrails list 6 areas with existing components that must be checked before adding new systems. Context Basis template provides a pasteable section for future PR bodies. |
+| **status** | implemented (Python; targeted `test_context_preflight` 24 passed; ruff clean; CLI smoke tested on real repo). |
+| **related_bug_id** | (none — new capability, not a bug fix) |
+| **related_test_case** | `tests/test_context_preflight.py` (canonical present/missing/partial, integration present/unknown, evidence topology, runner substrate, known caveats, overlap guardrails, full run artifacts, canonical-not-mutated, 9-section completeness, context basis, markdown rendering) |
+| **related_artifact_path** | `src/axiom_core/context_preflight.py` (new), `src/axiom_cli/main.py` (`context-preflight` command) |
+| **notes** | Read-only inspector only — no new knowledge framework, no new evidence system, no canonical mutation, no committed generated artifacts, no implementation-worker / retry / GPR / Revit behavior. Not canonical truth by itself; it is a context preflight / live system map consumed by Program 1, Devin, and future PR preflight. |

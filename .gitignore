@@ -73,6 +73,8 @@ artifacts/scratch/
 artifacts/validation_runs/vrun_*/
 # Validation Evidence Runner bundles (generated run outputs; keep curated evidence)
 artifacts/validation_evidence/
+# Context Preflight reports (generated live system maps; never committed)
+artifacts/context_preflight/
 # Capability Execution Runner bundles (generated run outputs; keep curated evidence)
 artifacts/capability_runs/
 # Promotion Eligibility Engine checks (generated decision records; keep curated evidence)
