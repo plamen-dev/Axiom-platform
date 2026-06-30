@@ -22272,5 +22272,131 @@ def _render_devin_session_import_report_rich(report: dict) -> None:
             console.print(f"    [{seq}] {ts} [{etype}] {summary_text}")
 
 
+# ---------------------------------------------------------------------------
+# context-preflight — live repo-derived context and system map (PR #157)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("context-preflight")
+@click.option(
+    "--repo-root",
+    "repo_root",
+    type=click.Path(exists=True, file_okay=False),
+    default=".",
+    help="Repository root to inspect (default: current directory).",
+)
+@click.option(
+    "--artifacts-root",
+    "artifacts_root",
+    type=click.Path(),
+    default=None,
+    help="Artifacts root for the generated report (default: ./artifacts).",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON instead of human-readable summary.")
+def context_preflight(
+    repo_root: str,
+    artifacts_root: str | None,
+    json_output: bool,
+) -> None:
+    """Run Axiom context preflight — live repo-derived system map.
+
+    Inspects the current repo and reports: git state, canonical context,
+    integration docs, CLI/command map, evidence topology, runner/execution
+    substrate, known caveats, overlap guardrails, and a Context Basis
+    template for future PR bodies.
+
+    Generated artifacts are written under ``<artifacts-root>/
+    context_preflight/<run_id>/`` (gitignored). Canonical documents are
+    never mutated.
+    """
+    from axiom_core.context_preflight import run_preflight
+
+    report = run_preflight(repo_root=repo_root, artifacts_root=artifacts_root)
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, default=str))
+    else:
+        console.print("\n[bold]Axiom Context Preflight Report[/bold]\n")
+        console.print(f"  Run ID:    {report['run_id']}")
+        console.print(f"  Generated: {report['generated_at_utc']}")
+        console.print(f"  Repo:      {report['repo_root']}")
+
+        # Git state
+        g = report.get("git_state", {})
+        console.print("\n[bold]1. Git State[/bold]")
+        console.print(f"  Branch:  {g.get('branch', 'unknown')}")
+        console.print(f"  Commit:  {g.get('commit_short', '?')}")
+        console.print(f"  Dirty:   {'yes' if g.get('dirty') else 'no'}")
+        console.print(f"  Tracked: {g.get('tracked_file_count', '?')} files")
+        for w in g.get("warnings", []):
+            console.print(f"  [yellow]Warning:[/yellow] {_rich_escape(w)}")
+
+        # Canonical context
+        cc = report.get("canonical_context", {})
+        present = sum(1 for v in cc.get("canonical_documents", {}).values() if v)
+        total = len(cc.get("canonical_documents", {}))
+        console.print("\n[bold]2. Canonical Context[/bold]")
+        console.print(f"  Documents: {present}/{total} present")
+        ledger_present = sum(1 for v in cc.get("impact_ledger", {}).values() if v)
+        console.print(f"  Impact ledger: {ledger_present}/{len(cc.get('impact_ledger', {}))} present")
+
+        # Integration context
+        ic = report.get("integration_context", {})
+        int_present = sum(
+            1 for v in ic.get("integration_documents", {}).values()
+            if v == "present"
+        )
+        int_total = len(ic.get("integration_documents", {}))
+        console.print("\n[bold]3. Integration Context[/bold]")
+        console.print(f"  Integration docs: {int_present}/{int_total} present")
+
+        # CLI map
+        cm = report.get("cli_command_map", {})
+        console.print("\n[bold]4. Command / CLI Map[/bold]")
+        console.print(f"  CLI commands: {cm.get('cli_command_count', 0)}")
+        console.print(f"  Registry entries: {cm.get('command_registry_count', 0)}")
+        for sub, cmds in cm.get("subsystem_commands", {}).items():
+            console.print(f"  [{sub}]: {', '.join(cmds)}")
+
+        # Evidence topology
+        et = report.get("evidence_topology", {})
+        console.print("\n[bold]5. Evidence Topology[/bold]")
+        console.print(f"  Known producers: {len(et.get('known_producers', []))}")
+        console.print(
+            f"  State-mutating: {', '.join(et.get('state_mutating_consumers', []))}"
+        )
+
+        # Runner substrate
+        rs = report.get("runner_substrate", {})
+        console.print("\n[bold]6. Runner / Execution Substrate[/bold]")
+        for key in [
+            "local_runner_present", "command_registry_present",
+            "execution_chain_present", "validation_recorder_present",
+            "evidence_promotion_present", "model_health_evidence_present",
+        ]:
+            label = key.replace("_present", "").replace("_", " ")
+            val = "yes" if rs.get(key) else "no"
+            console.print(f"  {label}: {val}")
+
+        # Caveats
+        caveats = report.get("known_caveats", [])
+        console.print(f"\n[bold]7. Known Caveats[/bold]  ({len(caveats)} items)")
+        for c in caveats:
+            console.print(f"  {c['id']}: [{c['status']}] {c['area']}")
+
+        # Overlap
+        og = report.get("overlap_guardrails", [])
+        console.print(f"\n[bold]8. Overlap Guardrails[/bold]  ({len(og)} areas)")
+        for a in og:
+            console.print(f"  - {a['area']} ({len(a['existing_components'])} components)")
+
+        # Artifact paths
+        ap = report.get("artifact_paths", {})
+        console.print("\n[bold]Artifacts:[/bold]")
+        console.print(f"  JSON: {ap.get('json', 'n/a')}")
+        console.print(f"  Markdown: {ap.get('markdown', 'n/a')}")
+        console.print()
+
+
 if __name__ == "__main__":
     cli()
