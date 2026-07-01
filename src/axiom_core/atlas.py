@@ -193,7 +193,9 @@ def write_atlas(repo_root: str | Path) -> tuple[str, str]:
 def serve_atlas(repo_root: str | Path, port: int = 8763) -> None:
     """Serve the atlas directory on localhost with a stdlib HTTP server.
 
-    Regenerates the page once at startup, then serves static files only.
+    Regenerates the page once at startup, then serves static files only —
+    artifacts created after startup (e.g. a new evidence summary) appear
+    only after restarting the server or re-running ``axiom atlas``.
     Local-first: binds 127.0.0.1, no external calls. Blocks until Ctrl+C.
     """
     import http.server
@@ -211,6 +213,10 @@ def serve_atlas(repo_root: str | Path, port: int = 8763) -> None:
 
     with http.server.ThreadingHTTPServer(("127.0.0.1", port), _Handler) as httpd:
         print(f"Axiom Atlas: http://127.0.0.1:{port}/atlas.html (Ctrl+C to stop)")
+        print(
+            "Static snapshot generated at startup; restart to pick up "
+            "artifacts created after this point."
+        )
         httpd.serve_forever()
 
 
