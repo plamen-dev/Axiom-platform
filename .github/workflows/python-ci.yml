@@ -33,6 +33,7 @@ jobs:
           tests/test_validation_loop.py
           tests/test_local_runner.py
           tests/test_set_parameter_value.py
+          tests/test_evidence_summary.py
 
       - name: Ruff lint
         run: poetry run ruff check .
