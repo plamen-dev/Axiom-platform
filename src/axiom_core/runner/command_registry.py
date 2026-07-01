@@ -6771,6 +6771,100 @@ _register(
 
 _register(
     CommandSpec(
+        name="model-health-evidence-apply",
+        command=(
+            "axiom model-health-evidence-apply --readiness <path> "
+            "[--max-age-seconds <n>] [--artifacts-root <p>] [--json-output]"
+        ),
+        description=(
+            "Consume Model Health readiness evidence "
+            "(axiom_capability_readiness.json) into durable, queryable state: "
+            "each capability entry is validated and recorded as accepted / "
+            "duplicate / quarantined / rejected, preserving provenance. "
+            "Readiness is NOT mapped onto confidence math."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput(
+                "model_health_readiness_intake/<intake_id>/report.json",
+                required=True,
+            ),
+            EvidenceOutput(
+                "model_health_readiness_intake/<intake_id>/pass_fail.json",
+                required=True,
+            ),
+        )
+        + EV_CONSOLE,
+        timeout_seconds=120,
+        failure_modes=(FM_NONZERO,),
+        notes=(
+            "Model Health evidence consumer: reuses the durable readiness "
+            "intake store; no new promotion framework. Read-only."
+        ),
+    )
+)
+
+_register(
+    CommandSpec(
+        name="model-health-evidence-history",
+        command=(
+            "axiom model-health-evidence-history [--capability <id>] "
+            "[--artifacts-root <p>] [--json-output]"
+        ),
+        description=(
+            "List Model Health readiness intake records (the queryable state "
+            "log), optionally filtered by capability."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(EV_CONSOLE,),
+        timeout_seconds=30,
+        failure_modes=(FM_NONZERO,),
+        notes="Reads from the persisted model health readiness intake store.",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="context-preflight",
+        command=(
+            "axiom context-preflight [--repo-root <p>] "
+            "[--artifacts-root <p>] [--json-output]"
+        ),
+        description=(
+            "Run Axiom context preflight: a live, repo-derived system map "
+            "(git state, canonical context, integration docs, CLI/command map, "
+            "evidence topology, runner/execution substrate, caveats, overlap "
+            "guardrails, and a Context Basis template). Canonical documents are "
+            "never mutated."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput(
+                "context_preflight/<run_id>/context_preflight.json",
+                required=True,
+            ),
+            EvidenceOutput(
+                "context_preflight/<run_id>/context_preflight.md", required=True
+            ),
+        )
+        + EV_CONSOLE,
+        timeout_seconds=120,
+        failure_modes=(FM_NONZERO,),
+        notes=(
+            "Read-only repo introspection; writes gitignored artifacts and "
+            "mutates no canonical documents."
+        ),
+    )
+)
+
+_register(
+    CommandSpec(
         name="cli-validation-record",
         command=(
             "axiom cli-validation-record --plan <path> [--artifacts-root <p>] "
