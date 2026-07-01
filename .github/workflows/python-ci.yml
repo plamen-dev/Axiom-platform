@@ -35,6 +35,7 @@ jobs:
           tests/test_set_parameter_value.py
           tests/test_advisory_preflight.py
           tests/test_evidence_summary.py
+          tests/test_atlas.py
 
       - name: Ruff lint
         run: poetry run ruff check .

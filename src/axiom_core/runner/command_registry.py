@@ -6865,6 +6865,39 @@ _register(
 
 _register(
     CommandSpec(
+        name="atlas",
+        command=(
+            "axiom atlas [--repo-root <p>] [--serve] [--port <n>] "
+            "[--json-output]"
+        ),
+        description=(
+            "Render the Axiom Atlas: a local-first, read-only visual map of "
+            "the platform. Renders the newest execution-chain self-model "
+            "(module bubbles + import edges), capability confidence/readiness "
+            "from intake records, and tracked evidence summaries into a "
+            "self-contained HTML page under artifacts/atlas/. Optional "
+            "--serve hosts it on 127.0.0.1 only."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("atlas/atlas.html", required=True),
+            EvidenceOutput("atlas/atlas_data.json", required=True),
+        )
+        + EV_CONSOLE,
+        timeout_seconds=60,
+        failure_modes=(FM_NONZERO,),
+        notes=(
+            "Read-only viewer over existing artifacts; mutates no capability, "
+            "confidence, readiness, or promotion state; local-first (binds "
+            "127.0.0.1, no external calls)."
+        ),
+    )
+)
+
+_register(
+    CommandSpec(
         name="cli-validation-record",
         command=(
             "axiom cli-validation-record --plan <path> [--artifacts-root <p>] "

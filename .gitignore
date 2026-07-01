@@ -171,6 +171,8 @@ artifacts/execution_chain/
 # Evidence-to-promotion intake + confidence records (generated run outputs; keep curated evidence)
 artifacts/capability_evidence_intake/
 artifacts/capability_confidence/
+# Axiom Atlas (generated read-only viewer)
+artifacts/atlas/
 
 # Visual Studio local state
 .vs/
