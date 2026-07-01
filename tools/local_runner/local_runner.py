@@ -452,25 +452,37 @@ def _write_failure_summary(result: RunResult, artifact_dir: Path) -> Path:
     return path
 
 
-# Tools whose console-script (.exe) shims can be blocked by Windows Application
-# Control (WDAC / Device Guard) with WinError 4551. Running them via module
-# execution (python -m <tool>) invokes the exact same code without the shim.
-_WINDOWS_MODULE_TOOLS = frozenset({"ruff", "pytest"})
+# ``poetry run <tool>`` heads mapped to the module that backs each tool, for
+# direct venv execution on Windows. ``axiom`` maps to ``axiom_cli`` (the package
+# whose ``__main__`` calls the same callable as the ``axiom`` console script:
+# ``axiom_cli.main:cli``); ``ruff``/``pytest`` map to their own module names.
+_WINDOWS_TOOL_MODULE = {
+    "ruff": "ruff",
+    "pytest": "pytest",
+    "axiom": "axiom_cli",
+}
 
 
 def _windows_safe_command(command: list[str], *, is_windows: bool | None = None) -> list[str]:
     """Rewrite an allowlisted command to avoid Windows-blocked executable shims.
 
     On Windows, bare console-script shims (``poetry.exe``, ``ruff.exe``,
-    ``pytest.exe``) can be blocked by Application Control policy
-    (``WinError 4551``). Invoking the same tools through module execution
-    (``python -m ...``) bypasses the shim while running identical code.
+    ``pytest.exe``, ``axiom.exe``) can be blocked by Application Control policy
+    (``WinError 4551``). The Local Runner already executes inside Poetry's
+    managed project virtualenv, so the project-installed tools are importable
+    directly with the current interpreter. Running them as
+    ``<sys.executable> -m <module>`` bypasses the shim *and* the ``poetry``
+    wrapper, running identical code.
 
-    Rewrites (Windows only):
-    - leading ``poetry ...``            -> ``<sys.executable> -m poetry ...``
-    - ``poetry run ruff ...``           -> ``... run python -m ruff ...``
-    - ``poetry run pytest ...``         -> ``... run python -m pytest ...``
-    - ``poetry run axiom ...``          -> ``<sys.executable> -m poetry run axiom ...``
+    Rewrites (Windows only), for a leading ``poetry run <tool> ...``:
+    - ``poetry run ruff ...``   -> ``<sys.executable> -m ruff ...``
+    - ``poetry run pytest ...`` -> ``<sys.executable> -m pytest ...``
+    - ``poetry run axiom ...``  -> ``<sys.executable> -m axiom_cli ...``
+
+    The ``poetry`` wrapper is dropped entirely: the previous
+    ``<sys.executable> -m poetry`` form failed with ``No module named poetry``
+    because the venv interpreter does not contain Poetry. Non-poetry heads
+    (``git``, ``dotnet``, ``powershell``) are left untouched.
 
     This is a pure argv transform on an already-allowlisted command; it adds no
     new arguments and no new action surface. On non-Windows platforms it is a
@@ -481,23 +493,13 @@ def _windows_safe_command(command: list[str], *, is_windows: bool | None = None)
     if not is_windows or not command:
         return command
 
-    rewritten = list(command)
-    # Inner "poetry run <tool>" shim: rewrite ruff/pytest to module form. The
-    # inner interpreter stays the bare string "python" so ``poetry run`` resolves
-    # the project venv's interpreter. Done before the outer rewrite so the "run"
-    # index is stable.
-    if rewritten and rewritten[0] == "poetry":
-        try:
-            run_idx = rewritten.index("run")
-        except ValueError:
-            run_idx = -1
-        if run_idx != -1 and run_idx + 1 < len(rewritten):
-            tool = rewritten[run_idx + 1]
-            if tool in _WINDOWS_MODULE_TOOLS:
-                rewritten[run_idx + 1 : run_idx + 2] = ["python", "-m", tool]
-        # Outer poetry shim -> module invocation with the current interpreter.
-        rewritten[:1] = [sys.executable, "-m", "poetry"]
-    return rewritten
+    # Only ``poetry run <tool> ...`` shapes are rewritten. Direct venv module
+    # execution avoids both the WDAC-blocked .exe shim and recursive poetry.
+    if len(command) >= 3 and command[0] == "poetry" and command[1] == "run":
+        module = _WINDOWS_TOOL_MODULE.get(command[2])
+        if module is not None:
+            return [sys.executable, "-m", module, *command[3:]]
+    return list(command)
 
 
 def _format_command_display(action_def: dict) -> str:
