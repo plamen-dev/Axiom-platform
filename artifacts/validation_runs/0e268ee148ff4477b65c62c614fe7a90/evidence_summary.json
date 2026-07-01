@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "summary_id": "0e268ee148ff4477b65c62c614fe7a90",
+  "generated_at_utc": "2026-07-01T20:20:06.045293+00:00",
+  "git_commit": "e923933",
+  "run_id": "e344dc38-7b75-4f74-9331-8e336552ca05",
+  "capability_id": "self-model-build",
+  "chain_status": "PASS",
+  "evidence_id": "06a42ee4-56df-45ae-b138-4deb675bc3aa",
+  "quality_verdict": "SUBSTANTIVE",
+  "quality_reason": "substantive evidence for self-model-build: required metric(s) ['module_count'] present and non-zero (module_count=167, import_edge_count=359, isolated_module_count=9)",
+  "decision": "accepted",
+  "state_changed": true,
+  "current_state": {
+    "confidence_level": "very_high",
+    "readiness": "ready",
+    "score": 1.0
+  },
+  "before_after": {
+    "before": {
+      "confidence_level": "very_high",
+      "readiness": "ready",
+      "score": 1.0
+    },
+    "after": {
+      "confidence_level": "very_high",
+      "readiness": "ready",
+      "score": 1.0
+    }
+  },
+  "source_artifacts": {
+    "evidence_json": "artifacts/execution_chain/e344dc38-7b75-4f74-9331-8e336552ca05/evidence.json",
+    "trace_json": "artifacts/execution_chain/e344dc38-7b75-4f74-9331-8e336552ca05/trace.json",
+    "intake_report_json": "artifacts/capability_evidence_intake/2239b3f3-d33f-4934-b3ed-577ca69fb15c/report.json",
+    "confidence_report_json": "artifacts/capability_confidence/96a8fc62-3c99-43dd-8e42-30dfc8e1b8f3/report.json"
+  }
+}
