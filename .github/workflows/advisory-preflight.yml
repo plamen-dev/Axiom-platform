@@ -1,0 +1,38 @@
+name: Advisory Preflight
+
+# Non-blocking advisory signpost for pull requests. It surfaces repo-context
+# advisories (protected-component changes, new concept modules, unbacked
+# provenance wording, missing Context Basis) as ::warning:: annotations.
+# It intentionally NEVER fails the build — the script always exits 0.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  advisory-preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Advisory context preflight (non-blocking, always exit 0)
+        run: poetry run python tools/ci/advisory_preflight.py
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+          PR_BODY: ${{ github.event.pull_request.body }}
