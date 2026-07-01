@@ -7,6 +7,21 @@ For regression fixture files, see `tests/fixtures/behavior_regressions/`.
 
 ---
 
+### BUG-021: Command registry catalog drift — 3 shipped CLI commands uncataloged
+
+- **Discovered by:** `tests/test_command_registry.py::test_all_builtin_axiom_commands_cataloged` failing on `main` (also flagged during Windows lane-2 review).
+- **Resolved in:** `devin/*-command-registry-catalog-drift`
+- **Description:** Three CLI commands were registered on the `axiom` Click group but missing from the governance `CommandRegistry` catalog: `context-preflight` (PR #157), `model-health-evidence-apply` and `model-health-evidence-history` (PR #156). The registry is meant to cover every built-in command with a safety classification, prerequisites, evidence outputs, and failure modes; the drift meant three commands had no governance record.
+- **Root cause:** New CLI commands were added without a corresponding `_register(CommandSpec(...))` entry; the coverage test caught the gap but was left red.
+- **Fix:** Added `CommandSpec` entries for all three (all `READ_ONLY` / `SAFE`, `POETRY_ENV` prerequisite) mirroring their real artifact outputs (`model_health_readiness_intake/<intake_id>/report.json` + `pass_fail.json`; `context_preflight/<run_id>/context_preflight.json` + `.md`). No CLI behavior changed — governance metadata only.
+- **Files changed:**
+  - `src/axiom_core/runner/command_registry.py` — 3 new `_register(CommandSpec(...))` entries.
+  - `tests/test_command_registry.py` — added the 3 names to `EXPECTED_AXIOM_COMMANDS`.
+- **Test coverage:** `test_all_builtin_axiom_commands_cataloged`, `test_catalog_matches_expected_set` (now green; full `test_command_registry.py` 27 passed).
+- **Note:** Catalog/governance-only change; no runtime, promotion, or Revit behavior affected; 2024 baseline unaffected.
+
+---
+
 ### BUG-020: Local Runner Windows-safe rewrite emits recursive `python -m poetry` (No module named poetry)
 
 - **Discovered by:** Windows lane-2 revalidation on `C:\Dev\Axiom\Code\Axiom-platform` after PR #52 — Local Runner `ruff` / `execution_chain_run` failed with `No module named poetry` (bare console-script shims had earlier failed with `[WinError 4551]` Application Control block).

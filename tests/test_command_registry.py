@@ -196,6 +196,8 @@ EXPECTED_AXIOM_COMMANDS = {
     "capability-evidence-apply", "capability-evidence-history",
     "capability-evidence-show",
     "cli-validation-record",
+    "model-health-evidence-apply", "model-health-evidence-history",
+    "context-preflight",
     "execution-context-create", "execution-contexts",
     "execution-context-show", "execution-context-export",
     "execution-environment-create", "execution-environments",
