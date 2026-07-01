@@ -15,6 +15,8 @@ from local_runner.local_runner import (  # noqa: E402
     ALLOWED_WORKSPACE_BASES_WINDOWS,
     WORKSPACE_CONFIG_ENV,
     WORKSPACE_ROOTS_ENV,
+    _resolve_evidence_command,
+    _resolve_latest_evidence,
     execute_task,
     get_allowed_workspace_roots,
     run_from_task_file,
@@ -496,3 +498,71 @@ class TestBOMHandling:
             f"Non-BOM task file should parse successfully, got: {result.status} "
             f"— {result.error_message}"
         )
+
+
+class TestExecutionChainLoopActions:
+    """The loop-enablement actions: execution_chain_run + capability_evidence_apply."""
+
+    def test_both_actions_registered(self):
+        assert "execution_chain_run" in ALLOWED_ACTIONS
+        assert "capability_evidence_apply" in ALLOWED_ACTIONS
+
+    def test_execution_chain_run_is_axiom_cli(self):
+        cmds = ALLOWED_ACTIONS["execution_chain_run"]["commands"]
+        assert cmds == [["poetry", "run", "axiom", "execution-chain-run", "--json-output"]]
+
+    def test_evidence_apply_has_no_static_command(self):
+        """The evidence-apply command is built at run time, not statically."""
+        action = ALLOWED_ACTIONS["capability_evidence_apply"]
+        assert action["commands"] == []
+        assert action.get("resolve_evidence") is True
+
+    def _seed_evidence(self, workspace: Path, run_id: str) -> Path:
+        run_dir = workspace / "artifacts" / "execution_chain" / run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+        bundle = run_dir / "evidence.json"
+        bundle.write_text(json.dumps({"evidence_id": run_id}), encoding="utf-8")
+        return bundle
+
+    def test_resolve_evidence_missing_dir(self, tmp_path):
+        path, error = _resolve_latest_evidence(str(tmp_path))
+        assert path is None
+        assert "execution_chain_run" in error
+
+    def test_resolve_evidence_missing_bundle(self, tmp_path):
+        (tmp_path / "artifacts" / "execution_chain").mkdir(parents=True)
+        path, error = _resolve_latest_evidence(str(tmp_path))
+        assert path is None
+        assert "No evidence.json" in error
+
+    def test_resolve_evidence_picks_newest(self, tmp_path):
+        import os
+        import time
+
+        older = self._seed_evidence(tmp_path, "run_old")
+        time.sleep(0.01)
+        newer = self._seed_evidence(tmp_path, "run_new")
+        # Force a clear mtime ordering regardless of filesystem granularity.
+        os.utime(older, (1, 1))
+        path, error = _resolve_latest_evidence(str(tmp_path))
+        assert error is None
+        assert Path(path) == newer.resolve()
+
+    def test_resolve_evidence_command_shape(self, tmp_path):
+        bundle = self._seed_evidence(tmp_path, "run_x")
+        commands, error = _resolve_evidence_command(str(tmp_path))
+        assert error is None
+        assert commands == [
+            ["poetry", "run", "axiom", "capability-evidence-apply",
+             "--evidence", str(bundle.resolve())]
+        ]
+
+    def test_evidence_apply_blocked_without_bundle(self, tmp_path, monkeypatch):
+        """With no chain evidence yet, the action is blocked with guidance."""
+        workspace = tmp_path / "ws"
+        workspace.mkdir()
+        monkeypatch.setenv(WORKSPACE_ROOTS_ENV, str(workspace))
+        task = {"action": "capability_evidence_apply", "workspace": str(workspace)}
+        result = execute_task(task, artifact_base=str(tmp_path / "artifacts_out"))
+        assert result.status == "blocked"
+        assert "execution_chain_run" in result.error_message
