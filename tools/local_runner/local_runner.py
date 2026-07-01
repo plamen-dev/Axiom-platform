@@ -452,6 +452,54 @@ def _write_failure_summary(result: RunResult, artifact_dir: Path) -> Path:
     return path
 
 
+# Tools whose console-script (.exe) shims can be blocked by Windows Application
+# Control (WDAC / Device Guard) with WinError 4551. Running them via module
+# execution (python -m <tool>) invokes the exact same code without the shim.
+_WINDOWS_MODULE_TOOLS = frozenset({"ruff", "pytest"})
+
+
+def _windows_safe_command(command: list[str], *, is_windows: bool | None = None) -> list[str]:
+    """Rewrite an allowlisted command to avoid Windows-blocked executable shims.
+
+    On Windows, bare console-script shims (``poetry.exe``, ``ruff.exe``,
+    ``pytest.exe``) can be blocked by Application Control policy
+    (``WinError 4551``). Invoking the same tools through module execution
+    (``python -m ...``) bypasses the shim while running identical code.
+
+    Rewrites (Windows only):
+    - leading ``poetry ...``            -> ``<sys.executable> -m poetry ...``
+    - ``poetry run ruff ...``           -> ``... run python -m ruff ...``
+    - ``poetry run pytest ...``         -> ``... run python -m pytest ...``
+    - ``poetry run axiom ...``          -> ``<sys.executable> -m poetry run axiom ...``
+
+    This is a pure argv transform on an already-allowlisted command; it adds no
+    new arguments and no new action surface. On non-Windows platforms it is a
+    no-op, preserving Linux/CI behavior. ``is_windows`` is injectable for tests.
+    """
+    if is_windows is None:
+        is_windows = os.name == "nt"
+    if not is_windows or not command:
+        return command
+
+    rewritten = list(command)
+    # Inner "poetry run <tool>" shim: rewrite ruff/pytest to module form. The
+    # inner interpreter stays the bare string "python" so ``poetry run`` resolves
+    # the project venv's interpreter. Done before the outer rewrite so the "run"
+    # index is stable.
+    if rewritten and rewritten[0] == "poetry":
+        try:
+            run_idx = rewritten.index("run")
+        except ValueError:
+            run_idx = -1
+        if run_idx != -1 and run_idx + 1 < len(rewritten):
+            tool = rewritten[run_idx + 1]
+            if tool in _WINDOWS_MODULE_TOOLS:
+                rewritten[run_idx + 1 : run_idx + 2] = ["python", "-m", tool]
+        # Outer poetry shim -> module invocation with the current interpreter.
+        rewritten[:1] = [sys.executable, "-m", "poetry"]
+    return rewritten
+
+
 def _format_command_display(action_def: dict) -> str:
     """Format the allowlisted commands as a human-readable string."""
     commands = action_def.get("commands", [])
@@ -651,7 +699,13 @@ def execute_task(task: dict, artifact_base: str = "artifacts/local_runner_runs")
     start_time = time.monotonic()
 
     remaining_timeout = timeout
+    executed_commands: list[list[str]] = []
     for cmd in commands:
+        # Windows Application Control (WDAC) can block bare poetry/ruff/pytest
+        # .exe shims (WinError 4551); rewrite to `python -m` form on Windows
+        # only. No-op on Linux/CI. Pure argv transform of an allowlisted command.
+        cmd = _windows_safe_command(cmd)
+        executed_commands.append(cmd)
         try:
             if remaining_timeout <= 0:
                 result.timed_out = True
@@ -691,6 +745,11 @@ def execute_task(task: dict, artifact_base: str = "artifacts/local_runner_runs")
     result.completed_at = datetime.now(timezone.utc).isoformat()
     result.stdout = "\n".join(all_stdout)
     result.stderr = "\n".join(all_stderr)
+
+    # Reflect the *actually executed* commands (post Windows-safe rewrite) so the
+    # run log / summary are honest about what ran.
+    if executed_commands and executed_commands != commands:
+        result.command_display = " && ".join(" ".join(c) for c in executed_commands)
 
     if result.timed_out:
         result.status = "timed_out"

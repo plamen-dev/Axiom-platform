@@ -16,6 +16,20 @@ This is **infrastructure tooling**, not Revit product functionality. It does not
 - **No external uploads.** All output stays local in artifact directories.
 - **Timeout handling.** Processes are killed after the configured timeout.
 
+## Windows-safe invocation (WDAC / WinError 4551)
+
+On Windows, console-script `.exe` shims (`poetry.exe`, `ruff.exe`, `pytest.exe`)
+can be blocked by Application Control / Device Guard with
+`[WinError 4551] An Application Control policy has blocked this file`. At
+execution time the runner rewrites those command heads to module form
+(`python -m poetry ...`, `poetry run python -m ruff/pytest ...`) via
+`_windows_safe_command`, so allowlisted actions run without hitting the shim.
+This is a pure argv transform of an already-allowlisted command — it adds no new
+arguments and no new action surface, and it is a **no-op on Linux/CI**. The
+allowlist remains the security boundary. See
+`docs/runbooks/windows-post-151-revalidation-runbook.md` for the direct-CLI
+`python -m poetry ...` fallback when invoking Axiom outside the runner.
+
 ## Allowed Actions
 
 | Action | Command | Description |

@@ -17,6 +17,7 @@ from local_runner.local_runner import (  # noqa: E402
     WORKSPACE_ROOTS_ENV,
     _resolve_evidence_command,
     _resolve_latest_evidence,
+    _windows_safe_command,
     execute_task,
     get_allowed_workspace_roots,
     run_from_task_file,
@@ -566,3 +567,124 @@ class TestExecutionChainLoopActions:
         result = execute_task(task, artifact_base=str(tmp_path / "artifacts_out"))
         assert result.status == "blocked"
         assert "execution_chain_run" in result.error_message
+
+
+class TestWindowsSafeCommand:
+    """Windows-safe command normalization (WDAC / WinError 4551 workaround)."""
+
+    def test_noop_on_non_windows(self):
+        """On non-Windows, commands pass through unchanged (Linux/CI preserved)."""
+        cmd = ["poetry", "run", "ruff", "check", "."]
+        assert _windows_safe_command(cmd, is_windows=False) == cmd
+
+    def test_noop_on_empty(self):
+        assert _windows_safe_command([], is_windows=True) == []
+
+    def test_leading_poetry_rewritten_to_module(self):
+        out = _windows_safe_command(["poetry", "install"], is_windows=True)
+        assert out == [sys.executable, "-m", "poetry", "install"]
+
+    def test_poetry_run_ruff_rewritten(self):
+        out = _windows_safe_command(
+            ["poetry", "run", "ruff", "check", "."], is_windows=True
+        )
+        assert out == [
+            sys.executable, "-m", "poetry", "run", "python", "-m", "ruff", "check", "."
+        ]
+
+    def test_poetry_run_pytest_rewritten(self):
+        out = _windows_safe_command(
+            ["poetry", "run", "pytest", "tests/test_x.py", "-q"], is_windows=True
+        )
+        assert out == [
+            sys.executable, "-m", "poetry", "run", "python", "-m", "pytest",
+            "tests/test_x.py", "-q",
+        ]
+
+    def test_poetry_run_axiom_kept_via_module_poetry(self):
+        """axiom entrypoint stays as-is under `python -m poetry run axiom`."""
+        out = _windows_safe_command(
+            ["poetry", "run", "axiom", "execution-chain-run", "--json-output"],
+            is_windows=True,
+        )
+        assert out == [
+            sys.executable, "-m", "poetry", "run", "axiom",
+            "execution-chain-run", "--json-output",
+        ]
+
+    def test_non_poetry_command_untouched(self):
+        """git/dotnet/powershell commands are not rewritten."""
+        cmd = ["git", "status", "--short"]
+        assert _windows_safe_command(cmd, is_windows=True) == cmd
+
+    def test_no_bare_shim_emitted_for_any_affected_action(self):
+        """Simulated-Windows guarantee: no bare poetry/ruff/pytest shim survives.
+
+        Every allowlisted command that starts with a blocked shim must be
+        rewritten so its first token is the current interpreter (module form).
+        """
+        blocked_heads = {"poetry", "ruff", "pytest"}
+        module_tools = {"ruff", "pytest"}
+        for action, action_def in ALLOWED_ACTIONS.items():
+            for cmd in action_def.get("commands", []):
+                if not cmd:
+                    continue
+                rewritten = _windows_safe_command(cmd, is_windows=True)
+                if cmd[0] in blocked_heads:
+                    assert rewritten[0] == sys.executable, (
+                        f"{action}: leading shim {cmd[0]!r} not rewritten"
+                    )
+                # No inner bare ruff/pytest tool token after `run` survives.
+                if cmd[0] == "poetry" and "run" in cmd:
+                    ri = cmd.index("run")
+                    if ri + 1 < len(cmd) and cmd[ri + 1] in module_tools:
+                        rri = rewritten.index("run")
+                        assert rewritten[rri + 1 : rri + 3] == ["python", "-m"], (
+                            f"{action}: inner tool {cmd[ri + 1]!r} not module-ized"
+                        )
+
+    def test_execute_task_applies_rewrite_via_injected_windows_flag(
+        self, tmp_path, monkeypatch
+    ):
+        """End-to-end: the affected action's argv reaching subprocess.run is
+        module-ized when the runner treats the platform as Windows.
+
+        We inject Windows-ness through ``_windows_safe_command`` rather than
+        faking ``os.name`` (which would corrupt ``pathlib``)."""
+        import local_runner.local_runner as lr
+
+        workspace = tmp_path / "ws"
+        workspace.mkdir()
+        monkeypatch.setenv(WORKSPACE_ROOTS_ENV, str(workspace))
+
+        real_norm = lr._windows_safe_command
+        monkeypatch.setattr(
+            lr,
+            "_windows_safe_command",
+            lambda cmd, **kw: real_norm(cmd, is_windows=True),
+        )
+
+        captured: list[list[str]] = []
+
+        class _FakeProc:
+            returncode = 0
+            stdout = "ok"
+            stderr = ""
+
+        def _fake_run(cmd, **kwargs):
+            captured.append(cmd)
+            return _FakeProc()
+
+        monkeypatch.setattr(lr.subprocess, "run", _fake_run)
+
+        task = {"action": "ruff", "workspace": str(workspace)}
+        lr.execute_task(task, artifact_base=str(tmp_path / "artifacts_out"))
+
+        assert captured, "subprocess.run was not invoked"
+        argv = captured[0]
+        assert argv[:3] == [sys.executable, "-m", "poetry"]
+        assert "ruff" in argv
+        ruff_idx = argv.index("ruff")
+        assert argv[ruff_idx - 2 : ruff_idx] == ["python", "-m"]
+        # The bare shim never appears as the executable head.
+        assert argv[0] not in ("ruff", "poetry")
