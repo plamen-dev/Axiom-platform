@@ -56,6 +56,7 @@ outside the runner.
 | `test_validation_loop` | `poetry run pytest tests/test_validation_loop.py` | Validation Automation Loop v0 tests |
 | `execution_chain_run` | `poetry run axiom execution-chain-run --json-output` | Drive a capability through the full execution chain; writes `artifacts/execution_chain/<run>/evidence.json` |
 | `capability_evidence_apply` | `poetry run axiom capability-evidence-apply --evidence <resolved>` | Apply the newest chain evidence bundle to capability state; `--evidence` is resolved and sandbox-validated by the runner (see below) |
+| `emit_evidence_summary` | *in-process (no subprocess)* | Read-only. Summarize the newest chain evidence bundle + its promotion outcome into a tracked proof object under `artifacts/validation_runs/<summary_id>/` (see below) |
 | `collect_revit_journals` | *placeholder* | NOT_IMPLEMENTED — planned journal collection |
 | `kill_revit` | *placeholder* | NOT_IMPLEMENTED — requires `allow_kill_revit=true` |
 
@@ -170,6 +171,7 @@ Located in `tools/local_runner/examples/`:
 - `test_validation_loop.task.json` — run Validation Automation Loop v0 tests
 - `execution_chain_run.task.json` — drive the execution chain and write an evidence bundle
 - `capability_evidence_apply.task.json` — apply the newest chain evidence bundle to capability state
+- `emit_evidence_summary.task.json` — emit a tracked evidence summary (proof object) for the newest bundle
 
 ## Loop-Enablement Actions (evidence-path resolution)
 
@@ -190,11 +192,36 @@ Typical sequence:
 ```bash
 poetry run axiom local-runner --task tools/local_runner/examples/execution_chain_run.task.json
 poetry run axiom local-runner --task tools/local_runner/examples/capability_evidence_apply.task.json
+poetry run axiom local-runner --task tools/local_runner/examples/emit_evidence_summary.task.json
 ```
 
 Generated artifact dirs (`artifacts/execution_chain/`, `artifacts/capability_evidence_intake/`,
 `artifacts/capability_confidence/`) are gitignored — runs are captured locally but
 never committed.
+
+### `emit_evidence_summary` — attested → captured
+
+`emit_evidence_summary` turns the loop's gitignored scratch into a durable,
+**committable** proof object. It runs **in-process** (no subprocess, so no WDAC
+shim exposure on Windows) and is **read-only** — it never mutates confidence,
+readiness, promotion, trust, or capability state.
+
+Like `capability_evidence_apply`, it takes **no** task-supplied path: the runner
+resolves the newest `artifacts/execution_chain/<run>/evidence.json` itself, then
+reads that bundle plus the matching intake/confidence records the loop already
+wrote. It emits, under `artifacts/validation_runs/<summary_id>/`:
+
+- `evidence_summary.json` — `run_id`, `capability_id`, chain id-flow `status`,
+  evidence `quality_verdict`, promotion `decision` (if applied), current
+  confidence/readiness, before→after where available, **relative** source
+  artifact paths, git commit, and a UTC timestamp.
+- `evidence_summary.md` — the same, human-readable.
+
+It never records raw stdout, secrets, or absolute/machine-specific paths. Unlike
+the loop's scratch dirs, `artifacts/validation_runs/<summary_id>/` is **not**
+gitignored (only `vrun_*/` is), so the operator commits the summary as the
+captured proof for a run. If no chain bundle exists yet, it returns
+`status: blocked` with guidance to run `execution_chain_run` first.
 
 ## Encoding Notes
 

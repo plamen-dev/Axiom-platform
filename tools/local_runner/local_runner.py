@@ -21,6 +21,17 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from local_runner.evidence_summary import (
+        build_evidence_summary,
+        write_evidence_summary,
+    )
+except ImportError:  # invoked as a bare script (tools/local_runner on sys.path)
+    from evidence_summary import (
+        build_evidence_summary,
+        write_evidence_summary,
+    )
+
 # ---------------------------------------------------------------------------
 # Trusted workspace policy
 # ---------------------------------------------------------------------------
@@ -227,6 +238,22 @@ def _get_allowed_actions() -> dict[str, dict]:
                 "Apply the newest execution-chain evidence bundle to capability "
                 "state (promotion/confidence). Resolves and validates the evidence "
                 "path from artifacts/execution_chain/; run execution_chain_run first."
+            ),
+        },
+        "emit_evidence_summary": {
+            # In-process, read-only action (no subprocess). Resolves the newest
+            # chain evidence bundle itself (runner-derived, sandbox-validated --
+            # no task-supplied path) and writes a compact, tracked proof object
+            # under artifacts/validation_runs/<summary_id>/. Never mutates
+            # confidence/readiness/promotion/capability state.
+            "commands": [],
+            "emit_summary": True,
+            "description": (
+                "Emit a tracked evidence summary (evidence_summary.json/.md) for "
+                "the newest execution-chain evidence bundle and its promotion "
+                "outcome. Read-only; writes to artifacts/validation_runs/. Run "
+                "execution_chain_run (and optionally capability_evidence_apply) "
+                "first."
             ),
         },
     }
@@ -663,6 +690,61 @@ def execute_task(task: dict, artifact_base: str = "artifacts/local_runner_runs")
             _write_result_summary(result, task, artifact_dir)
             return result
         action_def = {**action_def, "commands": resolved_commands}
+
+    # In-process, read-only summary emission: resolve the newest chain bundle
+    # ourselves, build a compact proof object, and write it under
+    # artifacts/validation_runs/. No subprocess, no state mutation.
+    if action_def.get("emit_summary"):
+        result.command_display = result.action
+        result.command_executed = result.action
+        result.started_at = datetime.now(timezone.utc).isoformat()
+        start_emit = time.monotonic()
+
+        evidence_path, resolve_error = _resolve_latest_evidence(result.workspace)
+        if resolve_error:
+            result.status = "blocked"
+            result.error_message = resolve_error
+            result.completed_at = datetime.now(timezone.utc).isoformat()
+            (artifact_dir / "stdout.txt").write_text("", encoding="utf-8")
+            (artifact_dir / "stderr.txt").write_text(resolve_error, encoding="utf-8")
+            _write_run_log(result, artifact_dir)
+            _write_failure_summary(result, artifact_dir)
+            _write_result_summary(result, task, artifact_dir)
+            return result
+
+        try:
+            summary = build_evidence_summary(result.workspace, evidence_path)
+            json_rel, md_rel = write_evidence_summary(result.workspace, summary)
+        except (OSError, ValueError) as exc:
+            result.status = "failed"
+            result.exit_code = 1
+            result.error_message = f"Failed to emit evidence summary: {exc}"
+            result.completed_at = datetime.now(timezone.utc).isoformat()
+            (artifact_dir / "stdout.txt").write_text("", encoding="utf-8")
+            (artifact_dir / "stderr.txt").write_text(
+                result.error_message, encoding="utf-8"
+            )
+            _write_run_log(result, artifact_dir)
+            _write_failure_summary(result, artifact_dir)
+            _write_result_summary(result, task, artifact_dir)
+            return result
+
+        result.exit_code = 0
+        result.status = "success"
+        result.duration_ms = int((time.monotonic() - start_emit) * 1000)
+        result.completed_at = datetime.now(timezone.utc).isoformat()
+        stdout = (
+            f"Wrote evidence summary:\n{json_rel}\n{md_rel}\n"
+            f"decision={summary.get('decision')} "
+            f"quality={summary.get('quality_verdict')} "
+            f"chain_status={summary.get('chain_status')}"
+        )
+        result.stdout = stdout
+        (artifact_dir / "stdout.txt").write_text(stdout, encoding="utf-8")
+        (artifact_dir / "stderr.txt").write_text("", encoding="utf-8")
+        _write_run_log(result, artifact_dir)
+        _write_result_summary(result, task, artifact_dir)
+        return result
 
     result.command_display = _format_command_display(action_def)
 
