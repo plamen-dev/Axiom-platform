@@ -5,7 +5,7 @@ Axiom codebase. Seeded from direct repo inspection of source modules, schemas,
 CLI commands, and architecture docs.
 
 Last updated: PR #157 (Axiom Context Preflight, PR Purpose Map, and Live System Atlas v0).
-Clusters 10–12 added by the required old-foundation scan (pipe/spine/bridge/MCP/agents).
+Clusters 10–12 added by the required foundational provenance scan (pipe/spine/bridge/MCP/agents).
 
 ---
 
@@ -154,11 +154,11 @@ Clusters 10–12 added by the required old-foundation scan (pipe/spine/bridge/MC
 | Field | Value |
 |-------|-------|
 | **Names / aliases** | run_spine (RunMetadata, AuditEntry, artifact_manifest.json, run_summary.md), ExecutionTrace (persistence), QAReport (schemas), ExecutionReport (chain), evidence.json/trace.json, validation_run.json, pass_fail.json, chain_evidence.json |
-| **Likely overlap** | Several layers each record "what happened during a run." `Run Spine` = run identity + standard artifact folder + audit log (cross-cutting backbone). `ExecutionTrace` (persistence) = legacy SQLite execution record. `QAReport` = legacy Revit plan quality assessment. `ExecutionReport` (PR #142) = execution-chain terminal record. Evidence/validation bundles = M2/M4 + CLI recorder outputs. |
-| **Known distinct responsibilities** | `Run Spine` = run-folder/audit identity layer every action wraps. `ExecutionTrace` = legacy job→trace persistence (queryable by job_id). `QAReport` = legacy quality/violation assessment. `ExecutionReport` = newer chain report. Bundles = per-engine evidence intake. |
+| **Likely overlap** | Several layers each record "what happened during a run." `Run Spine` = run identity + standard artifact folder + audit log (cross-cutting backbone). `ExecutionTrace` (persistence) = earlier-introduced SQLite execution record. `QAReport` = earlier-introduced Revit plan quality assessment. `ExecutionReport` (PR #142) = execution-chain terminal record. Evidence/validation bundles = M2/M4 + CLI recorder outputs. |
+| **Known distinct responsibilities** | `Run Spine` = run-folder/audit identity layer every action wraps. `ExecutionTrace` = earlier-introduced job→trace persistence (queryable by job_id). `QAReport` = earlier-introduced quality/violation assessment. `ExecutionReport` = newer chain report. Bundles = per-engine evidence intake. |
 | **Active files** | `src/axiom_core/run_spine.py`, `src/axiom_core/persistence.py` (ExecutionTrace), `src/axiom_core/schemas.py` (QAReport), `src/axiom_core/execution_report.py`, `src/axiom_core/execution_chain_orchestrator.py`, `src/axiom_core/validation/cli_validation_recorder.py` |
-| **Risk of duplication** | **High.** ExecutionTrace (legacy) and ExecutionReport (new) are duplicate-candidates for "the execution record." Run Spine artifacts overlap with bundle layouts. (Cluster 4 covers the artifact-format angle; this cluster covers the record-model + run-identity angle.) |
-| **Rule for future PRs** | Before adding a new validation/evidence bundle model or changing run-folder layout, reconcile against Run Spine (identity), ExecutionTrace (legacy record), and ExecutionReport (chain record). Do not add a fourth execution-record model. |
+| **Risk of duplication** | **High.** ExecutionTrace (earlier-introduced) and ExecutionReport (newer) are duplicate-candidates for "the execution record." Run Spine artifacts overlap with bundle layouts. (Cluster 4 covers the artifact-format angle; this cluster covers the record-model + run-identity angle.) |
+| **Rule for future PRs** | Before adding a new validation/evidence bundle model or changing run-folder layout, reconcile against Run Spine (identity), ExecutionTrace (earlier-introduced record), and ExecutionReport (chain record). Do not add a fourth execution-record model. |
 | **Status** | needs reconciliation — **duplicate candidate** (ExecutionTrace vs ExecutionReport) |
 
 ---
@@ -177,24 +177,24 @@ Clusters 10–12 added by the required old-foundation scan (pipe/spine/bridge/MC
 
 ---
 
-## Old-foundation scan result
+## Foundational provenance scan result
 
-Required scan (PR #157, before final commit) reconciling older pipe / spine / bridge / job-plan / MCP / agents concepts against the newer execution-chain / evidence / confidence work.
+Required scan (PR #157, before final commit) reconciling earlier-introduced pipe / spine / bridge / job-plan / MCP / agents concepts against the newer execution-chain / evidence / confidence work. "Earlier-introduced" denotes introduction order only, not legacy/deprecated status.
 
 1. **Did older pipe/spine/bridge/job-plan concepts already cover parts of the autonomy loop?**
    Yes. The named-pipe bridge (`PipeClient` → `AxiomPipeServer` → `PromptDispatcher`, "PR #2" per code) is the **real Revit execution edge**; `AutomationBridge` already wraps it as a non-interactive autonomy driver with durable bridge evidence. `Run Spine` already provides run identity + audit + artifact folders. `Orchestrator` already does Job→Plan→ToolStep→MCP. `WorkItem`/`WorkQueue` already model a work backlog. These cover transport, run-identity, planning, and backlog edges that a naive "new autonomy loop" would otherwise re-invent.
 
 2. **Which newer concepts overlap with them?**
    - `MCPLayer` (mock) overlaps the real pipe bridge → Cluster 10.
-   - `ExecutionReport`/evidence bundles overlap legacy `ExecutionTrace`/`QAReport` and Run Spine artifacts → Clusters 4 & 11.
-   - `ExecutionChainOrchestrator` / `OrchestratorAgent` overlap the legacy `Orchestrator` → Clusters 2 & 12.
+   - `ExecutionReport`/evidence bundles overlap earlier-introduced `ExecutionTrace`/`QAReport` and Run Spine artifacts → Clusters 4 & 11.
+   - `ExecutionChainOrchestrator` / `OrchestratorAgent` overlap the earlier-introduced `Orchestrator` → Clusters 2 & 12.
    - WorkItem/WorkQueue overlap Job/Plan as "what to do" → Cluster 1.
 
-3. **Which older concepts are still active vs legacy/unknown?**
+3. **Which earlier-introduced concepts are still active vs duplicate-candidate/unknown?** (No component is classified "legacy" — none is proven unused, superseded, bypassed, or intentionally retired.)
    - **Active:** Run Spine, PipeClient/AutomationBridge (Windows revalidation pending), AxiomPipeServer/PromptDispatcher (C#), Orchestrator, AutomationPlanner, Persistence/ExecutionTrace, Agents layer, input normalization, Job/Plan/ToolStep/QAReport schemas.
    - **Partial:** MCPLayer (mock only; real Revit-connected impl not proven in repo).
-   - **Legacy/duplicate-candidate:** ExecutionTrace (vs newer ExecutionReport) for the "execution record" concept.
-   - **Unknown:** original PR numbers for most pre-#112 foundation modules — not invented here; cited by file instead.
+   - **Duplicate-candidate:** ExecutionTrace (vs newer ExecutionReport) for the "execution record" concept — both currently active; duplication is a risk to reconcile, not a retirement decision.
+   - **Provenance:** introducing GitHub repo-local PR numbers are recoverable via `git log --diff-filter=A` (see PR Purpose Map); initial-foundation modules have no associated PR (repo bootstrap).
 
 4. **What must future PRs check before proposing:**
    - **task packet consumer** → Cluster 1 (Job/Plan/WorkItem/WorkQueue). Consume an existing model; do not add a 4th.
@@ -205,7 +205,7 @@ Required scan (PR #157, before final commit) reconciling older pipe / spine / br
 
 5. **What remains unknown?**
    - Whether `MCPLayer` is intended to become the real Revit boundary or be superseded by the pipe bridge (mock↔real adapter seam unresolved).
-   - Exact creating-PR numbers for pre-#112 foundation modules.
+   - Whether initial-foundation modules (introduced by the repo-bootstrap commit, no associated PR) map to any Axiom GPR number — GitHub repo-local provenance is recoverable, but GPR-level provenance is not visible from this workspace.
    - Whether ExecutionTrace is slated for retirement in favor of ExecutionReport, or both persist by design.
 
-**Did this change any conclusions about future task-packet / worker / retry work?** Yes — it strengthens the anti-duplication position: a "task packet consumer," "local worker loop," and "retry executor" would each overlap **already-existing** old-foundation components (Job/Plan/WorkQueue, AutomationBridge/PipeClient, execution_attempt + recovery chain). Future PRs proposing these must start from the existing components via an adapter seam, not a new framework.
+**Did this change any conclusions about future task-packet / worker / retry work?** Yes — it strengthens the anti-duplication position: a "task packet consumer," "local worker loop," and "retry executor" would each overlap **already-existing** earlier-introduced foundational components (Job/Plan/WorkQueue, AutomationBridge/PipeClient, execution_attempt + recovery chain). Future PRs proposing these must start from the existing components via an adapter seam, not a new framework.

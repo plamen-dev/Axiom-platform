@@ -457,11 +457,11 @@ class TestSystemAtlas:
         assert "data_source" in atlas
         assert "design pass" in atlas["data_source"].lower()
 
-    def test_atlas_includes_old_foundation_components(self) -> None:
-        """Old-foundation scan: pipe/spine/bridge/MCP/agents families are present."""
+    def test_atlas_includes_earlier_introduced_foundation_components(self) -> None:
+        """Foundational provenance scan: pipe/spine/bridge/MCP/agents families are present."""
         all_aliases = {a.lower() for f in _COMPONENT_FAMILIES for a in f["aliases"]}
         for alias in ("pipeclient", "mcplayer", "automationbridge", "run spine", "axiompipeserver"):
-            assert alias in all_aliases, f"Old-foundation alias missing from atlas: {alias}"
+            assert alias in all_aliases, f"Earlier-introduced foundational alias missing from atlas: {alias}"
         all_files = {p for f in _COMPONENT_FAMILIES for p in f["primary_files"]}
         for rel in (
             "src/axiom_core/run_spine.py",
@@ -469,7 +469,7 @@ class TestSystemAtlas:
             "src/axiom_core/automation_bridge.py",
             "src/axiom_core/pipe_client.py",
         ):
-            assert rel in all_files, f"Old-foundation file missing from atlas: {rel}"
+            assert rel in all_files, f"Earlier-introduced foundational file missing from atlas: {rel}"
 
 
 # ---------------------------------------------------------------------------
