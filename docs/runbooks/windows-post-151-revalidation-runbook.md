@@ -74,9 +74,9 @@ the runner) on a WDAC machine, use the `python -m poetry ...` forms above.
 > encoding artifact, not proof of empty data. Use `Out-File -Encoding utf8` (or
 > `python -m json.tool <file>`) when capturing JSON output.
 
-## The 8-point revalidation gate
+## The 9-point revalidation gate
 
-Run in order. All eight must pass before Windows is treated as ready for
+Run in order. All nine must pass before Windows is treated as ready for
 Local-Runner loop integration, implementation-worker work, or Revit-adjacent
 execution. Capture the console output and the artifact folders for each step.
 
@@ -119,26 +119,43 @@ no task-supplied path) and applies it. A confidence/intake record is written und
 If this step reports `blocked` with "run the 'execution_chain_run' action first",
 step 3 did not produce a bundle — fix step 3 before continuing.
 
-### 5. Targeted tests
+### 5. `emit_evidence_summary` (via the runner — PR B action)
 
 ```
-poetry run pytest tests/test_local_runner.py tests/test_command_registry.py tests/test_execution_chain_orchestrator.py tests/test_evidence_promotion.py -q
+poetry run axiom local-runner --task tools/local_runner/examples/emit_evidence_summary.task.json
+```
+Pass: `status: success`; a tracked proof object is written at
+`artifacts\validation_runs\<summary_id>\evidence_summary.json` + `.md` showing
+`run_id`, `capability_id`, chain id-flow status, `quality_verdict`, the promotion
+`decision`, current confidence/readiness, before→after, and relative source
+artifact paths. This step is read-only (no state mutation) and runs in-process,
+so it has no WDAC exe-shim exposure.
+
+Unlike the loop's scratch dirs, `artifacts\validation_runs\<summary_id>\` is
+**not** gitignored — commit it. This is what turns the lane-2 run from
+*attested* into *captured*.
+
+### 6. Targeted tests
+
+```
+poetry run pytest tests/test_local_runner.py tests/test_command_registry.py tests/test_execution_chain_orchestrator.py tests/test_evidence_promotion.py tests/test_evidence_summary.py -q
 ```
 Pass: 0 failed. (Pre-#151 this set produced the 38-failure cluster.)
 
-### 6. CLI Validation Evidence Recorder (if relevant)
+### 7. CLI Validation Evidence Recorder (if relevant)
 
 If exercised, run it on Windows and confirm it records the run without error. Skip
 only if not part of the current validation scope; note the skip in the report.
 
-### 7. No tracked source files modified
+### 8. No tracked source files modified
 
 ```
 git status --short
 ```
-Pass: no ` M ` / ` D ` on tracked files — only untracked artifact folders.
+Pass: no ` M ` / ` D ` on tracked files — the only allowed untracked entry is the
+step-5 summary under `artifacts\validation_runs\<summary_id>\` (which you commit).
 
-### 8. Only gitignored artifact folders produced
+### 9. Only gitignored artifact folders produced (plus the tracked summary)
 
 ```
 git status --short --ignored | findstr /R "artifacts"
@@ -146,24 +163,29 @@ git status --short --ignored | findstr /R "artifacts"
 Pass: `artifacts\execution_chain\`, `artifacts\capability_confidence\`,
 `artifacts\capability_evidence_intake\`, and `artifacts\local_runner_runs\` appear
 as **ignored** (`!!`), not untracked (`??`). (These are gitignored as of PR #50.)
+The step-5 `artifacts\validation_runs\<summary_id>\` folder appears untracked
+(`??`) by design — it is the committable proof object.
 
 ## Recording the result
 
-After all eight pass, record the outcome so it becomes captured evidence, not a
+After all nine pass, record the outcome so it becomes captured evidence, not a
 chat note:
 
+- **Commit the step-5 summary** (`artifacts/validation_runs/<summary_id>/`) — this
+  is the primary captured proof for the run.
 - Append a dated entry to `docs/logs/behavior-change-ledger.md` (observed command,
   previous behavior = pre-#151 path-escape failure, current behavior = pass, related
   PRs #151/#50, artifact paths).
 - Preserve the `execution_chain\<run_id>\evidence.json` and the
-  `capability_confidence\` / `capability_evidence_intake\` records as the captured
-  lane-2 bundle.
+  `capability_confidence\` / `capability_evidence_intake\` records locally as the
+  lane-2 source bundle (gitignored; referenced by relative path from the summary).
 
 ### Required status line on success
 
 > "Post-#151 Windows revalidation passed on `C:\Dev\Axiom\Code\Axiom-platform`:
 > Local Runner `git_status`/`ruff`, `execution-chain-run`, and
-> `capability-evidence-apply` all succeeded via the runner; the targeted
+> `capability-evidence-apply` all succeeded via the runner; `emit_evidence_summary`
+> produced a committed evidence summary; the targeted
 > execution-chain/evidence-promotion tests are green; no tracked source files were
 > modified; only gitignored artifact folders were produced. The pre-#151
 > `Resolved path escapes artifacts root` bug is resolved. Windows substrate loop is
