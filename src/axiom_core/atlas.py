@@ -359,7 +359,7 @@ for (const [a,b] of edges){
     degree[idx.get(a)]++; degree[idx.get(b)]++;
   }
 }
-const groupOf = name => name.split(".").slice(0,2).join(".");
+const groupOf = name => name.split(".")[0];
 const groups = [...new Set(modules.map(groupOf))].sort();
 const groupColor = new Map(groups.map((g,i)=>[g, COLORS[i % COLORS.length]]));
 
