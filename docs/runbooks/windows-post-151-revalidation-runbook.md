@@ -44,6 +44,36 @@ runbook confirms the fix on the real machine.
 See `docs/runbooks/windows-revit-build-test-runbook.md` and
 `docs/runbooks/local-runner-runbook.md` for environment/build detail — not repeated here.
 
+## Known Windows issue: Application Control (WDAC) blocks executable shims
+
+On machines with Windows Application Control / Device Guard enabled, subprocess
+invocation of console-script **`.exe` shims** (`poetry.exe`, `ruff.exe`,
+`pytest.exe`) can be blocked, failing with:
+
+```
+OS error: [WinError 4551] An Application Control policy has blocked this file
+```
+
+**Module invocation bypasses the shim** while running identical code:
+
+```
+python -m poetry run python -m ruff check .
+python -m poetry run python -m pytest tests/test_local_runner.py -q
+python -m poetry run axiom execution-chain-run --json-output
+python -m poetry run axiom capability-evidence-apply --evidence <evidence.json>
+```
+
+The Local Runner emits **Windows-safe module invocation automatically** on
+Windows (`_windows_safe_command` rewrites `poetry`/`ruff`/`pytest` heads to
+`python -m` form at execution time; Linux/CI unchanged). So steps 2–5 below run
+via the runner without hitting WDAC. If you invoke Axiom **directly** (outside
+the runner) on a WDAC machine, use the `python -m poetry ...` forms above.
+
+> Operator note: PowerShell `>` redirection writes **UTF-16** by default. Piping
+> such a file into a UTF-8 JSON reader fails with a BOM/codec error — this is an
+> encoding artifact, not proof of empty data. Use `Out-File -Encoding utf8` (or
+> `python -m json.tool <file>`) when capturing JSON output.
+
 ## The 8-point revalidation gate
 
 Run in order. All eight must pass before Windows is treated as ready for
