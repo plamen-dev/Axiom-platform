@@ -205,6 +205,30 @@ def _get_allowed_actions() -> dict[str, dict]:
             ],
             "description": "Run Validation Automation Loop v0 tests.",
         },
+        "execution_chain_run": {
+            "commands": [
+                ["poetry", "run", "axiom", "execution-chain-run", "--json-output"],
+            ],
+            "description": (
+                "Drive one deterministic capability through the full execution "
+                "chain (Plan -> Step -> Attempt -> Result -> Artifact -> Evidence "
+                "-> Report), writing artifacts/execution_chain/<run>/evidence.json."
+            ),
+        },
+        "capability_evidence_apply": {
+            # Commands are built at run time by _resolve_evidence_command: the
+            # --evidence path is derived from the newest chain evidence bundle in
+            # the workspace and sandbox-validated. No task-supplied path is
+            # accepted, preserving the "named actions only / no arbitrary args"
+            # security model.
+            "commands": [],
+            "resolve_evidence": True,
+            "description": (
+                "Apply the newest execution-chain evidence bundle to capability "
+                "state (promotion/confidence). Resolves and validates the evidence "
+                "path from artifacts/execution_chain/; run execution_chain_run first."
+            ),
+        },
     }
 
 
@@ -290,6 +314,62 @@ def validate_task(task: dict) -> str | None:
         return "Arbitrary command execution is not allowed. Use named actions only."
 
     return None
+
+
+def _resolve_latest_evidence(workspace: str) -> tuple[str | None, str | None]:
+    """Find the newest execution-chain evidence bundle inside the workspace.
+
+    Returns ``(evidence_path, error)``. The path is derived from
+    ``<workspace>/artifacts/execution_chain/*/evidence.json`` and validated to
+    live inside the workspace root (no escape via symlink/relative traversal).
+    No task-supplied path is ever used, so the runner's "named actions only /
+    no arbitrary args" security model is preserved.
+    """
+    try:
+        ws_root = Path(workspace).resolve()
+    except (OSError, ValueError) as exc:
+        return None, f"Invalid workspace: {exc}"
+
+    chain_dir = ws_root / "artifacts" / "execution_chain"
+    if not chain_dir.is_dir():
+        return None, (
+            f"No execution-chain evidence found ({chain_dir} does not exist). "
+            "Run the 'execution_chain_run' action first."
+        )
+
+    candidates = sorted(
+        chain_dir.glob("*/evidence.json"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    if not candidates:
+        return None, (
+            f"No evidence.json bundle found under {chain_dir}. "
+            "Run the 'execution_chain_run' action first."
+        )
+
+    evidence = candidates[0].resolve()
+    if ws_root != evidence and ws_root not in evidence.parents:
+        return None, (
+            f"Resolved evidence path '{evidence}' escapes the workspace root "
+            f"'{ws_root}'; refusing to use it."
+        )
+    return str(evidence), None
+
+
+def _resolve_evidence_command(
+    workspace: str,
+) -> tuple[list[list[str]] | None, str | None]:
+    """Build the capability-evidence-apply command with a validated path."""
+    evidence_path, error = _resolve_latest_evidence(workspace)
+    if error:
+        return None, error
+    return [
+        [
+            "poetry", "run", "axiom", "capability-evidence-apply",
+            "--evidence", evidence_path,
+        ],
+    ], None
 
 
 def _build_environment_summary(workspace: str) -> dict:
@@ -514,6 +594,25 @@ def execute_task(task: dict, artifact_base: str = "artifacts/local_runner_runs")
     env_summary = _build_environment_summary(result.workspace)
     env_path = artifact_dir / "environment_summary.json"
     env_path.write_text(json.dumps(env_summary, indent=2), encoding="utf-8")
+
+    # Actions that consume a prior run's evidence bundle build their command at
+    # run time from a runner-derived, sandbox-validated path (no task-supplied
+    # path). If no bundle exists yet, the action is blocked with guidance.
+    if action_def.get("resolve_evidence"):
+        resolved_commands, resolve_error = _resolve_evidence_command(result.workspace)
+        if resolve_error:
+            result.status = "blocked"
+            result.error_message = resolve_error
+            result.started_at = datetime.now(timezone.utc).isoformat()
+            result.completed_at = result.started_at
+            result.command_executed = result.action
+            (artifact_dir / "stdout.txt").write_text("", encoding="utf-8")
+            (artifact_dir / "stderr.txt").write_text(resolve_error, encoding="utf-8")
+            _write_run_log(result, artifact_dir)
+            _write_failure_summary(result, artifact_dir)
+            _write_result_summary(result, task, artifact_dir)
+            return result
+        action_def = {**action_def, "commands": resolved_commands}
 
     result.command_display = _format_command_display(action_def)
 

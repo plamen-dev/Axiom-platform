@@ -1,0 +1,10 @@
+{
+  "action": "execution_chain_run",
+  "prompt": "Drive a deterministic capability through the full execution chain (Plan -> Step -> Attempt -> Result -> Artifact -> Evidence -> Report) and write the evidence bundle under artifacts/execution_chain/.",
+  "timeout_seconds": 300,
+  "workspace": "C:\\Dev\\Axiom\\Code\\Axiom-platform",
+  "metadata": {
+    "requested_by": "agent",
+    "purpose": "prove the execution chain closes on Windows and produces a captured evidence bundle"
+  }
+}

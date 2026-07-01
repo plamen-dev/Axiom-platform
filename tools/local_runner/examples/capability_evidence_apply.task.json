@@ -1,0 +1,10 @@
+{
+  "action": "capability_evidence_apply",
+  "prompt": "Apply the newest execution-chain evidence bundle to capability state (promotion/confidence). The evidence path is resolved and sandbox-validated by the runner; run the execution_chain_run action first.",
+  "timeout_seconds": 180,
+  "workspace": "C:\\Dev\\Axiom\\Code\\Axiom-platform",
+  "metadata": {
+    "requested_by": "agent",
+    "purpose": "close the substrate loop: evidence bundle -> promotion/confidence update"
+  }
+}

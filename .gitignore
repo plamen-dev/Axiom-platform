@@ -165,6 +165,13 @@ artifacts/execution_artifact/
 # Execution Report Framework bundles (generated run outputs; keep curated evidence)
 artifacts/execution_report/
 
+# Execution Chain Orchestrator run bundles (generated run outputs; keep curated evidence)
+artifacts/execution_chain/
+
+# Evidence-to-promotion intake + confidence records (generated run outputs; keep curated evidence)
+artifacts/capability_evidence_intake/
+artifacts/capability_confidence/
+
 # Visual Studio local state
 .vs/
 
