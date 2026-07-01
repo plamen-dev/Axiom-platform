@@ -57,6 +57,9 @@ def _write_chain_evidence(
     bundle_passed: bool | None = None,
     bundle_status: str | None = None,
     evidence_id: str | None = None,
+    metrics: dict[str, Any] | None = None,
+    quality: dict[str, Any] | None = None,
+    include_metrics: bool = True,
 ) -> str:
     """Write an evidence.json + sibling trace.json like execution-chain-run does.
 
@@ -72,9 +75,16 @@ def _write_chain_evidence(
     evidence: dict[str, Any] = {
         "evidence_id": evidence_id if evidence_id is not None else f"EVID-{run_id}",
         "references": references,
-        "metrics": {"module_count": 10, "import_edge_count": 20},
         "summary": "fixture evidence",
     }
+    if include_metrics:
+        evidence["metrics"] = (
+            metrics
+            if metrics is not None
+            else {"module_count": 10, "import_edge_count": 20}
+        )
+    if quality is not None:
+        evidence["quality"] = quality
     if bundle_passed is not None:
         evidence["passed"] = bundle_passed
     if bundle_status is not None:
@@ -624,3 +634,161 @@ def test_evid001_language_is_scoped_to_m2_slice() -> None:
     assert "narrow m2 slice" in module_doc
     assert "model_health" in module_doc
     assert "remains" in module_doc and "open" in module_doc
+
+
+# ---------------------------------------------------------------------------
+# Finding 2 — semantically empty evidence is quarantined, not promoted
+# ---------------------------------------------------------------------------
+
+
+def test_empty_evidence_is_quarantined_not_promoted(
+    loop: EvidencePromotionLoop, artifacts_root: str
+) -> None:
+    """A PASS bundle with module_count=0 must be quarantined with no state change."""
+    evidence = _write_chain_evidence(
+        artifacts_root,
+        status="PASS",
+        metrics={"module_count": 0, "import_edge_count": 0, "isolated_module_count": 0},
+    )
+    record = loop.apply(evidence)
+
+    assert record["decision"] == EvidenceDecision.QUARANTINED.value
+    assert record["accepted"] is False
+    assert record["state_changed"] is False
+    assert record["evidence_quality"]["verdict"] == "EMPTY"
+    assert "module_count" in record["evidence_quality"]["zero_metrics"]
+
+
+def test_empty_evidence_does_not_move_confidence_or_readiness(
+    loop: EvidencePromotionLoop, artifacts_root: str
+) -> None:
+    """Empty evidence must not move very_low -> very_high / blocked -> ready."""
+    evidence = _write_chain_evidence(
+        artifacts_root, status="PASS", metrics={"module_count": 0}
+    )
+    record = loop.apply(evidence)
+
+    assert record["prior_state"]["confidence_level"] == "very_low"
+    assert record["updated_state"]["confidence_level"] == "very_low"
+    assert record["prior_state"]["readiness"] == "blocked"
+    assert record["updated_state"]["readiness"] == "blocked"
+    # And the durable capability state is untouched.
+    assert loop.current_state("self-model-build")["confidence_level"] == "very_low"
+    assert loop.current_state("self-model-build")["readiness"] == "blocked"
+
+
+def test_substantive_evidence_still_promotes(
+    loop: EvidencePromotionLoop, artifacts_root: str
+) -> None:
+    """Non-zero module_count still accepts + promotes exactly as before."""
+    evidence = _write_chain_evidence(
+        artifacts_root, status="PASS", metrics={"module_count": 5, "import_edge_count": 0}
+    )
+    record = loop.apply(evidence)
+
+    assert record["decision"] == EvidenceDecision.ACCEPTED.value
+    assert record["updated_state"]["confidence_level"] == "very_high"
+    assert record["updated_state"]["readiness"] == "ready"
+
+
+def test_unknown_capability_not_evaluated_preserves_behavior(
+    loop: EvidencePromotionLoop, artifacts_root: str
+) -> None:
+    """A capability with no configured rule is NOT_EVALUATED and still accepts."""
+    evidence = _write_chain_evidence(
+        artifacts_root,
+        capability_id="some-other-capability",
+        status="PASS",
+        metrics={"module_count": 0},
+    )
+    record = loop.apply(evidence, capability_id="some-other-capability")
+
+    assert record["decision"] == EvidenceDecision.ACCEPTED.value
+    assert record["evidence_quality"]["verdict"] == "NOT_EVALUATED"
+
+
+def test_older_bundle_without_quality_is_defensively_recomputed(
+    loop: EvidencePromotionLoop, artifacts_root: str
+) -> None:
+    """A bundle lacking the quality field is recomputed and quarantined if empty."""
+    evidence = _write_chain_evidence(
+        artifacts_root, status="PASS", metrics={"module_count": 0}
+    )
+    # No `quality` field was written (older-format bundle).
+    record = loop.apply(evidence)
+
+    assert record["decision"] == EvidenceDecision.QUARANTINED.value
+    assert record["evidence_quality"]["verdict"] == "EMPTY"
+    assert "recomputed from metrics" in record["reason"]
+
+
+def test_malformed_quality_field_is_defensively_recomputed(
+    loop: EvidencePromotionLoop, artifacts_root: str
+) -> None:
+    """A malformed quality field cannot smuggle empty evidence past the gate."""
+    evidence = _write_chain_evidence(
+        artifacts_root,
+        status="PASS",
+        metrics={"module_count": 0},
+        quality={"verdict": "TOTALLY_FINE_TRUST_ME"},
+    )
+    record = loop.apply(evidence)
+
+    assert record["decision"] == EvidenceDecision.QUARANTINED.value
+    assert record["evidence_quality"]["verdict"] == "EMPTY"
+
+
+def test_stamped_substantive_quality_is_honored(
+    loop: EvidencePromotionLoop, artifacts_root: str
+) -> None:
+    """A well-formed stamped SUBSTANTIVE verdict is used as-is (not recomputed)."""
+    evidence = _write_chain_evidence(
+        artifacts_root,
+        status="PASS",
+        metrics={"module_count": 3},
+        quality={
+            "verdict": "SUBSTANTIVE",
+            "required_metrics": ["module_count"],
+            "zero_metrics": [],
+            "reason": "stamped by producer",
+        },
+    )
+    record = loop.apply(evidence)
+
+    assert record["decision"] == EvidenceDecision.ACCEPTED.value
+    assert "recomputed" not in record["reason"]
+
+
+def test_chain_stamps_quality_empty_while_status_pass(tmp_path: Any) -> None:
+    """Producer: a valid id-flow PASS run still stamps quality.verdict=EMPTY
+    when the self-model has zero modules (empty repo)."""
+    empty_repo = tmp_path / "empty_repo"
+    (empty_repo / "src").mkdir(parents=True)
+    orch = ExecutionChainOrchestrator(
+        repo_root=str(empty_repo), artifacts_root=str(tmp_path / "artifacts")
+    )
+    trace = orch.run("self-model-build")
+
+    assert trace.status == "PASS"  # id-flow plumbing verdict unchanged
+    evidence_path = Path(trace.evidence_reference["evidence_path"])
+    bundle = json.loads(evidence_path.read_text())
+    assert bundle["metrics"]["module_count"] == 0
+    assert bundle["quality"]["verdict"] == "EMPTY"
+    assert "module_count" in bundle["quality"]["zero_metrics"]
+
+
+def test_chain_quality_empty_is_quarantined_end_to_end(tmp_path: Any) -> None:
+    """Producer + consumer: an empty repo's chain evidence is quarantined."""
+    empty_repo = tmp_path / "empty_repo"
+    (empty_repo / "src").mkdir(parents=True)
+    artifacts = str(tmp_path / "artifacts")
+    orch = ExecutionChainOrchestrator(
+        repo_root=str(empty_repo), artifacts_root=artifacts
+    )
+    trace = orch.run("self-model-build")
+    loop = EvidencePromotionLoop(artifacts_root=artifacts)
+    record = loop.apply(trace.evidence_reference["evidence_path"])
+
+    assert record["decision"] == EvidenceDecision.QUARANTINED.value
+    assert record["state_changed"] is False
+    assert record["evidence_quality"]["verdict"] == "EMPTY"

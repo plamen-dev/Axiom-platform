@@ -43,6 +43,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from axiom_core.evidence_quality import evaluate_quality
 from axiom_core.execution_artifact import ExecutionArtifactEngine
 from axiom_core.execution_attempt_v2 import ExecutionAttemptEngine
 from axiom_core.execution_plan import ExecutionPlanEngine
@@ -598,10 +599,17 @@ class ExecutionChainOrchestrator:
             "result_id": trace.result_id,
             "artifact_id": trace.artifact_id,
         }
+        # Evidence-quality / substance verdict (Finding 2). This is orthogonal
+        # to the chain's id-flow ``status``: it judges whether the produced
+        # metrics are substantive so the downstream promotion gate can quarantine
+        # semantically empty evidence. Stamped here so the verdict travels with
+        # the bundle (the bundle is the navigable record).
+        quality = evaluate_quality(trace.capability_id, metrics)
         evidence = {
             "evidence_id": evidence_id,
             "references": references,
             "metrics": metrics,
+            "quality": quality,
             "summary": (
                 f"Evidence for {trace.capability_id} chain run: "
                 f"result {trace.result_id} produced artifact {trace.artifact_id}."
