@@ -5,22 +5,31 @@ docs, and direct code inspection. Does not fabricate missing facts — unknown
 items are marked.
 
 Last updated: PR #157 (Axiom Context Preflight, PR Purpose Map, and Live System Atlas v0).
-Old-foundation section (pre-#112 components) added by the required old-foundation scan.
+Earlier-introduced foundational components section added by the required foundational provenance scan.
 
 ---
 
-## Old-foundation components (pre-#112) — repo-visible, creating PR unknown
+## Earlier-introduced foundational components (predate the PR #112+ series) — repo-visible
 
-The required old-foundation scan surfaced foundational modules that predate the
-PR #112+ framework series. Their original creating-PR numbers are **not** repo-visible,
-so they are **not invented** — components are cited by file. Mapped here so future PRs
-do not rebuild these under new names. (Code docstrings reference an early "PR #2" for the
-named-pipe bridge; treated as a docstring claim, not a verified ledger fact.)
+The required foundational provenance scan surfaced foundational modules that predate
+the PR #112+ framework series. These are **not** "legacy": none is proven unused,
+superseded, bypassed, or intentionally retired. They are earlier-introduced components,
+mapped here so future PRs do not rebuild them under new names.
+
+Their introducing **GitHub repo-local PR numbers are recoverable** from this repo's git
+history via `git log --diff-filter=A` (they are *not* unknown): AutomationBridge = repo-local
+PR #19, PipeClient = repo-local PR #2 (the earliest agents + named-pipe vertical slice),
+Run Spine = repo-local PR #31, Automation Planner = repo-local PR #35, WorkItem/WorkQueue =
+repo-local PR #56, Execution-attempt = repo-local PR #111. Prompt/Input Normalization,
+Job/Plan/ToolStep/QAReport schemas, Orchestrator, MCP Layer, and Persistence/ExecutionTrace
+were introduced by the initial-foundation commit (repo bootstrap, no associated PR).
+(GitHub repo-local PR numbers are distinct from Axiom GPR numbers; Devin lane provenance is
+not required to establish these — git history in this workspace is sufficient.)
 
 | Component (repo-visible) | Files | Workflow edge | Classification |
 |--------------------------|-------|---------------|----------------|
 | Prompt / Input Normalization | `src/axiom_core/input_normalization.py`, `prompt_resolver.py` | User prompt/Excel → NormalizedJob | active / distinct responsibility |
-| Job / Plan / ToolStep / QAReport schemas | `src/axiom_core/schemas.py` | NormalizedJob → Plan → ToolStep → QAReport | active (legacy pipeline) |
+| Job / Plan / ToolStep / QAReport schemas | `src/axiom_core/schemas.py` | NormalizedJob → Plan → ToolStep → QAReport | active (earlier-introduced pipeline) |
 | Orchestrator (job→plan→MCP) | `src/axiom_core/orchestrator.py` | Job → Plan → ToolStep → MCP execution | active; overlaps newer orchestrators (Cluster 2/12) |
 | MCP Layer (mock tool boundary) | `src/axiom_core/mcp_layer.py` | Plan/ToolStep → ToolResult (simulated) | partial (mock only; real Revit-connected impl unproven) |
 | Automation Bridge / Pipe Client | `src/axiom_core/automation_bridge.py`, `pipe_client.py` | Capability request → named pipe → Revit | active; Windows revalidation pending (PR #151) |
@@ -32,7 +41,7 @@ named-pipe bridge; treated as a docstring claim, not a verified ledger fact.)
 | Work backlog (WorkItem/WorkQueue) | `src/axiom_core/work_item_registry.py`, `work_queue.py`, `work_prioritization.py` | Backlog of "what to do" | active; overlaps Job/Plan (Cluster 1) |
 | Execution-attempt / recovery chain | `src/axiom_core/execution_attempt.py`, `execution_attempt_v2.py`, `recovery_recommendation.py`, `recovery_execution.py` | Attempt → failure classification → recommendation → execution | active; check before any new retry executor (Cluster 7) |
 
-See the Duplicate / Alias Map (Clusters 1, 2, 4, 7, 10, 11, 12) and its **Old-foundation scan result** section for overlap analysis and the rules future PRs must follow before adding a task-packet consumer, local worker loop, or retry executor.
+See the Duplicate / Alias Map (Clusters 1, 2, 4, 7, 10, 11, 12) and its **Foundational provenance scan result** section for overlap analysis and the rules future PRs must follow before adding a task-packet consumer, local worker loop, or retry executor.
 
 ---
 
