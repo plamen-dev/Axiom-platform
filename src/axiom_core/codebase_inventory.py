@@ -254,6 +254,17 @@ class CodebaseInventory:
     def __init__(self, repo_root: str | Path) -> None:
         self.repo_root = Path(repo_root).resolve()
 
+    @staticmethod
+    def _rel_posix(fpath: Path, root: Path) -> str:
+        """Repo-relative path with forward slashes on every platform.
+
+        ``str(Path.relative_to(...))`` uses the OS separator, so on Windows it
+        yields ``src\\pkg\\mod.py`` and breaks the ``src/`` prefix checks and the
+        ``.replace("/", ".")`` module-name logic downstream. ``as_posix`` keeps
+        those checks correct on Windows while being a no-op on POSIX.
+        """
+        return fpath.relative_to(root).as_posix()
+
     def scan(self) -> tuple[list[CodeFileRecord], list[CodeSymbol], list[TestCoverageReference]]:
         """Scan the repo and return files, symbols, and test coverage refs."""
         now = datetime.now(timezone.utc).isoformat()
@@ -264,7 +275,10 @@ class CodebaseInventory:
         for fpath in sorted(self.repo_root.rglob("*")):
             if not fpath.is_file():
                 continue
-            rel = str(fpath.relative_to(self.repo_root))
+            # Normalize to forward slashes so the ``src/`` / ``tests/`` prefix
+            # and ``.replace("/", ".")`` module-name logic behave identically on
+            # Windows (where ``str(rel)`` would otherwise use backslashes).
+            rel = self._rel_posix(fpath, self.repo_root)
             if self._should_skip(rel):
                 continue
 
@@ -340,7 +354,7 @@ class CodebaseInventory:
         for fpath in sorted(self.repo_root.rglob("*.py")):
             if not fpath.is_file():
                 continue
-            rel = str(fpath.relative_to(self.repo_root))
+            rel = self._rel_posix(fpath, self.repo_root)
             if self._should_skip(rel) or not rel.startswith("src/"):
                 continue
             module_name = self._module_name(rel)
