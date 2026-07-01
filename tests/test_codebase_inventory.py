@@ -2,6 +2,7 @@
 
 import json
 import textwrap
+from pathlib import PureWindowsPath
 
 import pytest
 from axiom_core.codebase_inventory import (
@@ -178,6 +179,24 @@ class TestScanner:
         _, _, refs = scanner.scan()
         assert len(refs) >= 1
         assert any(r.target_module == "axiom_core.models" for r in refs)
+
+    def test_rel_posix_normalizes_windows_separators(self):
+        """Regression: repo-relative paths must use forward slashes on Windows.
+
+        ``str(Path.relative_to())`` yields backslashes on Windows, which breaks
+        every downstream ``startswith("src/")`` check and the module-name
+        ``.replace("/", ".")`` logic — producing ``module_count=0`` /
+        ``import_edge_count=0`` on Windows (see docs/logs/bug-validation-log.md).
+        ``PureWindowsPath`` reproduces the backslash behavior cross-platform.
+        """
+        root = PureWindowsPath(r"C:\Dev\Axiom")
+        fpath = PureWindowsPath(r"C:\Dev\Axiom\src\axiom_core\foo.py")
+        rel = CodebaseInventory._rel_posix(fpath, root)
+        assert rel == "src/axiom_core/foo.py"
+        # Downstream classification then works for the normalized path.
+        scanner = CodebaseInventory.__new__(CodebaseInventory)
+        assert scanner._categorize(rel) == FileCategory.SOURCE
+        assert scanner._module_name(rel) == "axiom_core.foo"
 
     def test_scan_module_name(self, sample_repo):
         scanner = CodebaseInventory(sample_repo)

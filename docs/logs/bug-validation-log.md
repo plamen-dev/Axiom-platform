@@ -7,6 +7,20 @@ For regression fixture files, see `tests/fixtures/behavior_regressions/`.
 
 ---
 
+### BUG-019: code-inventory / self-model report zero modules & edges on Windows
+
+- **Discovered by:** Windows lane-2 revalidation on `C:\Dev\Axiom\Code\Axiom-platform` — `execution-chain-run --json-output` produced `module_count=0`, `import_edge_count=0`, `isolated_module_count=0`, `relationship_count=0` even though `code-inventory --refresh` had populated records (including tests and Local Runner files).
+- **Resolved in:** `devin/*-inventory-windows-path-normalization`
+- **Description:** `CodebaseInventory.scan()` and `extract_import_edges()` built the repo-relative path with `str(Path.relative_to(repo_root))`, which uses the OS separator. On Windows this yields `src\axiom_core\...` (backslashes). Every downstream check assumes forward slashes: `_categorize` (`startswith("src/")` → everything falls to `OTHER`), `extract_import_edges` (`not rel.startswith("src/")` → **all files skipped** → zero edges), and `_module_name` (`rel.replace("/", ".")` is a no-op on backslashes → malformed module id, then filtered out by `self_model.build`'s `f.path.startswith("src/")`). Net effect on Windows: `SelfModelBuilder` sees zero `src/` modules and zero edges.
+- **Root cause:** OS-native path separators leaking into forward-slash string logic (same class as BUG's Windows artifact-path issue fixed in PR #151).
+- **Fix:** Normalize the relative path with `Path.relative_to(root).as_posix()` at both scan sites, via a `CodebaseInventory._rel_posix()` helper. No-op on POSIX; correct on Windows.
+- **Files changed:**
+  - `src/axiom_core/codebase_inventory.py` — `_rel_posix()` helper; both `scan()` and `extract_import_edges()` use it.
+  - `tests/test_codebase_inventory.py` — `test_rel_posix_normalizes_windows_separators` (uses `PureWindowsPath` to reproduce backslashes cross-platform).
+- **Note:** This is distinct from the *semantic* evidence-quality concern (chain `status=PASS` + promotion accepting zero-metric evidence) tracked separately as Finding 2 — that gate is still worthwhile for genuinely-degenerate runs.
+
+---
+
 ## Live Revit 2027 Validation Results (2026-05-06 → 2026-05-23)
 
 Plan execution queue validated with structured dispatch. Full plan validated after export collision fix (PR #9).
