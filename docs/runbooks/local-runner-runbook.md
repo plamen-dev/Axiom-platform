@@ -18,17 +18,27 @@ This is **infrastructure tooling**, not Revit product functionality. It does not
 
 ## Windows-safe invocation (WDAC / WinError 4551)
 
-On Windows, console-script `.exe` shims (`poetry.exe`, `ruff.exe`, `pytest.exe`)
-can be blocked by Application Control / Device Guard with
-`[WinError 4551] An Application Control policy has blocked this file`. At
-execution time the runner rewrites those command heads to module form
-(`python -m poetry ...`, `poetry run python -m ruff/pytest ...`) via
-`_windows_safe_command`, so allowlisted actions run without hitting the shim.
-This is a pure argv transform of an already-allowlisted command — it adds no new
-arguments and no new action surface, and it is a **no-op on Linux/CI**. The
-allowlist remains the security boundary. See
-`docs/runbooks/windows-post-151-revalidation-runbook.md` for the direct-CLI
-`python -m poetry ...` fallback when invoking Axiom outside the runner.
+On Windows, console-script `.exe` shims (`poetry.exe`, `ruff.exe`, `pytest.exe`,
+`axiom.exe`) can be blocked by Application Control / Device Guard with
+`[WinError 4551] An Application Control policy has blocked this file`. The Local
+Runner already executes inside Poetry's managed project virtualenv, so at
+execution time it rewrites `poetry run <tool> ...` heads to **direct venv module
+execution** with the current interpreter via `_windows_safe_command`:
+
+- `poetry run ruff ...`   → `<python> -m ruff ...`
+- `poetry run pytest ...` → `<python> -m pytest ...`
+- `poetry run axiom ...`  → `<python> -m axiom_cli ...`
+
+The `poetry` wrapper is dropped entirely (an earlier `<python> -m poetry ...`
+form failed with `No module named poetry`, because the venv interpreter does not
+contain Poetry). `axiom_cli` is the package module entrypoint
+(`src/axiom_cli/__main__.py`) backed by the exact same callable as the `axiom`
+console script (`axiom_cli.main:cli`). This is a pure argv transform of an
+already-allowlisted command — it adds no new arguments and no new action
+surface, and it is a **no-op on Linux/CI**. The allowlist remains the security
+boundary. See `docs/runbooks/windows-post-151-revalidation-runbook.md` for the
+direct-CLI `python -m poetry run ...` fallback when invoking Axiom manually
+outside the runner.
 
 ## Allowed Actions
 

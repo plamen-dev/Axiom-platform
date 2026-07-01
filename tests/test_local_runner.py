@@ -2,6 +2,7 @@
 
 import json
 import platform
+import subprocess
 import sys
 from pathlib import Path
 
@@ -11,6 +12,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
 from local_runner.local_runner import (  # noqa: E402
+    _WINDOWS_TOOL_MODULE,
     ALLOWED_ACTIONS,
     ALLOWED_WORKSPACE_BASES_WINDOWS,
     WORKSPACE_CONFIG_ENV,
@@ -580,68 +582,92 @@ class TestWindowsSafeCommand:
     def test_noop_on_empty(self):
         assert _windows_safe_command([], is_windows=True) == []
 
-    def test_leading_poetry_rewritten_to_module(self):
-        out = _windows_safe_command(["poetry", "install"], is_windows=True)
-        assert out == [sys.executable, "-m", "poetry", "install"]
-
     def test_poetry_run_ruff_rewritten(self):
         out = _windows_safe_command(
             ["poetry", "run", "ruff", "check", "."], is_windows=True
         )
-        assert out == [
-            sys.executable, "-m", "poetry", "run", "python", "-m", "ruff", "check", "."
-        ]
+        assert out == [sys.executable, "-m", "ruff", "check", "."]
 
     def test_poetry_run_pytest_rewritten(self):
         out = _windows_safe_command(
             ["poetry", "run", "pytest", "tests/test_x.py", "-q"], is_windows=True
         )
         assert out == [
-            sys.executable, "-m", "poetry", "run", "python", "-m", "pytest",
-            "tests/test_x.py", "-q",
+            sys.executable, "-m", "pytest", "tests/test_x.py", "-q",
         ]
 
-    def test_poetry_run_axiom_kept_via_module_poetry(self):
-        """axiom entrypoint stays as-is under `python -m poetry run axiom`."""
+    def test_poetry_run_pytest_no_args_rewritten(self):
+        out = _windows_safe_command(["poetry", "run", "pytest"], is_windows=True)
+        assert out == [sys.executable, "-m", "pytest"]
+
+    def test_poetry_run_axiom_rewritten_to_axiom_cli(self):
+        """axiom is invoked as ``python -m axiom_cli`` (no poetry, no .exe)."""
         out = _windows_safe_command(
             ["poetry", "run", "axiom", "execution-chain-run", "--json-output"],
             is_windows=True,
         )
         assert out == [
-            sys.executable, "-m", "poetry", "run", "axiom",
+            sys.executable, "-m", "axiom_cli",
             "execution-chain-run", "--json-output",
         ]
+
+    def test_poetry_run_axiom_evidence_apply_rewritten(self):
+        out = _windows_safe_command(
+            ["poetry", "run", "axiom", "capability-evidence-apply",
+             "--evidence", "/ws/evidence.json"],
+            is_windows=True,
+        )
+        assert out == [
+            sys.executable, "-m", "axiom_cli", "capability-evidence-apply",
+            "--evidence", "/ws/evidence.json",
+        ]
+
+    def test_no_recursive_poetry_emitted(self):
+        """The broken ``<python> -m poetry`` form must never be emitted."""
+        for cmd in (
+            ["poetry", "run", "ruff", "check", "."],
+            ["poetry", "run", "pytest"],
+            ["poetry", "run", "axiom", "execution-chain-run", "--json-output"],
+        ):
+            out = _windows_safe_command(cmd, is_windows=True)
+            assert "poetry" not in out, f"recursive poetry survived: {out}"
 
     def test_non_poetry_command_untouched(self):
         """git/dotnet/powershell commands are not rewritten."""
         cmd = ["git", "status", "--short"]
         assert _windows_safe_command(cmd, is_windows=True) == cmd
 
-    def test_no_bare_shim_emitted_for_any_affected_action(self):
-        """Simulated-Windows guarantee: no bare poetry/ruff/pytest shim survives.
+    def test_no_shim_or_poetry_survives_any_affected_action(self):
+        """Simulated-Windows guarantee across every allowlisted command:
 
-        Every allowlisted command that starts with a blocked shim must be
-        rewritten so its first token is the current interpreter (module form).
+        for a ``poetry run <tool> ...`` command, the rewritten form runs via the
+        current interpreter's module form (``<python> -m <module> ...``) — the
+        executable head is never a bare ``poetry``/``ruff``/``pytest``/``axiom``
+        shim, and no recursive ``poetry`` token survives. The module name after
+        ``-m`` may legitimately equal the tool name (e.g. ``-m pytest``).
         """
-        blocked_heads = {"poetry", "ruff", "pytest"}
-        module_tools = {"ruff", "pytest"}
+        shim_heads = {"poetry", "ruff", "pytest", "axiom"}
         for action, action_def in ALLOWED_ACTIONS.items():
             for cmd in action_def.get("commands", []):
                 if not cmd:
                     continue
                 rewritten = _windows_safe_command(cmd, is_windows=True)
-                if cmd[0] in blocked_heads:
+                if cmd[0] == "poetry" and len(cmd) >= 3 and cmd[1] == "run":
+                    tool = cmd[2]
+                    if tool not in _WINDOWS_TOOL_MODULE:
+                        continue
                     assert rewritten[0] == sys.executable, (
-                        f"{action}: leading shim {cmd[0]!r} not rewritten"
+                        f"{action}: {cmd!r} not module-ized"
                     )
-                # No inner bare ruff/pytest tool token after `run` survives.
-                if cmd[0] == "poetry" and "run" in cmd:
-                    ri = cmd.index("run")
-                    if ri + 1 < len(cmd) and cmd[ri + 1] in module_tools:
-                        rri = rewritten.index("run")
-                        assert rewritten[rri + 1 : rri + 3] == ["python", "-m"], (
-                            f"{action}: inner tool {cmd[ri + 1]!r} not module-ized"
-                        )
+                    assert rewritten[1] == "-m"
+                    assert rewritten[2] == _WINDOWS_TOOL_MODULE[tool]
+                    assert "poetry" not in rewritten, (
+                        f"{action}: recursive poetry survived in {rewritten!r}"
+                    )
+                    # No shim head appears as the executable (position 0).
+                    assert rewritten[0] not in shim_heads, (
+                        f"{action}: shim head survived in {rewritten!r}"
+                    )
 
     def test_execute_task_applies_rewrite_via_injected_windows_flag(
         self, tmp_path, monkeypatch
@@ -682,9 +708,41 @@ class TestWindowsSafeCommand:
 
         assert captured, "subprocess.run was not invoked"
         argv = captured[0]
-        assert argv[:3] == [sys.executable, "-m", "poetry"]
-        assert "ruff" in argv
-        ruff_idx = argv.index("ruff")
-        assert argv[ruff_idx - 2 : ruff_idx] == ["python", "-m"]
-        # The bare shim never appears as the executable head.
+        assert argv == [sys.executable, "-m", "ruff", "check", "."]
+        # Neither the .exe shim nor recursive poetry appears.
         assert argv[0] not in ("ruff", "poetry")
+        assert "poetry" not in argv
+
+
+class TestAxiomCliModuleEntrypoint:
+    """`python -m axiom_cli` must work and back the same callable as `axiom`."""
+
+    def test_main_module_exposes_console_script_callable(self):
+        """`axiom_cli.__main__` imports the same `cli` as the console script."""
+        import importlib
+
+        main_module = importlib.import_module("axiom_cli.__main__")
+        from axiom_cli.main import cli
+
+        assert main_module.cli is cli
+
+    def test_python_m_axiom_cli_help_works(self):
+        """`python -m axiom_cli --help` exits 0 (no .exe shim required)."""
+        proc = subprocess.run(
+            [sys.executable, "-m", "axiom_cli", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        assert proc.returncode == 0, proc.stderr
+        assert "execution-chain-run" in proc.stdout
+
+    def test_python_m_axiom_cli_lists_execution_chain_run(self):
+        """The module entrypoint exposes the loop subcommands the runner uses."""
+        proc = subprocess.run(
+            [sys.executable, "-m", "axiom_cli", "execution-chain-run", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        assert proc.returncode == 0, proc.stderr

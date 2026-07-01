@@ -7,6 +7,23 @@ For regression fixture files, see `tests/fixtures/behavior_regressions/`.
 
 ---
 
+### BUG-020: Local Runner Windows-safe rewrite emits recursive `python -m poetry` (No module named poetry)
+
+- **Discovered by:** Windows lane-2 revalidation on `C:\Dev\Axiom\Code\Axiom-platform` after PR #52 — Local Runner `ruff` / `execution_chain_run` failed with `No module named poetry` (bare console-script shims had earlier failed with `[WinError 4551]` Application Control block).
+- **Resolved in:** `devin/*-runner-windows-safe-invocation-rework`
+- **Description:** PR #52's `_windows_safe_command` rewrote a leading `poetry ...` to `[sys.executable, "-m", "poetry", ...]`. But the Local Runner already executes inside Poetry's managed project virtualenv, so `sys.executable` is the venv interpreter — which does **not** contain the `poetry` module. The rewrite therefore self-defeated: `<venv-python> -m poetry ...` → `No module named poetry`. The bare `.exe` shim (WDAC `WinError 4551`) and the recursive-poetry form both failed, so the runner never ran the tool.
+- **Root cause:** Assuming `python -m poetry` is available from the interpreter running the Local Runner. Inside the venv it is not, and Poetry must not be installed into the project venv (it would corrupt the dependency model).
+- **Fix:** Drop the `poetry` wrapper entirely on Windows and invoke project-installed tools directly with the current venv interpreter: `poetry run ruff …` → `<python> -m ruff …`; `poetry run pytest …` → `<python> -m pytest …`; `poetry run axiom …` → `<python> -m axiom_cli …`. `axiom_cli` is a new module entrypoint (`src/axiom_cli/__main__.py`) backed by the same callable as the `axiom` console script (`axiom_cli.main:cli`). No-op on Linux/CI. Allowlist unchanged.
+- **Files changed:**
+  - `tools/local_runner/local_runner.py` — rewrote `_windows_safe_command`; replaced `_WINDOWS_MODULE_TOOLS` with `_WINDOWS_TOOL_MODULE`.
+  - `src/axiom_cli/__main__.py` — new module entrypoint calling `cli`.
+  - `tests/test_local_runner.py` — `TestWindowsSafeCommand` rewritten; new `TestAxiomCliModuleEntrypoint`.
+- **Test coverage:** `test_poetry_run_ruff_rewritten`, `test_poetry_run_pytest_rewritten`, `test_poetry_run_axiom_rewritten_to_axiom_cli`, `test_no_recursive_poetry_emitted`, `test_no_shim_or_poetry_survives_any_affected_action`, `test_execute_task_applies_rewrite_via_injected_windows_flag`, `test_main_module_exposes_console_script_callable`, `test_python_m_axiom_cli_help_works`.
+- **Behavior change:** See `docs/logs/behavior-change-ledger.md` BHV-033.
+- **Note:** PR #53 (BUG-019) and PR #54 (Finding 2) direct Windows validation already passed; this fix unblocks the Local Runner path so lane-2 can be captured end-to-end.
+
+---
+
 ### BUG-019: code-inventory / self-model report zero modules & edges on Windows
 
 - **Discovered by:** Windows lane-2 revalidation on `C:\Dev\Axiom\Code\Axiom-platform` — `execution-chain-run --json-output` produced `module_count=0`, `import_edge_count=0`, `isolated_module_count=0`, `relationship_count=0` even though `code-inventory --refresh` had populated records (including tests and Local Runner files).
