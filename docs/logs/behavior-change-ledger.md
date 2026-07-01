@@ -610,3 +610,22 @@ See `docs/runbooks/behavior-regression-runbook.md` for philosophy and process.
 | **related_test_case** | `tests/test_evidence_summary.py` (substantive summary, EMPTY→quarantined with no state jump, not-applied bundle, no absolute paths, no stdout leak, allowlist-boundary/ignored task paths, blocked-with-guidance when no bundle, in-process execute_task artifacts) |
 | **related_artifact_path** | `tools/local_runner/evidence_summary.py` (new), `tools/local_runner/local_runner.py` (`emit_evidence_summary` action + in-process branch), `tools/local_runner/examples/emit_evidence_summary.task.json` (new), `docs/runbooks/local-runner-runbook.md` (attested→captured section) |
 | **notes** | Variant A (dedicated action) chosen over folding into `capability_evidence_apply`: emission is a read-only proof-capture step, distinct from apply's state mutation. No new evidence framework — only summarizes existing artifacts. No change to execution-chain, evidence-quality, or promotion-scoring semantics. Keeps the allowlist as the security boundary; no arbitrary-arg surface. 2024 Revit baseline unaffected; no Revit live validation required. Separate PR from #55/#53/#54. |
+
+---
+
+## BHV-035: Axiom Atlas — local-first visual map (axiom atlas)
+
+| Field | Value |
+|-------|-------|
+| **behavior_id** | BHV-035 |
+| **date** | 2026-07-01 |
+| **capability** | Platform visibility / evidence navigation (viewer tooling, not a Revit capability) |
+| **observed_prompt** | Operator wants a navigable visual of Axiom — module connectivity as bubbles, capability state, and captured evidence — reachable at a local URL |
+| **previous_behavior** | Axiom's self-model (modules + import edges), capability confidence/readiness, and tracked evidence summaries existed only as JSON/markdown artifacts; there was no visual, navigable rendering and no URL where the platform state could be inspected. |
+| **expected_behavior** | A read-only, local-first viewer renders existing artifacts into an interactive page: self-model modules as bubbles connected by import edges, capabilities colored by confidence/readiness, and the tracked evidence summaries — without mutating any state or calling external services. |
+| **current_behavior** | New CLI command `axiom atlas` (`src/axiom_core/atlas.py`) reads the newest `artifacts/execution_chain/<run>/self_model.json`, the latest per-capability intake reports, and `artifacts/validation_runs/*/evidence_summary.json`, and writes a self-contained `artifacts/atlas/atlas.html` (+ `atlas_data.json`). The page is vanilla JS/SVG (no CDN, no frameworks) with a force-layout bubble graph (bubble size = import degree, color = top-level package, hover highlights edges), a capability panel (confidence/readiness pills, decision counts), and a captured-summaries panel (quality verdict + promotion decision pills). `--serve` hosts it on `127.0.0.1:<port>` via stdlib `http.server` only. Read-only: mutates no capability/confidence/readiness/promotion state; no external calls; module names are HTML-escaped. `artifacts/atlas/` is gitignored (generated viewer output). Cataloged in the runner command registry as READ_ONLY/SAFE. |
+| **status** | implemented (Python; `tests/test_atlas.py`; ruff green on Ubuntu) |
+| **related_bug_id** | (none — additive viewer) |
+| **related_test_case** | `tests/test_atlas.py` (data collection, empty-workspace grace, no absolute paths, self-contained/no-CDN HTML, script-injection escaping, read-only over source artifacts, registry governance) |
+| **related_artifact_path** | `src/axiom_core/atlas.py` (new), `src/axiom_cli/main.py` (`atlas` command), `src/axiom_core/runner/command_registry.py` (catalog entry), `.gitignore` (`artifacts/atlas/`) |
+| **notes** | Viewer only — not a new evidence framework and not a producer; it renders what the chain/promotion/summary engines already persist. Local-first per platform direction (no Autodesk Assistant/MCP, no uploads). Chat/communicate-with-Axiom surface is out of scope for v1. 2024 Revit baseline unaffected; no Revit live validation required. |

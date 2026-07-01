@@ -19398,6 +19398,73 @@ def self_model_build(
     )
 
 
+@cli.command("atlas")
+@click.option(
+    "--repo-root",
+    "repo_root",
+    type=click.Path(exists=True, file_okay=False),
+    default=".",
+    help="Repository root containing the artifacts/ tree (default: cwd).",
+)
+@click.option(
+    "--serve",
+    is_flag=True,
+    default=False,
+    help="Serve the atlas on a local (127.0.0.1) HTTP server after writing it.",
+)
+@click.option(
+    "--port",
+    type=int,
+    default=8763,
+    help="Port for --serve (default: 8763).",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def atlas(repo_root: str, serve: bool, port: int, json_output: bool) -> None:
+    """Render the Axiom Atlas: a local, read-only visual map of the platform.
+
+    Renders the newest execution-chain self-model (module bubbles + import
+    edges), current capability confidence/readiness from intake records, and
+    the tracked evidence summaries into a single self-contained HTML page
+    under ``artifacts/atlas/``. Read-only viewer: mutates no capability,
+    confidence, readiness, or promotion state, and makes no external calls.
+    """
+    from axiom_core.atlas import build_atlas_data, serve_atlas, write_atlas
+
+    try:
+        html_rel, json_rel = write_atlas(repo_root)
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if json_output:
+        data = build_atlas_data(repo_root)
+        click.echo(
+            json.dumps(
+                {
+                    "atlas_html": html_rel,
+                    "atlas_data_json": json_rel,
+                    "module_count": len(data["self_model"]["modules"]),
+                    "import_edge_count": len(data["self_model"]["edges"]),
+                    "capability_count": len(data["capabilities"]),
+                    "evidence_summary_count": len(data["evidence_summaries"]),
+                },
+                indent=2,
+            )
+        )
+    else:
+        console.print("\n[bold]Axiom Atlas written[/bold]\n")
+        console.print(f"  Page: {html_rel}")
+        console.print(f"  Data: {json_rel}")
+        if not serve:
+            console.print(
+                "\n[dim]Open the page in a browser, or run: "
+                "axiom atlas --serve[/dim]"
+            )
+
+    if serve:
+        serve_atlas(repo_root, port=port)
+
+
 @cli.command("execution-chain-run")
 @click.option(
     "--capability",
