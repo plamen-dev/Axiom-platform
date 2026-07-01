@@ -25,6 +25,12 @@ Decision handling (reusing existing timestamp/state structures):
   (no state change);
 * stale evidence (older than an opt-in ``max_age_seconds``, measured from the
   existing ``created_at`` timestamp) is **quarantined** (no state change);
+* **semantically empty** evidence — a bundle whose capability-specific required
+  self-model metrics are all zero (e.g. ``self-model-build`` with
+  ``module_count=0``) — is **quarantined** (no state change), regardless of a
+  passing id-flow status. The verdict is read from the bundle's ``quality``
+  field and defensively recomputed from ``metrics`` when that field is
+  absent/malformed (see :mod:`axiom_core.evidence_quality`);
 * evidence whose stable fingerprint was **already accepted** for the capability
   is recorded as a **duplicate** and does **not** mutate confidence/readiness a
   second time (distinct evidence from distinct runs still accumulates).
@@ -71,6 +77,7 @@ from axiom_core.capability_confidence import (
     CapabilityConfidenceEngine,
     _level_from_score,
 )
+from axiom_core.evidence_quality import EMPTY, resolve_quality
 
 SCHEMA_VERSION = "1.0"
 
@@ -233,6 +240,24 @@ class EvidencePromotionLoop:
                     signals=signals,
                 )
 
+        # 4b. Semantically empty evidence -> quarantine (Finding 2). The chain's
+        # id-flow status can be PASS while its key self-model metrics are all
+        # zero; such evidence must not move confidence/readiness/trust. Uses the
+        # verdict stamped on the bundle, defensively recomputing from metrics
+        # when the field is absent/malformed so older bundles cannot bypass this.
+        quality, quality_recomputed = resolve_quality(resolved_capability, bundle)
+        if quality.get("verdict") == EMPTY:
+            reason = (
+                f"{quality.get('reason', 'semantically empty evidence')}; "
+                f"quarantined without confidence/readiness/trust change"
+                + (" (verdict recomputed from metrics)" if quality_recomputed else "")
+            )
+            return self._record(
+                resolved_capability, evidence_path, outcome,
+                EvidenceDecision.QUARANTINED, reason, links, now,
+                signals=signals, quality=quality,
+            )
+
         # 5. No determinable outcome -> reject.
         if outcome is EvidenceOutcome.MISSING:
             return self._record(
@@ -258,6 +283,7 @@ class EvidencePromotionLoop:
                 EvidenceDecision.DUPLICATE, reason, links, now,
                 prior=prior, updated=prior, signals=signals,
                 fingerprint=fingerprint, duplicate_of=duplicate_of,
+                quality=quality,
             )
 
         # 7. Accepted: accumulate the outcome onto prior confidence state.
@@ -293,7 +319,7 @@ class EvidencePromotionLoop:
             resolved_capability, evidence_path, outcome,
             EvidenceDecision.ACCEPTED, reason, links, now,
             prior=prior, updated=updated, signals=signals,
-            fingerprint=fingerprint,
+            fingerprint=fingerprint, quality=quality,
         )
 
     # ------------------------------------------------------------------
@@ -516,6 +542,7 @@ class EvidencePromotionLoop:
         signals: list[dict[str, str]] | None = None,
         fingerprint: str = "",
         duplicate_of: str = "",
+        quality: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         prior = prior or CapabilityStateSnapshot(capability_id=capability_id)
         updated = updated or prior
@@ -535,6 +562,7 @@ class EvidencePromotionLoop:
             "evidence_fingerprint": fingerprint,
             "evidence_outcome": outcome.value,
             "outcome_signals": signals or [],
+            "evidence_quality": quality or {},
             "decision": decision.value,
             "accepted": decision is EvidenceDecision.ACCEPTED,
             "duplicate_of": duplicate_of,
