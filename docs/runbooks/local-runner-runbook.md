@@ -30,6 +30,8 @@ This is **infrastructure tooling**, not Revit product functionality. It does not
 | `test_pr_snapshot` | `poetry run pytest tests/test_pr_snapshot.py` | PR evidence snapshot tests |
 | `test_set_parameter_value` | `poetry run pytest tests/test_set_parameter_value.py` | SetParameterValue v0 tests |
 | `test_validation_loop` | `poetry run pytest tests/test_validation_loop.py` | Validation Automation Loop v0 tests |
+| `execution_chain_run` | `poetry run axiom execution-chain-run --json-output` | Drive a capability through the full execution chain; writes `artifacts/execution_chain/<run>/evidence.json` |
+| `capability_evidence_apply` | `poetry run axiom capability-evidence-apply --evidence <resolved>` | Apply the newest chain evidence bundle to capability state; `--evidence` is resolved and sandbox-validated by the runner (see below) |
 | `collect_revit_journals` | *placeholder* | NOT_IMPLEMENTED — planned journal collection |
 | `kill_revit` | *placeholder* | NOT_IMPLEMENTED — requires `allow_kill_revit=true` |
 
@@ -142,6 +144,33 @@ Located in `tools/local_runner/examples/`:
 - `test_pr_snapshot.task.json` — run PR evidence snapshot tests
 - `test_set_parameter_value.task.json` — run SetParameterValue v0 tests
 - `test_validation_loop.task.json` — run Validation Automation Loop v0 tests
+- `execution_chain_run.task.json` — drive the execution chain and write an evidence bundle
+- `capability_evidence_apply.task.json` — apply the newest chain evidence bundle to capability state
+
+## Loop-Enablement Actions (evidence-path resolution)
+
+`execution_chain_run` and `capability_evidence_apply` let the runner *perform the
+loop* (chain → evidence → promotion), not just run test/build/deploy.
+
+`capability_evidence_apply` does **not** accept an evidence path from `task.json`
+(that would break the no-arbitrary-args model). Instead the runner resolves it
+itself: it takes the newest `artifacts/execution_chain/<run>/evidence.json` under
+the workspace (by mtime), validates the resolved path is inside the workspace root
+(rejecting any symlink/traversal escape), and only then runs
+`capability-evidence-apply --evidence <resolved>`. If no bundle exists yet, the
+action returns `status: blocked` with guidance to run `execution_chain_run` first —
+it is not a hard error.
+
+Typical sequence:
+
+```bash
+poetry run axiom local-runner --task tools/local_runner/examples/execution_chain_run.task.json
+poetry run axiom local-runner --task tools/local_runner/examples/capability_evidence_apply.task.json
+```
+
+Generated artifact dirs (`artifacts/execution_chain/`, `artifacts/capability_evidence_intake/`,
+`artifacts/capability_confidence/`) are gitignored — runs are captured locally but
+never committed.
 
 ## Encoding Notes
 
