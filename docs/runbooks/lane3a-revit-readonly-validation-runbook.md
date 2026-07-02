@@ -25,30 +25,34 @@ mutation, e.g. SetParameterValue / PR C).
 | 3A — Revit read-only | environment + add-in + read-only interaction proof | **this runbook** |
 | 3B — Revit mutation | real model mutation (PR C, SetParameterValue) | out of scope — NOT unlocked by 3A |
 
-## Operator target: Revit 2026
+## Operator target: Revit 2025 (2026 when installed)
 
-**Revit 2026 is the explicit validation target for lane-3A.** The 2024
-baseline (`baseline-001-revit-2024-capability-platform`) and the isolated
-2027 compatibility work are mentioned below only as build/path context —
-they are not the lane-3A target.
+**Revit 2025 is the validation target for lane-3A** — it is the newest
+modern-.NET Revit installed on the operator machine (2024, 2025, 2027
+installed; 2026 not yet). The 2026 target is kept build-ready in the repo
+and becomes the target when 2026 is installed; the 2024 baseline
+(`baseline-001-revit-2024-capability-platform`) and the isolated 2027
+compatibility work are mentioned below only as build/path context — they
+are not the lane-3A target.
 
-2026 build/deploy context (confirm on the machine; record actuals):
+2025 build/deploy context (confirm on the machine; record actuals):
 
 - Revit 2025+ runs add-ins on modern .NET (not .NET Framework 4.8). The
-  repo has a dedicated 2026 build target: `Axiom.Revit.2026.sln`
-  (SDK-style, `net8.0-windows`, `REVIT_2026`), built/deployed via
-  `scripts/deploy-revit-2026.ps1` (`-BuildOnly` first). This target is
+  repo has dedicated 2025 and 2026 build targets: `Axiom.Revit.2025.sln` /
+  `Axiom.Revit.2026.sln` (SDK-style, `net8.0-windows`, `REVIT_2025` /
+  `REVIT_2026`), built/deployed via `scripts/deploy-revit-2025.ps1` /
+  `deploy-revit-2026.ps1` (`-BuildOnly` first). These targets are
   build-verified only until this lane-3A run — **record any deviations
   needed on the machine** for the multi-version runbook.
-- Deployed add-in folder for 2026:
-  `C:\ProgramData\Autodesk\Revit\Addins\2026\` (the 2024 all-users
-  pattern; 2027 is the deviation to Program Files). If Revit 2026 does not
+- Deployed add-in folder for 2025:
+  `C:\ProgramData\Autodesk\Revit\Addins\2025\` (the 2024 all-users
+  pattern; 2027 is the deviation to Program Files). If Revit 2025 does not
   load from ProgramData, record the actual working location as a finding.
 - Deployment set: `Axiom.RevitAddin.addin` (manifest, `<Assembly>` pointing
   at the deployed DLL), `Axiom.RevitAddin.dll`, `Axiom.Core.dll`,
   `Newtonsoft.Json.dll`.
 
-If a 2026 build cannot be produced (API/framework break), STOP: that is a
+If a 2025 build cannot be produced (API/framework break), STOP: that is a
 lane-3A finding to report, not a reason to fall back silently to 2024/2027.
 
 ## Scope
@@ -74,11 +78,11 @@ Non-goals — **strictly forbidden in lane-3A**:
 
 | Field | Value |
 |-------|-------|
-| Revit version + build | e.g. Revit 2026.x, build ____ |
+| Revit version + build | e.g. Revit 2025.x, build ____ |
 | Model name/path | ____ |
 | Model disposable/copied/backed up? | must be YES (disposable or a copy) — state which |
-| Add-in path (deployed DLLs) | e.g. `...\Autodesk\Revit\Addins\2026\` |
-| Manifest path | `...\Addins\2026\Axiom.RevitAddin.addin` |
+| Add-in path (deployed DLLs) | e.g. `...\Autodesk\Revit\Addins\2025\` |
+| Manifest path | `...\Addins\2025\Axiom.RevitAddin.addin` |
 | Expected artifact directory | `artifacts/model_inventory_runs/lane3a_<date>/` + `artifacts/validation_runs/<summary_id>/` |
 | Cleanup action | default: **close model WITHOUT saving** (state if you chose otherwise) |
 | Repo commit (`git rev-parse HEAD`) | ____ |
@@ -88,9 +92,9 @@ Non-goals — **strictly forbidden in lane-3A**:
 - Windows 10/11, repo at `C:\Dev\Axiom\Code\Axiom-platform`, `main` at or
   past PR #64; `git status --short` clean.
 - `poetry install` done; `python -m poetry run axiom --help` works.
-- Revit 2026 installed and licensed.
+- Revit 2025 installed and licensed.
 - A **disposable or copied** test model (never a production model), openable
-  in Revit 2026.
+  in Revit 2025.
 - WDAC note: invoke Axiom directly via module form
   (`python -m poetry run axiom ...`); the Local Runner already emits
   Windows-safe invocation.
@@ -110,23 +114,23 @@ python -m poetry run axiom runner-commands | findstr /i inventory
 `inventory-summary`, `local-runner`; registry catalogs the inventory
 commands. **FAIL:** any command errors or commands missing.
 
-### Gate 2 — Add-in build + deploy for Revit 2026 (read-only w.r.t. models)
+### Gate 2 — Add-in build + deploy for Revit 2025 (read-only w.r.t. models)
 
 ```
-.\scripts\deploy-revit-2026.ps1 -BuildOnly
-.\scripts\deploy-revit-2026.ps1
+.\scripts\deploy-revit-2025.ps1 -BuildOnly
+.\scripts\deploy-revit-2025.ps1
 ```
 
-- Verify all four files exist at `C:\ProgramData\Autodesk\Revit\Addins\2026\`
+- Verify all four files exist at `C:\ProgramData\Autodesk\Revit\Addins\2025\`
   and the manifest `<Assembly>` points at the deployed DLL.
 
-**PASS:** build succeeds; manifest + DLLs present at the 2026 per-version
+**PASS:** build succeeds; manifest + DLLs present at the 2025 per-version
 path. **FAIL:** build/API errors (report as a lane-3A finding — do not fall
 back to another Revit version silently).
 
 ### Gate 3 — Add-in load smoke (Revit open, no document interaction yet)
 
-- Start Revit 2026; accept the add-in load prompt if shown.
+- Start Revit 2025; accept the add-in load prompt if shown.
 - Confirm the Axiom add-in loaded (no load-error dialog).
 - Open the disposable test model.
 
@@ -231,7 +235,7 @@ bug/evidence entry (`docs/logs/bug-validation-log.md`, plus
 
 - Filled operator-fields table (above).
 - Per-gate PASS/FAIL with the observed values (counts, categories, paths).
-- Exact 2026 build/deploy commands used (feeds the multi-version runbook).
+- Exact 2025 build/deploy commands used (feeds the multi-version runbook).
 - `run_id`(s) and `summary_id`.
 - The committed `evidence_summary.{json,md}` (or the commit hash containing
   them).
