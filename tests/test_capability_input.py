@@ -12,6 +12,8 @@ from axiom_core.capability_input import (
     CapabilityInputValidationResult,
 )
 
+from tests.conftest import make_symlink_or_skip
+
 # ---------------------------------------------------------------------------
 # Model tests
 # ---------------------------------------------------------------------------
@@ -344,7 +346,7 @@ class TestSafety:
         input_dir = tmp_path / "capability_inputs"
         input_dir.mkdir(exist_ok=True)
         link_name = input_dir / "evil-link"
-        link_name.symlink_to("/tmp")
+        make_symlink_or_skip(link_name, "/tmp")
         with pytest.raises(ValueError, match="escapes artifacts root"):
             engine._safe_input_path("evil-link")
 

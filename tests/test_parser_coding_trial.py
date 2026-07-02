@@ -8,6 +8,8 @@ from pathlib import Path
 import pytest
 from axiom_core.parser_coding_trial import ParserCodingTrialRunner
 
+from tests.conftest import make_symlink_or_skip
+
 
 class TestRunTrial:
     def test_basic_trial(self, tmp_path: Path) -> None:
@@ -103,7 +105,7 @@ class TestSafeTrialPath:
         outside = tmp_path / "outside"
         outside.mkdir()
         symlink = trials_dir / "evil-link"
-        symlink.symlink_to(outside)
+        make_symlink_or_skip(symlink, outside)
         with pytest.raises(ValueError, match="escapes artifacts root"):
             runner._safe_trial_path("evil-link")
 

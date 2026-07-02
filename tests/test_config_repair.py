@@ -15,6 +15,8 @@ from axiom_core.config_repair import (
     ConfigurationRepairReport,
 )
 
+from tests.conftest import make_symlink_or_skip
+
 # ---------------------------------------------------------------------------
 # Helper: build config dict from entries
 # ---------------------------------------------------------------------------
@@ -365,7 +367,7 @@ class TestSafety:
         repairs_dir = tmp_path / "config_repair_recommendations"
         repairs_dir.mkdir(parents=True, exist_ok=True)
         link = repairs_dir / "evil-link"
-        link.symlink_to("/tmp")
+        make_symlink_or_skip(link, "/tmp")
         with pytest.raises(ValueError, match="escapes artifacts root"):
             engine._safe_repair_path("evil-link")
 

@@ -15,6 +15,8 @@ from axiom_core.session_state_machine import (
     TransitionReason,
 )
 
+from tests.conftest import make_symlink_or_skip
+
 # ---------------------------------------------------------------------------
 # Enum tests
 # ---------------------------------------------------------------------------
@@ -439,7 +441,7 @@ class TestIdValidation:
         outside = tmp_path / "outside"
         outside.mkdir()
         symlink = states_dir / "evil-link"
-        symlink.symlink_to(outside)
+        make_symlink_or_skip(symlink, outside)
         with pytest.raises(ValueError, match="escapes artifacts root"):
             reg._safe_state_path("evil-link")
 
@@ -452,7 +454,7 @@ class TestIdValidation:
         fake_json.write_text('{"session_id":"evil","current_state":"created"}')
         states_dir = tmp_path / "session_states"
         symlink = states_dir / "evil-link"
-        symlink.symlink_to(outside)
+        make_symlink_or_skip(symlink, outside)
         results = reg.list_states()
         sessions = [s["session_id"] for s in results]
         assert "real" in sessions

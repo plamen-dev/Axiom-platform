@@ -14,6 +14,8 @@ from axiom_core.config_policy import (
     ConfigurationPolicyViolation,
 )
 
+from tests.conftest import make_symlink_or_skip
+
 # ---------------------------------------------------------------------------
 # Model tests
 # ---------------------------------------------------------------------------
@@ -508,7 +510,7 @@ class TestPolicySafety:
         policy_dir = tmp_path / "config_policy"
         policy_dir.mkdir(parents=True, exist_ok=True)
         link = policy_dir / "evil-link"
-        link.symlink_to("/tmp")
+        make_symlink_or_skip(link, "/tmp")
         with pytest.raises(ValueError, match="escapes artifacts root"):
             engine._safe_policy_path("evil-link")
 

@@ -13,6 +13,8 @@ from axiom_core.configuration_registry import (
     ConfigurationValidationResult,
 )
 
+from tests.conftest import make_symlink_or_skip
+
 
 class TestConfigurationEntry:
     def test_to_dict(self) -> None:
@@ -153,7 +155,7 @@ class TestListConfigs:
         outside = tmp_path / "outside"
         outside.mkdir()
         symlink = configs_dir / "evil-link"
-        symlink.symlink_to(outside)
+        make_symlink_or_skip(symlink, outside)
         configs = registry.list_configs()
         assert all(c.get("config_id") != "evil-link" for c in configs)
 
@@ -235,7 +237,7 @@ class TestSafeConfigPath:
         outside = tmp_path / "outside"
         outside.mkdir()
         symlink = configs_dir / "evil-link"
-        symlink.symlink_to(outside)
+        make_symlink_or_skip(symlink, outside)
         with pytest.raises(ValueError, match="escapes artifacts root"):
             registry._safe_config_path("evil-link")
 

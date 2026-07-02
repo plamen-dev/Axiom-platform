@@ -15,6 +15,8 @@ from axiom_core.config_validation import (
     ViolationSeverity,
 )
 
+from tests.conftest import make_symlink_or_skip
+
 # ---------------------------------------------------------------------------
 # Model tests
 # ---------------------------------------------------------------------------
@@ -412,7 +414,7 @@ class TestSafety:
         outside = tmp_path / "outside"
         outside.mkdir()
         symlink = validations_dir / "evil-link"
-        symlink.symlink_to(outside)
+        make_symlink_or_skip(symlink, outside)
         with pytest.raises(ValueError, match="escapes artifacts root"):
             validator._safe_validation_path("evil-link")
 

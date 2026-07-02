@@ -13,6 +13,8 @@ from axiom_core.config_batch_execution import (
     ConfigurationBatchExecutionResult,
 )
 
+from tests.conftest import make_symlink_or_skip
+
 # ---------------------------------------------------------------------------
 # Model tests
 # ---------------------------------------------------------------------------
@@ -349,7 +351,7 @@ class TestSafety:
         batch_dir = tmp_path / "config_batch_execution"
         batch_dir.mkdir(exist_ok=True)
         link_name = batch_dir / "evil-link"
-        link_name.symlink_to("/tmp")
+        make_symlink_or_skip(link_name, "/tmp")
         with pytest.raises(ValueError, match="escapes artifacts root"):
             engine._safe_batch_path("evil-link")
 

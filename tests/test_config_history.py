@@ -11,6 +11,8 @@ from axiom_core.config_history import (
     ConfigurationChangeHistoryReport,
 )
 
+from tests.conftest import make_symlink_or_skip
+
 # ---------------------------------------------------------------------------
 # Model tests
 # ---------------------------------------------------------------------------
@@ -267,7 +269,7 @@ class TestSafety:
         hist_dir = tmp_path / "config_history"
         hist_dir.mkdir(parents=True, exist_ok=True)
         link = hist_dir / "evil-link"
-        link.symlink_to("/tmp")
+        make_symlink_or_skip(link, "/tmp")
         with pytest.raises(ValueError, match="escapes artifacts root"):
             engine._safe_history_path("evil-link")
 

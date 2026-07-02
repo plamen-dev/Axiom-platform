@@ -12,6 +12,8 @@ from axiom_core.config_diff import (
     ConfigurationDiffType,
 )
 
+from tests.conftest import make_symlink_or_skip
+
 # ---------------------------------------------------------------------------
 # Model tests
 # ---------------------------------------------------------------------------
@@ -294,7 +296,7 @@ class TestDiffSafety:
         diff_dir = tmp_path / "config_diff"
         diff_dir.mkdir(parents=True, exist_ok=True)
         link = diff_dir / "evil-link"
-        link.symlink_to("/tmp")
+        make_symlink_or_skip(link, "/tmp")
         with pytest.raises(ValueError, match="escapes artifacts root"):
             engine._safe_diff_path("evil-link")
 
