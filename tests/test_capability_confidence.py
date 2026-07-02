@@ -181,6 +181,32 @@ class TestCreate:
         assert factors["repair_count"] == 10
         assert factors["recovery_count"] == 15
 
+    def test_create_level_override_persists(
+        self, engine: CapabilityConfidenceEngine
+    ) -> None:
+        result = engine.create(
+            capability_id="cap-clamped",
+            execution_count=1,
+            success_count=1,
+            level_override="low",
+        )
+        # Score stays the unmodified ratio; only the published level differs.
+        assert result["score"] == 1.0
+        assert result["confidence_level"] == "low"
+        loaded = engine.get_report(result["report_id"])
+        assert loaded["confidence_level"] == "low"
+
+    def test_create_invalid_level_override_raises(
+        self, engine: CapabilityConfidenceEngine
+    ) -> None:
+        with pytest.raises(ValueError, match="level_override"):
+            engine.create(
+                capability_id="cap-bad",
+                execution_count=1,
+                success_count=1,
+                level_override="super_high",
+            )
+
 
 # ---------------------------------------------------------------------------
 # TestPassFail

@@ -118,11 +118,17 @@ def test_passing_evidence_raises_confidence(
     assert record["decision"] == EvidenceDecision.ACCEPTED.value
     assert record["evidence_outcome"] == EvidenceOutcome.PASS.value
     assert record["state_changed"] is True
-    # From the very_low baseline, a passing run raises confidence + readiness.
+    # From the very_low baseline, a passing run raises confidence + readiness
+    # by exactly one ladder step (not straight to very_high/ready).
     assert record["prior_state"]["confidence_level"] == "very_low"
     assert record["updated_state"]["score"] > record["prior_state"]["score"]
-    assert record["updated_state"]["confidence_level"] == "very_high"
-    assert record["updated_state"]["readiness"] == "ready"
+    assert record["updated_state"]["confidence_level"] == "low"
+    assert record["updated_state"]["readiness"] == "provisional"
+    assert record["promotion"] == {
+        "raw_level": "very_high",
+        "effective_level": "low",
+        "clamped": True,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -316,7 +322,7 @@ def test_intake_records_are_queryable(
 
     state = loop.current_state("self-model-build")
     assert state["confidence_report_id"] == record["updated_state"]["confidence_report_id"]
-    assert state["readiness"] == "ready"
+    assert state["readiness"] == "provisional"
 
 
 def test_m3_hook_recorded(loop: EvidencePromotionLoop, artifacts_root: str) -> None:
@@ -349,10 +355,11 @@ def test_execution_chain_evidence_changes_state(artifacts_root: str) -> None:
     assert record["links"]["result_id"] == trace.result_id
     assert record["links"]["artifact_id"] == trace.artifact_id
     assert record["links"]["report_id"] == trace.report_id
-    # State changed purely because evidence was ingested.
+    # State changed purely because evidence was ingested; the single-step
+    # ladder limits the first run to one level above the very_low baseline.
     assert record["prior_state"]["confidence_level"] == "very_low"
-    assert record["updated_state"]["confidence_level"] == "very_high"
-    assert record["updated_state"]["readiness"] == "ready"
+    assert record["updated_state"]["confidence_level"] == "low"
+    assert record["updated_state"]["readiness"] == "provisional"
 
 
 # ---------------------------------------------------------------------------
@@ -378,7 +385,7 @@ def test_cli_capability_evidence_apply_json(tmp_path: Any) -> None:
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert payload["decision"] == "accepted"
-    assert payload["updated_state"]["readiness"] == "ready"
+    assert payload["updated_state"]["readiness"] == "provisional"
 
 
 def test_cli_capability_evidence_apply_console(tmp_path: Any) -> None:
@@ -687,8 +694,8 @@ def test_substantive_evidence_still_promotes(
     record = loop.apply(evidence)
 
     assert record["decision"] == EvidenceDecision.ACCEPTED.value
-    assert record["updated_state"]["confidence_level"] == "very_high"
-    assert record["updated_state"]["readiness"] == "ready"
+    assert record["updated_state"]["confidence_level"] == "low"
+    assert record["updated_state"]["readiness"] == "provisional"
 
 
 def test_unknown_capability_not_evaluated_preserves_behavior(
@@ -792,3 +799,106 @@ def test_chain_quality_empty_is_quarantined_end_to_end(tmp_path: Any) -> None:
     assert record["decision"] == EvidenceDecision.QUARANTINED.value
     assert record["state_changed"] is False
     assert record["evidence_quality"]["verdict"] == "EMPTY"
+
+
+# ---------------------------------------------------------------------------
+# Single-step promotion ladder — trust accumulates, it is not granted at once
+# ---------------------------------------------------------------------------
+
+
+def _apply_pass(loop: EvidencePromotionLoop, root: str, run_id: str) -> dict[str, Any]:
+    evidence = _write_chain_evidence(root, run_id=run_id, status="PASS")
+    return loop.apply(evidence)
+
+
+def test_ladder_climbs_one_level_per_accepted_pass(
+    loop: EvidencePromotionLoop, artifacts_root: str
+) -> None:
+    """Four distinct accepted PASSes climb exactly one level each."""
+    expectations = [
+        ("low", "provisional", True),
+        ("medium", "provisional", True),
+        ("high", "ready", True),
+        ("very_high", "ready", False),  # high -> very_high is one step: no clamp
+    ]
+    for i, (level, readiness, clamped) in enumerate(expectations):
+        record = _apply_pass(loop, artifacts_root, run_id=f"ladder-{i}")
+        assert record["decision"] == EvidenceDecision.ACCEPTED.value
+        assert record["updated_state"]["confidence_level"] == level
+        assert record["updated_state"]["readiness"] == readiness
+        assert record["promotion"]["raw_level"] == "very_high"
+        assert record["promotion"]["effective_level"] == level
+        assert record["promotion"]["clamped"] is clamped
+
+
+def test_failure_drop_is_never_clamped(
+    loop: EvidencePromotionLoop, artifacts_root: str
+) -> None:
+    """Once at very_high, a failure lowers the published level immediately."""
+    for i in range(4):
+        _apply_pass(loop, artifacts_root, run_id=f"drop-up-{i}")
+    assert loop.current_state("self-model-build")["confidence_level"] == "very_high"
+
+    failing = _write_chain_evidence(artifacts_root, run_id="drop-fail", status="FAIL")
+    record = loop.apply(failing)
+
+    assert record["decision"] == EvidenceDecision.ACCEPTED.value
+    # 4/5 = 0.8 -> raw high; the drop is applied as-is, not rate-limited.
+    assert record["updated_state"]["confidence_level"] == "high"
+    assert record["promotion"] == {
+        "raw_level": "high",
+        "effective_level": "high",
+        "clamped": False,
+    }
+
+
+def test_quarantined_and_duplicate_do_not_advance_ladder(
+    loop: EvidencePromotionLoop, artifacts_root: str
+) -> None:
+    """Only accepted applications climb the ladder."""
+    first = _apply_pass(loop, artifacts_root, run_id="rung-1")
+    assert first["updated_state"]["confidence_level"] == "low"
+
+    empty = _write_chain_evidence(
+        artifacts_root, run_id="rung-empty", status="PASS",
+        metrics={"module_count": 0},
+    )
+    quarantined = loop.apply(empty)
+    assert quarantined["decision"] == EvidenceDecision.QUARANTINED.value
+
+    duplicate = loop.apply(
+        _write_chain_evidence(artifacts_root, run_id="rung-1", status="PASS")
+    )
+    assert duplicate["decision"] == EvidenceDecision.DUPLICATE.value
+
+    state = loop.current_state("self-model-build")
+    assert state["confidence_level"] == "low"
+    assert state["readiness"] == "provisional"
+
+
+def test_ladder_state_round_trips_durable_store(
+    artifacts_root: str,
+) -> None:
+    """The clamped level survives a fresh loop over the same artifacts root."""
+    loop = EvidencePromotionLoop(artifacts_root=artifacts_root)
+    _apply_pass(loop, artifacts_root, run_id="rt-1")
+    _apply_pass(loop, artifacts_root, run_id="rt-2")
+
+    fresh = EvidencePromotionLoop(artifacts_root=artifacts_root)
+    state = fresh.current_state("self-model-build")
+    assert state["confidence_level"] == "medium"
+    assert state["readiness"] == "provisional"
+    # The raw score is untouched doctrine: still the pure success ratio.
+    assert state["score"] == 1.0
+
+
+def test_clamp_level_is_pure_and_conservative() -> None:
+    from axiom_core.evidence_promotion import _clamp_level
+
+    assert _clamp_level("very_low", "very_high") == ("low", True)
+    assert _clamp_level("low", "very_high") == ("medium", True)
+    assert _clamp_level("high", "very_high") == ("very_high", False)
+    assert _clamp_level("very_high", "low") == ("low", False)  # drops uncapped
+    assert _clamp_level("medium", "medium") == ("medium", False)
+    # Unknown labels are treated as very_low.
+    assert _clamp_level("weird", "very_high") == ("low", True)

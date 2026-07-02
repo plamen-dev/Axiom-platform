@@ -629,3 +629,22 @@ See `docs/runbooks/behavior-regression-runbook.md` for philosophy and process.
 | **related_test_case** | `tests/test_atlas.py` (data collection, empty-workspace grace, no absolute paths, self-contained/no-CDN HTML, script-injection escaping, read-only over source artifacts, registry governance) |
 | **related_artifact_path** | `src/axiom_core/atlas.py` (new), `src/axiom_cli/main.py` (`atlas` command), `src/axiom_core/runner/command_registry.py` (catalog entry), `.gitignore` (`artifacts/atlas/`) |
 | **notes** | Viewer only — not a new evidence framework and not a producer; it renders what the chain/promotion/summary engines already persist. Local-first per platform direction (no Autodesk Assistant/MCP, no uploads). Chat/communicate-with-Axiom surface is out of scope for v1. 2024 Revit baseline unaffected; no Revit live validation required. |
+
+---
+
+## BHV-036: Single-step promotion ladder — trust accumulates, not granted at once
+
+| Field | Value |
+|-------|-------|
+| **behavior_id** | BHV-036 |
+| **date** | 2026-06-23 |
+| **capability** | Evidence-to-promotion loop (`capability-evidence-apply`; promotion-side hardening, not a Revit capability) |
+| **observed_prompt** | Operator concern: a single accepted evidence application could jump a capability `very_low → very_high` / `blocked → ready` in one shot, because the confidence score is the raw success ratio (1/1 = 1.0) |
+| **previous_behavior** | The first accepted PASS produced score 1.0 → confidence `very_high`, readiness `ready` immediately. The Finding-2 quality gate stops *empty* evidence, but one substantive run still bought full trust. |
+| **expected_behavior** | Accepted evidence advances the published confidence level by at most one ladder step per application (`very_low → low → medium → high → very_high`); reaching `very_high`/`ready` requires ≥4 distinct accepted applications. Drops are never rate-limited — failures lower the level immediately. The clamp must be fully auditable, never hidden. |
+| **current_behavior** | `EvidencePromotionEngine.apply()` computes the raw score-derived level, clamps any upward transition to one rung via `_clamp_level`, persists the effective level through `CapabilityConfidenceEngine.create(level_override=...)` (score itself remains the unmodified success ratio — no scoring redesign), and projects readiness from the effective *level* (`_readiness_from_level`), so `blocked → ready` also cannot happen in one hop. The intake record gains a `promotion` field: `{raw_level, effective_level, clamped}`. Quarantined/rejected/duplicate applications never advance the ladder (unchanged). |
+| **status** | implemented (Python; `tests/test_evidence_promotion.py` + `tests/test_capability_confidence.py`; ruff green on Ubuntu) |
+| **related_bug_id** | (none — hardening; design option B of the accumulation review) |
+| **related_test_case** | `tests/test_evidence_promotion.py::test_ladder_climbs_one_level_per_accepted_pass`, `::test_failure_drop_is_never_clamped`, `::test_quarantined_and_duplicate_do_not_advance_ladder`, `::test_ladder_state_round_trips_durable_store`, `::test_clamp_level_is_pure_and_conservative`; `tests/test_capability_confidence.py::TestCreate::test_create_level_override_persists` |
+| **related_artifact_path** | `src/axiom_core/evidence_promotion.py` (`_clamp_level`, `_readiness_from_level`, apply step 7), `src/axiom_core/capability_confidence.py` (`create(level_override=...)`) |
+| **notes** | Promotion-side only: no confidence-scoring redesign (the score is still the pure ratio — a staged follow-up will evaluate evidence-mass damping of the score itself as design option A), no new framework, no chain/quality/quarantine/duplicate semantics change. Asymmetric by design: slow to trust, fast to distrust. Previously persisted confidence reports keep their recorded levels; the ladder applies from the next accepted application onward. 2024 Revit baseline unaffected; no Revit live validation required. |
