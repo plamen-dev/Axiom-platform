@@ -33,7 +33,13 @@ Decision handling (reusing existing timestamp/state structures):
   absent/malformed (see :mod:`axiom_core.evidence_quality`);
 * evidence whose stable fingerprint was **already accepted** for the capability
   is recorded as a **duplicate** and does **not** mutate confidence/readiness a
-  second time (distinct evidence from distinct runs still accumulates).
+  second time (distinct evidence from distinct runs still accumulates);
+* accepted evidence advances the published confidence level by **at most one
+  step per application** (the single-step ladder, see :func:`_clamp_level`):
+  a single passing run cannot jump ``very_low -> very_high`` even though its
+  raw success-ratio score is 1.0. Drops are never clamped — a failure lowers
+  the level immediately. The raw vs effective level and whether clamping
+  occurred are recorded on the intake record's ``promotion`` field.
 
 A small intake record is persisted per application so the decision
 (accepted / rejected / quarantined / duplicate), the reason, the detected
@@ -75,6 +81,8 @@ from uuid import uuid4
 from axiom_core.artifact_paths import is_within_sandbox
 from axiom_core.capability_confidence import (
     CapabilityConfidenceEngine,
+    CapabilityConfidenceFactors,
+    _compute_score,
     _level_from_score,
 )
 from axiom_core.evidence_quality import EMPTY, resolve_quality
@@ -131,6 +139,45 @@ def _readiness_from_score(score: float) -> str:
     if score >= 0.3:
         return "provisional"
     return "blocked"
+
+
+# Ordered confidence levels for the single-step promotion ladder.
+_LEVEL_LADDER = ("very_low", "low", "medium", "high", "very_high")
+
+
+def _readiness_from_level(level: str) -> str:
+    """Project a confidence *level* onto a deterministic readiness label.
+
+    **Classification: implementation-local readiness labelling — NOT promotion
+    doctrine** (same status as :func:`_readiness_from_score`). Level-based so
+    the label follows the *effective* (ladder-clamped) confidence level rather
+    than the raw score; the mapping mirrors the score thresholds exactly
+    (high/very_high <=> score >= 0.7 <=> ready; low/medium <=> score >= 0.3
+    <=> provisional; very_low <=> blocked). The canonical owner of readiness
+    remains an open doctrine question routed to **Program 6**.
+    """
+    if level in ("high", "very_high"):
+        return "ready"
+    if level in ("low", "medium"):
+        return "provisional"
+    return "blocked"
+
+
+def _clamp_level(prior_level: str, raw_level: str) -> tuple[str, bool]:
+    """Rate-limit an upward confidence-level transition to one step.
+
+    Returns ``(effective_level, clamped)``. The published level may rise at
+    most one rung of :data:`_LEVEL_LADDER` per accepted evidence application,
+    so trust is accumulated across distinct runs rather than granted by a
+    single one. Downward transitions are never clamped — failures lower the
+    published level immediately and by as many rungs as the score dictates.
+    Unknown level strings are treated conservatively as ``very_low``.
+    """
+    prior_idx = _LEVEL_LADDER.index(prior_level) if prior_level in _LEVEL_LADDER else 0
+    raw_idx = _LEVEL_LADDER.index(raw_level) if raw_level in _LEVEL_LADDER else 0
+    if raw_idx > prior_idx + 1:
+        return _LEVEL_LADDER[prior_idx + 1], True
+    return _LEVEL_LADDER[raw_idx], False
 
 
 @dataclass
@@ -292,17 +339,33 @@ class EvidencePromotionLoop:
         success_count = prior.success_count + (1 if outcome is EvidenceOutcome.PASS else 0)
         failure_count = prior.failure_count + (1 if outcome is EvidenceOutcome.FAIL else 0)
 
+        raw_score = _compute_score(
+            CapabilityConfidenceFactors(
+                execution_count=execution_count,
+                success_count=success_count,
+                failure_count=failure_count,
+            )
+        )
+        raw_level = _level_from_score(raw_score)
+        effective_level, clamped = _clamp_level(prior.confidence_level, raw_level)
+        promotion = {
+            "raw_level": raw_level,
+            "effective_level": effective_level,
+            "clamped": clamped,
+        }
+
         report = self._confidence.create(
             capability_id=resolved_capability,
             execution_count=execution_count,
             success_count=success_count,
             failure_count=failure_count,
+            level_override=effective_level,
         )
         updated = CapabilityStateSnapshot(
             capability_id=resolved_capability,
             score=report["score"],
-            confidence_level=report["confidence_level"],
-            readiness=_readiness_from_score(report["score"]),
+            confidence_level=effective_level,
+            readiness=_readiness_from_level(effective_level),
             execution_count=execution_count,
             success_count=success_count,
             failure_count=failure_count,
@@ -314,12 +377,18 @@ class EvidencePromotionLoop:
             f"{success_count}/{execution_count}); "
             f"confidence {prior.confidence_level} -> {updated.confidence_level}, "
             f"readiness {prior.readiness} -> {updated.readiness}"
+            + (
+                f" (single-step ladder: raw level {raw_level} clamped to "
+                f"{effective_level})"
+                if clamped
+                else ""
+            )
         )
         return self._record(
             resolved_capability, evidence_path, outcome,
             EvidenceDecision.ACCEPTED, reason, links, now,
             prior=prior, updated=updated, signals=signals,
-            fingerprint=fingerprint, quality=quality,
+            fingerprint=fingerprint, quality=quality, promotion=promotion,
         )
 
     # ------------------------------------------------------------------
@@ -338,11 +407,12 @@ class EvidencePromotionLoop:
         latest = max(reports, key=lambda r: r.get("created_at", ""))
         factors = (latest.get("confidence") or {}).get("factors", {})
         score = float(latest.get("score", 0.0))
+        level = latest.get("confidence_level", _level_from_score(score))
         return CapabilityStateSnapshot(
             capability_id=capability_id,
             score=score,
-            confidence_level=latest.get("confidence_level", _level_from_score(score)),
-            readiness=_readiness_from_score(score),
+            confidence_level=level,
+            readiness=_readiness_from_level(level),
             execution_count=int(factors.get("execution_count", 0)),
             success_count=int(factors.get("success_count", 0)),
             failure_count=int(factors.get("failure_count", 0)),
@@ -543,6 +613,7 @@ class EvidencePromotionLoop:
         fingerprint: str = "",
         duplicate_of: str = "",
         quality: dict[str, Any] | None = None,
+        promotion: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         prior = prior or CapabilityStateSnapshot(capability_id=capability_id)
         updated = updated or prior
@@ -563,6 +634,7 @@ class EvidencePromotionLoop:
             "evidence_outcome": outcome.value,
             "outcome_signals": signals or [],
             "evidence_quality": quality or {},
+            "promotion": promotion or {},
             "decision": decision.value,
             "accepted": decision is EvidenceDecision.ACCEPTED,
             "duplicate_of": duplicate_of,

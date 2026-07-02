@@ -215,8 +215,17 @@ class CapabilityConfidenceEngine:
         failure_count: int = 0,
         repair_count: int = 0,
         recovery_count: int = 0,
+        level_override: str | None = None,
     ) -> dict[str, Any]:
-        """Create a confidence report from execution factors."""
+        """Create a confidence report from execution factors.
+
+        ``level_override`` lets a caller persist a confidence level other than
+        the score-derived one (e.g. the promotion loop's single-step ladder,
+        which rate-limits how fast the published level may rise). The score
+        itself is always the unmodified deterministic value from
+        :func:`_compute_score`; only the published level differs, and the
+        override must be one of the valid confidence levels.
+        """
         factors = CapabilityConfidenceFactors(
             execution_count=execution_count,
             success_count=success_count,
@@ -227,6 +236,13 @@ class CapabilityConfidenceEngine:
 
         score = _compute_score(factors)
         level = _level_from_score(score)
+        if level_override is not None:
+            if level_override not in _VALID_LEVELS:
+                raise ValueError(
+                    f"level_override must be one of {sorted(_VALID_LEVELS)}: "
+                    f"{level_override!r}"
+                )
+            level = level_override
 
         confidence = CapabilityConfidence(
             capability_id=capability_id,

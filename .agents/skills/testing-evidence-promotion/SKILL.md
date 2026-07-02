@@ -27,7 +27,7 @@ How evidence flows into capability confidence/readiness and how validation evide
 ### capability-evidence-apply (hardened, PR #147/#148/#54)
 
 1. **Show baseline confidence/readiness:** Before applying evidence, confirm the capability starts at `very_low (0.0) / blocked`.
-2. **Apply passing evidence:** Assert: decision `accepted`, confidence raised (e.g. `very_low → very_high`), readiness `blocked → ready`, `Signals:` line present.
+2. **Apply passing evidence:** Assert: decision `accepted`, confidence raised by **exactly one ladder step** (`very_low → low`, readiness `blocked → provisional`), `Signals:` line present, and the record's `promotion` field shows `{raw_level: very_high, effective_level: low, clamped: true}` (single-step ladder, BHV-036).
 3. **Show after state:** Confirm updated confidence/readiness, factors (successes/executions), linkage fields (capability, result, artifact, report).
 4. **Apply failing evidence:** Assert: decision `accepted`, confidence reduced, readiness may drop to `provisional` or `blocked`, factors show failure increment.
 5. **Apply duplicate evidence:** Re-apply the exact same evidence file. Assert: decision `duplicate`, `state_changed: false`, confidence/readiness unchanged, `duplicate_of` references the prior accepted intake, execution/success counts do NOT inflate.
@@ -38,6 +38,7 @@ How evidence flows into capability confidence/readiness and how validation evide
 10. **Show history / show:** `capability-evidence-history` lists all intakes with timestamps, decisions, confidence transitions; `capability-evidence-show <intake_id>` shows full detail (decision, reason, signals, fingerprint, linkage).
 11. **Confirm rejected/quarantined/duplicate records do not mutate confidence:** accepted intakes produce confidence reports; others do not (`accepted_count == confidence_report_count`).
 12. **Confirm audit artifacts are not a new registry:** only `report.json` + `pass_fail.json` per intake; no promotion registry, no doctrine layer, no independent durable state separate from `CapabilityConfidenceEngine`.
+13. **Single-step ladder (BHV-036):** four distinct accepted PASSes climb `low → medium → high → very_high` (readiness `provisional, provisional, ready, ready`); the 4th step is one rung so `clamped: false`. The score stays the raw success ratio (1.0 throughout) — only the published level is rate-limited. Drops are never clamped: from `very_high`, one FAIL (4/5 = 0.8) lands `high` immediately with `clamped: false`. Quarantined/rejected/duplicate applications never advance the ladder, and the clamped level round-trips the durable confidence store (persisted via `create(level_override=...)`).
 
 ### cli-validation-record
 
