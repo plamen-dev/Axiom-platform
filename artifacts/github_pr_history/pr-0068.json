@@ -1,0 +1,500 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 68,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/68",
+    "title": "GitHub PR metadata backfill: batch import + canonical PR sequence ledger",
+    "description": "## Summary\n\nBackfills the full GitHub PR history of this repo (67 PRs) into the GitHub Metadata Import Framework and reconciles the two PR numbering sequences into one canonical, durable reference — before the divergence gets messier.\n\nWhy: PR numbering restarted with this account (GitHub #1 == canonical \"PR #112\" from the prior 112-PR sequence). Recent PRs (#48–#67) stopped encoding a canonical number in their titles, so cross-account referencing is already breaking down. This PR gives the other worker account a complete, machine-readable base to populate the knowledge graph from.\n\nWhat's in it:\n\n- `GitHubMetadataImportEngine.backfill(payload_dir)` — batch import of `*.json` payloads. Canonical number resolution: payload `global_capability_number` → else parsed from title via `^(?:Integration\\s+)?PR\\s*#(\\d+)` (`canonical_number_from_title`) → else recorded as an explicit **canonical gap** (never invented). Duplicate imports are skipped, not fatal, so the backfill is safely re-runnable.\n- `GitHubMetadataImportEngine.generate_sequence_ledger()` — renders `docs/logs/pr-sequence-ledger.md`: one row per PR, `Canonical # | GitHub PR # | Title | Status | Merged at | Author`, sorted by GitHub PR number, gaps marked `— (gap)`.\n- New CLI `axiom github-import-backfill --payload-dir <dir> [--ledger-out <path>] [--json-output]`, cataloged in the command registry (READ_ONLY / SAFE) and added to `EXPECTED_AXIOM_COMMANDS`.\n- `scripts/fetch_github_pr_metadata.py` — the only network-touching piece (via `gh api`), writes per-PR payloads (PR + commits + files + labels) in the engine's shape. The framework itself stays network-free per its doctrine.\n- Committed evidence: `artifacts/github_pr_history/pr-0001..0067.json` (raw payloads) and the generated `docs/logs/pr-sequence-ledger.md`.\n\nBackfill result: 67 imported, 0 failed, 23 canonical gaps — GitHub #9, #20, #38 (skill/fix PRs that never had a canonical number) and #48–#67 (the recent run where canonical titling stopped). Assigning continuation numbers (158+) to the gap PRs is an operator decision, deliberately not automated.\n\nWhat did NOT change: `import_metadata` semantics, registry/timeline shapes, schema version, existing evidence outputs.\n\nTests (tier 2, targeted): `tests/test_github_metadata_import.py` 54 passed (6 new: canonical parsing, backfill import/derivation, re-runnability, malformed payload, missing dir, ledger ordering/gaps), `tests/test_command_registry.py` 27 passed; ruff clean on changed files. Skill `testing-cli-governance` updated in the same PR.\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1783002142-gpr-backfill",
+    "status": "open",
+    "merge_commit_sha": "a388acfeb2da8a4db7120aeabcad0e981e3c6915",
+    "created_at": "2026-07-02T14:27:01Z",
+    "updated_at": "2026-07-02T14:46:55Z",
+    "merged_at": ""
+  },
+  "commits": [
+    {
+      "commit_sha": "d90791345190f3516df5c71f01f96b23b4f1c120",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "GitHub PR metadata backfill: batch import + canonical PR sequence ledger\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-02T14:26:28Z"
+    },
+    {
+      "commit_sha": "07e90f638ce9a335ec4b5a8c23c71eafe2432bf2",
+      "author": "plamen-dev",
+      "message": "Knowledge graph auto-ingest: capability-graph-ingest command (C10) (#69)\n\nScope\n\nAdds a read-only graph auto-ingest path that converts existing Axiom evidence and metadata artifacts into a capability knowledge graph without requiring manual capability-graph-create payloads.\n\nKey Changes\n\n- Adds `GraphAutoIngestEngine` to scan existing artifact sources and assemble a capability graph through the existing `CapabilityKnowledgeGraphEngine`.\n- Adds the new CLI command `capability-graph-ingest` with `--artifacts-root` and `--json-output` options.\n- Catalogs `capability-graph-ingest` in the command registry as READ_ONLY / SAFE.\n- Ingests evidence intake reports as validation nodes linked to shared capability nodes.\n- Ingests execution-chain evidence as artifact nodes linked to capabilities.\n- Ingests validation evidence runs as validation nodes with run status and command-count metadata.\n- Ingests GitHub metadata import reports as PR/event nodes carrying repository PR number and global capability number.\n- Uses deterministic node and edge IDs derived from source artifact IDs so repeated ingests over the same inputs produce stable graph structure.\n- Records malformed artifact files as skipped instead of failing the ingest.\n- Preserves upstream artifact files without mutation.\n- Updates CLI governance testing skill guidance for the new graph-ingest command.\n\nValidation\n\n- Ran targeted tier-2 tests:\n  - `tests/test_graph_auto_ingest.py`\n  - `tests/test_command_registry.py`\n- Result:\n  - `tests/test_graph_auto_ingest.py`: 10 passed.\n  - `tests/test_command_registry.py`: 27 passed.\n- Covered all-source ingest, shared capability-node deduplication, deterministic reruns, malformed artifact skipping, no upstream mutation, and canonical/global PR number carry-through.\n- Ruff clean.\n- Real-data run on repo artifacts produced:\n  - 76 nodes\n  - 6 edges\n  - 0 skipped\n- PR is stacked on #68 and should merge after #68 so GitHub can retarget it cleanly to main.\n\nNon-Goals\n\n- Does not change `CapabilityKnowledgeGraphEngine` semantics.\n- Does not change graph schemas.\n- Does not mutate upstream evidence, validation, execution-chain, or GitHub metadata artifacts.\n- Does not replace existing evidence producers.\n- Does not create a new graph framework.\n- Does not make graph ingestion a promotion or confidence mutation path.\n- Does not require Revit or Revit validation.\n- Does not directly modify canonical documents.\n\nArchitectural Significance\n\nThis PR turns Axiom’s existing evidence and PR metadata artifacts into graph-consumable knowledge without manual graph construction. It closes an important evidence-flow gap: artifacts that were previously inspectable but disconnected can now feed a deterministic, read-only capability graph. This strengthens the path toward Atlas and future operator cockpit views by giving them a structured graph substrate sourced from existing evidence, validation, and PR metadata while preserving local-first and non-mutating safety boundaries.\n\nCo-authored-by: plamen.hristov@imsdevlab.onmicrosoft.com <plamen.m.hristov@gmail.com>",
+      "timestamp": "2026-07-02T14:46:53Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".agents/skills/testing-cli-governance/SKILL.md",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0001.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0002.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0003.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0004.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0005.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0006.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0007.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0008.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0009.json",
+      "status": "added",
+      "additions": 38,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0010.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0011.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0012.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0013.json",
+      "status": "added",
+      "additions": 68,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0014.json",
+      "status": "added",
+      "additions": 68,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0015.json",
+      "status": "added",
+      "additions": 86,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0016.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0017.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0018.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0019.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0020.json",
+      "status": "added",
+      "additions": 44,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0021.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0022.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0023.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0024.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0025.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0026.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0027.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0028.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0029.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0030.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0031.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0032.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0033.json",
+      "status": "added",
+      "additions": 68,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0034.json",
+      "status": "added",
+      "additions": 62,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0035.json",
+      "status": "added",
+      "additions": 56,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0036.json",
+      "status": "added",
+      "additions": 62,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0037.json",
+      "status": "added",
+      "additions": 62,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0038.json",
+      "status": "added",
+      "additions": 44,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0039.json",
+      "status": "added",
+      "additions": 62,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0040.json",
+      "status": "added",
+      "additions": 38,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0041.json",
+      "status": "added",
+      "additions": 428,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0042.json",
+      "status": "added",
+      "additions": 80,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0043.json",
+      "status": "added",
+      "additions": 92,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0044.json",
+      "status": "added",
+      "additions": 38,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0045.json",
+      "status": "added",
+      "additions": 62,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0046.json",
+      "status": "added",
+      "additions": 62,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0047.json",
+      "status": "added",
+      "additions": 98,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0048.json",
+      "status": "added",
+      "additions": 62,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0049.json",
+      "status": "added",
+      "additions": 50,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0050.json",
+      "status": "added",
+      "additions": 62,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0051.json",
+      "status": "added",
+      "additions": 50,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0052.json",
+      "status": "added",
+      "additions": 56,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0053.json",
+      "status": "added",
+      "additions": 50,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0054.json",
+      "status": "added",
+      "additions": 68,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0055.json",
+      "status": "added",
+      "additions": 68,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0056.json",
+      "status": "added",
+      "additions": 50,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0057.json",
+      "status": "added",
+      "additions": 62,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0058.json",
+      "status": "added",
+      "additions": 80,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0059.json",
+      "status": "added",
+      "additions": 50,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0060.json",
+      "status": "added",
+      "additions": 92,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0061.json",
+      "status": "added",
+      "additions": 104,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0062.json",
+      "status": "added",
+      "additions": 68,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0063.json",
+      "status": "added",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0064.json",
+      "status": "added",
+      "additions": 272,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0065.json",
+      "status": "added",
+      "additions": 44,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0066.json",
+      "status": "added",
+      "additions": 122,
+      "deletions": 0
+    },
+    {
+      "path": "artifacts/github_pr_history/pr-0067.json",
+      "status": "added",
+      "additions": 50,
+      "deletions": 0
+    },
+    {
+      "path": "docs/logs/pr-sequence-ledger.md",
+      "status": "added",
+      "additions": 79,
+      "deletions": 0
+    },
+    {
+      "path": "scripts/fetch_github_pr_metadata.py",
+      "status": "added",
+      "additions": 131,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 92,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/github_metadata_import.py",
+      "status": "modified",
+      "additions": 140,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/graph_auto_ingest.py",
+      "status": "added",
+      "additions": 333,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 59,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_github_metadata_import.py",
+      "status": "modified",
+      "additions": 108,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_graph_auto_ingest.py",
+      "status": "added",
+      "additions": 228,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:52:23.741845+00:00"
+  }
+}

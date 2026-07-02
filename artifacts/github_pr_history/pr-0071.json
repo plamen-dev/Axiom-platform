@@ -1,0 +1,68 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 71,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/71",
+    "title": "Simulated Product Adapter (Adapter 000): in-memory model behind the bridge interface (B6)",
+    "description": "## Summary\n\nAdapter 000 lets capabilities validate with zero Revit (and zero license). New `src/axiom_core/simulated_adapter.py`:\n\n- `SimulatedModel` — deterministic in-memory model (seed: 3 Walls + 2 Doors with Text `Comments`/`Mark` params plus one read-only param to exercise safety gates).\n- `SimulatedPipeClient` — same surface as `PipeClient` (`is_available()` / `execute_tool(tool_name, args, simulate, step_id, transaction_name) -> ToolResult`), so it injects straight into the existing `execute_capability_via_bridge(pipe_client=...)` driver and produces **real bridge evidence bundles** (`bridge_request.json` / `bridge_response.json` / `pass_fail.json` / summary md).\n\nSupported capabilities mirror Adapter 001's contract and doctrine:\n- `CreateGrids` — numeric + alphabetic grids per the registry schema; rejects `SpacingFeet <= 0`.\n- `CreateLevels` — uniform (`FloorToFloorFeet`) or `VariableElevationsFeet` + `LevelNames`, with length-mismatch validation.\n- `InventoryModel` — **summary mode only**: counts + category breakdown + source model, never a parameter dump (same safety rule as live inventory); supports `CategoryFilter`.\n- `SetParameterValue` — category-constrained, Text/writable/instance parameters only, **hard cap 5 elements**, preview by default; `Mode: \"apply\"` required to mutate (`modified_ids` empty on preview).\n\nAnti-overclaim (fidelity doctrine): every `ToolResult.output_data` is stamped `adapter: \"simulated-000\"`, `simulated_model: true`, and it flows into the persisted bridge evidence — simulated evidence can never be mistaken for live-Revit proof. The registry note repeats this.\n\nCLI: `axiom simulated-adapter-run --capability <name> [--args-json <json>] [--output-dir <p>] [--json-output]` (fresh seed model per invocation; non-pass classification exits 1). Registry entry (READ_ONLY/SAFE) + `EXPECTED_AXIOM_COMMANDS`; `revit-adapter` skill documents Adapter 000 in the same PR.\n\n**Stacked on #70** (merge order: #70 → this).\n\nWhat did NOT change: `automation_bridge`, `pipe_client`, capability registry schemas, any live-Revit path.\n\nTests (tier 2, targeted): `tests/test_simulated_adapter.py` — 23 tests covering the client contract, all four capabilities (including safety failures: spacing/count validation, hard cap, missing category, read-only param rejection, preview non-mutation), bridge evidence bundle on disk, seed determinism, CLI JSON/failure exits; `tests/test_command_registry.py` 27 passed; ruff clean. Real CLI smoke: CreateGrids (6 created) and SetParameterValue apply (2 modified) both `pass` with evidence bundles written.\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1783003712-simulated-adapter",
+    "status": "open",
+    "merge_commit_sha": "ab0e40e81b03af1bab4b1a6331c57befdbeb18bc",
+    "created_at": "2026-07-02T14:48:56Z",
+    "updated_at": "2026-07-02T14:48:59Z",
+    "merged_at": ""
+  },
+  "commits": [
+    {
+      "commit_sha": "5ef1f4b11b9aae03a854fb9fa640320ce0bc41d7",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Simulated Product Adapter (Adapter 000): in-memory model behind the bridge interface (B6)\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-02T14:48:32Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".agents/skills/revit-adapter/SKILL.md",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 106,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 41,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/simulated_adapter.py",
+      "status": "added",
+      "additions": 436,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_simulated_adapter.py",
+      "status": "added",
+      "additions": 312,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:52:25.873967+00:00"
+  }
+}
