@@ -35,17 +35,15 @@ they are not the lane-3A target.
 2026 build/deploy context (confirm on the machine; record actuals):
 
 - Revit 2025+ runs add-ins on modern .NET (not .NET Framework 4.8). The
-  repo has verified build paths for 2024 (`net48`) and 2027
-  (`net10.0-windows`) but **no verified 2026 build target yet**. Use the
-  MSBuild `RevitVersion` override strategy from
-  `revit-multi-version-runbook.md` (or an SDK-style build against
-  `C:\Program Files\Autodesk\Revit 2026\RevitAPI.dll`) and **record exactly
-  what was needed** — that record becomes the 2026 section of the
-  multi-version runbook.
-- Deployed add-in folder for 2026: the version-specific Addins folder
-  `...\Autodesk\Revit\Addins\2026\` (ProgramData for all-users is the 2024
-  pattern; 2027 deviates to Program Files — record which location 2026
-  actually loads from).
+  repo has a dedicated 2026 build target: `Axiom.Revit.2026.sln`
+  (SDK-style, `net8.0-windows`, `REVIT_2026`), built/deployed via
+  `scripts/deploy-revit-2026.ps1` (`-BuildOnly` first). This target is
+  build-verified only until this lane-3A run — **record any deviations
+  needed on the machine** for the multi-version runbook.
+- Deployed add-in folder for 2026:
+  `C:\ProgramData\Autodesk\Revit\Addins\2026\` (the 2024 all-users
+  pattern; 2027 is the deviation to Program Files). If Revit 2026 does not
+  load from ProgramData, record the actual working location as a finding.
 - Deployment set: `Axiom.RevitAddin.addin` (manifest, `<Assembly>` pointing
   at the deployed DLL), `Axiom.RevitAddin.dll`, `Axiom.Core.dll`,
   `Newtonsoft.Json.dll`.
@@ -114,10 +112,13 @@ commands. **FAIL:** any command errors or commands missing.
 
 ### Gate 2 — Add-in build + deploy for Revit 2026 (read-only w.r.t. models)
 
-- Build against Revit 2026 API per the multi-version strategy (record the
-  exact commands/property overrides used).
-- Deploy manifest + DLL set to the 2026 Addins folder; verify all four files
-  exist and the manifest `<Assembly>` points at the deployed DLL.
+```
+.\scripts\deploy-revit-2026.ps1 -BuildOnly
+.\scripts\deploy-revit-2026.ps1
+```
+
+- Verify all four files exist at `C:\ProgramData\Autodesk\Revit\Addins\2026\`
+  and the manifest `<Assembly>` points at the deployed DLL.
 
 **PASS:** build succeeds; manifest + DLLs present at the 2026 per-version
 path. **FAIL:** build/API errors (report as a lane-3A finding — do not fall

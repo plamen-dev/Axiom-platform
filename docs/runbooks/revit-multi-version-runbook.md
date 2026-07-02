@@ -330,6 +330,22 @@ msbuild Axiom.Revit.sln /p:Configuration=Debug /p:Platform=x64
 # Deploy to C:\ProgramData\Autodesk\Revit\Addins\2024\
 ```
 
+### Build and deploy 2026 (lane-3A operator target)
+
+```powershell
+.\scripts\deploy-revit-2026.ps1 -BuildOnly   # build only
+.\scripts\deploy-revit-2026.ps1              # build + deploy
+# Solution: src\axiom_revit\Axiom.Revit.2026.sln (SDK-style, net8.0-windows, REVIT_2026)
+# Deploy to C:\ProgramData\Autodesk\Revit\Addins\2026\
+```
+
+Revit 2026 add-ins run on .NET 8. The 2026 projects mirror the 2027
+SDK-style pattern (shared source compiled via `Compile Include` links, Revit
+API HintPaths under `$(ProgramW6432)\Autodesk\Revit 2026\`), and
+`RevitElementIdCompat` uses `ElementId.Value` for both `REVIT_2026` and
+`REVIT_2027`. All-users deployment uses the ProgramData Addins folder (the
+2024 pattern; Program Files is the 2027 deviation).
+
 ### Build and deploy 2027 (when ready)
 
 ```powershell

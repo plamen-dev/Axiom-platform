@@ -19,7 +19,7 @@ namespace Axiom.Core.Compat
         public static long GetValue(ElementId id)
         {
             if (id == null) return -1;
-#if REVIT_2027
+#if REVIT_2026 || REVIT_2027
             return id.Value;
 #else
             return id.IntegerValue;
@@ -44,7 +44,7 @@ namespace Axiom.Core.Compat
         /// </summary>
         public static ElementId FromLong(long value)
         {
-#if REVIT_2027
+#if REVIT_2026 || REVIT_2027
             return new ElementId(value);
 #else
             return new ElementId((int)value);
