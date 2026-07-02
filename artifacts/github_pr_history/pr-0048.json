@@ -1,0 +1,62 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 48,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/48",
+    "title": "Provenance-neutral terminology for the #157 architecture maps (drop evidence-free \"legacy/old-foundation\")",
+    "description": "## Summary\n\nTerminology-only correction to the maps merged in PR #157 (repo-local #47). The scan added there labeled earlier-introduced foundational modules as **\"old-foundation\" / \"pre-#112 legacy\" / \"legacy pipeline.\"** Per the Program 7 operating rule, a component must not be called legacy/old/deprecated unless repo evidence proves it is unused, superseded, bypassed, or intentionally retired — none of these are. This PR replaces that wording with provenance-neutral terms and corrects one factual claim. **Mapping/wording only — no pipe/spine/bridge/orchestrator/runtime behavior changed.**\n\nWhat changed:\n- **Wording:** `old-foundation` / `pre-#112 legacy` / `legacy pipeline` / `older pipeline` → **\"earlier-introduced foundational component\"** across the tracked maps and the System Atlas data strings. `ExecutionTrace` vs `ExecutionReport` stays a **duplicate-candidate** (evidence-backed: both currently active) but is no longer called \"legacy.\"\n- **Section rename:** Duplicate/Alias Map \"Old-foundation scan result\" → **\"Foundational provenance scan result\"** (cross-reference in PR Purpose Map + behavior ledger updated to match).\n- **Factual correction:** the PR Purpose Map previously claimed *\"original creating-PR numbers are not repo-visible.\"* They are. This is a full (non-shallow) clone; `git log --diff-filter=A` recovers the introducing **GitHub repo-local** PR for each module:\n\n  ```\n  automation_bridge.py  -> repo-local PR #19\n  pipe_client.py        -> repo-local PR #2   (earliest agents + named-pipe vertical slice)\n  run_spine.py          -> repo-local PR #31\n  automation_planner.py -> repo-local PR #35\n  work_item_registry.py -> repo-local PR #56\n  execution_attempt.py  -> repo-local PR #111\n  schemas/orchestrator/mcp_layer/input_normalization/persistence -> initial-foundation commit (repo bootstrap, no PR)\n  ```\n  The map now cites these and notes GitHub repo-local PR numbers are distinct from Axiom **GPR** numbers, and that establishing them does **not** require the other Devin lane's provenance — this workspace's git history is sufficient. GPR-level provenance remains \"not visible from this workspace\" (marked as such, not invented).\n\n## What did NOT change\n- No component reclassified in substance (active/partial/duplicate-candidate statuses preserved; only the \"legacy/old\" label removed where unproven).\n- No runtime code paths, schemas, atlas *structure*, or CLI behavior. The atlas still emits 25 families; only `name`/`status`/`notes`/`purpose` **strings** changed. Family list, aliases, and `primary_files` are untouched, so the atlas presence-checks and cross-references are unaffected.\n\n## Files\n- `docs/architecture/integration/PR_Purpose_Map_v0.md` — header, intro paragraph (provenance correction), one classification cell, cross-reference.\n- `docs/architecture/integration/Duplicate_Alias_Map_v0.md` — Cluster 11 wording, scan-result section rename + wording, unknowns updated.\n- `docs/logs/behavior-change-ledger.md` — BHV-031 wording synced to the renamed section/terms.\n- `src/axiom_core/context_preflight.py` — System Atlas `name`/`status`/`notes`/`purpose` strings only.\n- `tests/test_context_preflight.py` — test renamed to `test_atlas_includes_earlier_introduced_foundation_components`; assertion messages reworded (same assertions).\n\n## Tests run\n- `poetry run ruff check` on the two changed Python files — clean.\n- `poetry run pytest tests/test_context_preflight.py -q` — **34 passed**. (Docs + atlas-string change; targeted test per tiered-testing policy.)\n\n## Validation still pending / risks\n- None functional. Risk is purely editorial (a missed occurrence of the old wording); grep confirms remaining \"legacy\" mentions are the intentional *\"these are **not** legacy\"* clarifications.\n\n## Factory relevance\nStrengthens the anti-duplication/context-enforcement layer (evidence quality of the maps): future architecture-sensitive PRs read accurate provenance and are not misled into treating active foundational components as retired. Does not touch discovery/primitive-validation/promotion runtime. 2024 baseline unaffected; no Revit-live validation required.\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782872385-terminology-fix",
+    "status": "merged",
+    "merge_commit_sha": "9f8f037850647b303b8b92ee6924f84480f97477",
+    "created_at": "2026-07-01T02:29:56Z",
+    "updated_at": "2026-07-01T04:35:05Z",
+    "merged_at": "2026-07-01T04:35:05Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "2e81119ee4d5f91b88beb23f3a6bf5fb7261d44c",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Provenance-neutral terminology: replace 'legacy/old-foundation/pre-#112' wording in #157 maps\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-01T02:29:11Z"
+    }
+  ],
+  "files": [
+    {
+      "path": "docs/architecture/integration/Duplicate_Alias_Map_v0.md",
+      "status": "modified",
+      "additions": 14,
+      "deletions": 14
+    },
+    {
+      "path": "docs/architecture/integration/PR_Purpose_Map_v0.md",
+      "status": "modified",
+      "additions": 18,
+      "deletions": 9
+    },
+    {
+      "path": "docs/logs/behavior-change-ledger.md",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/context_preflight.py",
+      "status": "modified",
+      "additions": 13,
+      "deletions": 13
+    },
+    {
+      "path": "tests/test_context_preflight.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 4
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:57.766846+00:00"
+  }
+}

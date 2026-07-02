@@ -1,0 +1,50 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 53,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/53",
+    "title": "Fix code-inventory/self-model reporting zero modules & edges on Windows (path separator)",
+    "description": "## Summary\n\nWindows lane-2 found `execution-chain-run` producing `module_count=0`, `import_edge_count=0`, `isolated_module_count=0` **even after** `code-inventory --refresh` populated records. Root cause is a Windows path-separator bug in the inventory scanner — **not** empty inventory (this is exactly the \"inventory-category / self-model-consumption mismatch\" Plamen suspected).\n\n`CodebaseInventory.scan()` and `extract_import_edges()` computed the repo-relative path with `str(Path.relative_to(repo_root))`, which uses the **OS separator**. On Windows that yields `src\\axiom_core\\...`, and every downstream check assumes forward slashes:\n\n```python\n# _categorize:            \"src\\\\axiom_core\\\\x.py\".startswith(\"src/\")  -> False  => FileCategory.OTHER (not SOURCE/TEST/CLI)\n# extract_import_edges:   not rel.startswith(\"src/\")                  -> True   => every file skipped => 0 edges\n# _module_name:           \"src\\\\..\\\\x.py\".replace(\"/\", \".\")          -> no-op   => malformed id, then dropped by\n#                          self_model.build()'s  f.path.startswith(\"src/\")      => 0 modules\n```\n\nSo on Windows `SelfModelBuilder.build()` returns zero modules/edges → the chain reports zero metrics → (separately) promotion happily accepts it. Same failure family as the Windows artifact-path bug fixed in PR #151.\n\n**Fix:** normalize once, at both scan sites, via a small helper:\n\n```python\n@staticmethod\ndef _rel_posix(fpath: Path, root: Path) -> str:\n    return fpath.relative_to(root).as_posix()   # no-op on POSIX; forward slashes on Windows\n```\n\n`.as_posix()` is a no-op on Linux, so **CI/Linux behavior is unchanged**; it only corrects Windows.\n\n**Test:** `test_rel_posix_normalizes_windows_separators` uses `PureWindowsPath` to reproduce backslash paths cross-platform (so it would fail against the old `str(...)` on Linux CI too), and asserts `_categorize`/`_module_name` then classify the normalized path correctly.\n\n## What changed / did not change\n- **Changed:** path normalization in `codebase_inventory.py` (2 call sites) + 1 regression test + BUG-019 log entry.\n- **Not changed:** inventory schema, categories, module-name rules, self-model/chain/promotion logic, and all Linux behavior.\n\n## Tests run\n- `tests/test_codebase_inventory.py`, `tests/test_self_model.py`, `tests/test_execution_chain_orchestrator.py` → 65 passed. Ruff clean. (Targeted per testing-tier policy — Python-only change.)\n\n## Validation still pending\n- **Windows lane-2 confirmation by Plamen:** on `C:\\Dev\\Axiom\\Code\\Axiom-platform`, re-run `code-inventory --refresh` then `execution-chain-run --json-output` and confirm `module_count > 0` / `import_edge_count > 0`. Not claimed until you run it.\n- Does not touch Revit; 2024 baseline unaffected.\n\n## Relationship to Finding 2\nThis fixes the *mechanical* zero-metric cause on Windows. The *semantic* gate (chain `status=PASS` + promotion accepting genuinely-degenerate zero-metric evidence and jumping `very_low` → `very_high`) is **still worthwhile** and is returned separately as a design diff for your approval before coding — it is NOT in this PR.\n\n## Known risks\n- Low. On POSIX `as_posix()` == prior `str()` output, so no behavior change off Windows.\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782884589-inventory-windows-path-normalization",
+    "status": "merged",
+    "merge_commit_sha": "61e949e7b9eadfef9a99e50b7e82913cd90fce26",
+    "created_at": "2026-07-01T05:46:41Z",
+    "updated_at": "2026-07-01T13:35:51Z",
+    "merged_at": "2026-07-01T13:35:51Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "a9db0748890c4536623ebf2a062ae0636e1ef047",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Fix code-inventory/self-model reporting zero modules on Windows (path separator normalization)\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-01T05:46:18Z"
+    }
+  ],
+  "files": [
+    {
+      "path": "docs/logs/bug-validation-log.md",
+      "status": "modified",
+      "additions": 14,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/codebase_inventory.py",
+      "status": "modified",
+      "additions": 16,
+      "deletions": 2
+    },
+    {
+      "path": "tests/test_codebase_inventory.py",
+      "status": "modified",
+      "additions": 19,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:25:01.554093+00:00"
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 15,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/15",
+    "title": "PR #126 — Devin Session Metadata Import Framework v1",
+    "description": "## Summary\n\nAdds the **Devin Session Metadata Import Framework** — the first *worker/session* understanding source, layered on top of the Global Capability Registry (#122, identity), Capability Event Timeline (#123, memory), GitHub Metadata Import (#124), and Capability Summary (#125). GitHub captures repository metadata; Devin sessions hold execution context GitHub never sees (worker actions, testing walkthroughs, review findings, skill proposals, recordings/screenshots, operational interruptions). This framework ingests that context **conservatively** as deterministic, source-preserving records + append-only timeline events.\n\nRead-only ingestion from a provided payload — **no Devin API, no scraping, no browser automation, no network calls**.\n\n### Registry is referenced, never owned (per clarification)\n\nThe import adapter **observes and enriches**; the Global Capability Registry remains the sole owner of capability identity. It does **not** create, mutate, or duplicate registry entries and never mints a second canonical identity. Instead it records a non-owning `registry_reference`:\n\n```\nhas_reference = session.capability_id != \"\" or global_capability_number > 0\nregistry_reference_status = \"referenced\" if has_reference else \"missing_registry_reference\"\nregistry_reference = {            # plain observation — NOT a GlobalCapabilityEntry\n    reference_status, global_capability_number, capability_id, capability_name,\n    repository_owner/name, repository_pr_number, worker{...},\n    observed_session_status,      # session status verbatim, not remapped to a registry status\n    affected_files,\n}\n```\n\nWhen the session names no existing identity, `missing_registry_reference` is reported and the registry is left untouched (the safer v1 option) — the import still succeeds (`imported`); absence is flagged, not failed.\n\n### What landed\n- `src/axiom_core/devin_session_import.py`:\n  - Models: `DevinSessionMetadata`, `DevinSessionActionMetadata` (`STARTED`/`IMPLEMENTED`/`TESTED`/`REVIEWED`/`FIXED_FINDING`/`RECORDED_WALKTHROUGH`/`PROPOSED_SKILL`/`UPDATED_SKILL`/`REPORTED_READY`/`SLEPT`/`RESUMED`/`NOTE`), `DevinSessionArtifactMetadata` (`RECORDING`/`SCREENSHOT`/`TEST_REPORT`/`PR_COMMENT`/`EVIDENCE_BUNDLE`/`SKILL_FILE`/`LOG`/`OTHER`), `DevinSessionValidationMetadata`, `DevinSessionSkillProposalMetadata` (`PROPOSED`/`APPROVED`/`REJECTED`/`MERGED`/`SUPERSEDED`), `DevinSessionMetadataImport`, `DevinSessionImportReport`, `DevinSessionImportEvidence` + `DevinSessionMetadataImportEngine`.\n  - Deterministic ordering: actions by `(timestamp, action_type, action_id)`; artifacts by `(created_at, artifact_type, artifact_id)`; skill proposals by `(skill_name, skill_id)`. Input order is irrelevant.\n  - Timeline events built from actions + media artifacts + skill proposals, then re-sorted by `(timestamp, event_type, summary)` and sequenced:\n\n    ```\n    action TESTED            -> TEST_COMPLETED      artifact RECORDING  -> VIDEO_RECORDED\n    action FIXED_FINDING     -> BUG_FIXED           artifact SCREENSHOT -> SCREENSHOT_CAPTURED\n    action REPORTED_READY    -> PR_READY            skill PROPOSED      -> SKILL_PROPOSED\n    action SLEPT             -> WARNING             skill APPROVED/MERGED -> SKILL_APPROVED\n    action STARTED/.../NOTE  -> NOTE\n    ```\n  - `passed = (status == imported)` — malformed sub-records are skipped (not fatal) and downgrade the import to `partial_import` (→ `passed: false`); missing optional artifacts are tolerated. Duplicate `session_id` rejected; `session_id` is a hard-required identity field; path-traversal guarded.\n- CLI `devin-session-import` / `devin-session-show` / `devin-session-export` (JSON/Markdown/CSV), registered in `command_registry.py`, `test_selection_engine.py`, `test_command_registry.py`. Show/render and exports surface `registry_reference_status`.\n- Evidence bundle under `artifacts/devin_session_import/<run_id>/`: `devin_session_import_request.json`, `devin_session_import_result.json`, `devin_session_import_summary.md`, `pass_fail.json` (gitignored). `pass_fail.json` includes `registry_reference_status`.\n\n### What did not change\nNo architecture/dependency changes, no GitHub/Devin API, no orchestration/scraping/automation. **No mutation, duplication, or creation of canonical Global Capability Registry entries**, no mutation of existing timeline events. Revit 2024 baseline unaffected.\n\n### Validation\n- `poetry run pytest -q` → **4124 passed, 1 skipped**\n- `poetry run ruff check src/ tests/` → **0 errors**\n- Recorded 6/6 CLI walkthrough (see PR comment) + smoke for `referenced` / `missing_registry_reference` paths.\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782248614-devin-session-import",
+    "status": "merged",
+    "merge_commit_sha": "7a57c687f353f792d7563991410e3e4d88aa2da0",
+    "created_at": "2026-06-23T21:08:43Z",
+    "updated_at": "2026-06-23T23:19:04Z",
+    "merged_at": "2026-06-23T21:35:06Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "1e5272e36c84bb68a7c988c555a1f3584e3ca660",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #126 — Devin Session Metadata Import Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-23T21:08:09Z"
+    },
+    {
+      "commit_sha": "2b66cdbf8be0c6320b11fd592839466c682633c5",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Ignore generated import/summary framework artifact bundles\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-23T21:08:27Z"
+    },
+    {
+      "commit_sha": "72c884de342913b25445c3bd68a4341d74b16599",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #126 — treat registry as non-owning reference (never mint canonical identity)\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-23T21:27:18Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 9,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 181,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/devin_session_import.py",
+      "status": "added",
+      "additions": 1219,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 61,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_devin_session_import.py",
+      "status": "added",
+      "additions": 833,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:31.719238+00:00"
+  }
+}

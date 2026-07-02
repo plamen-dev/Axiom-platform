@@ -1,0 +1,50 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 49,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/49",
+    "title": "ADRs 0001–0003: canonical execution-attempt / execution-record / Revit tool boundary (proposals, no code change)",
+    "description": "## Summary\n\nPhase 0 of the Chief Architect roadmap: three **decision-record proposals** that name the canonical \"machine\" for each duplicate pair the loop must traverse, so the real SetParameterValue loop is driven through one unambiguous path. **Docs only — no runtime code, no deletion, no rename, no rewiring.** Retirement/loop-dependent calls are explicitly marked *pending furnace evidence*. Introduces a new `docs/architecture/decisions/` folder (no prior ADR convention existed).\n\nDecisions (evidence-backed; full evidence tables in each file):\n\n- **ADR-0001 — execution attempt:** v1 and v2 both export a class named `ExecutionAttemptEngine`. The M4 chain imports **v2** (`execution_chain_orchestrator.py:47`); v1 is off-chain (Work Prioritization, PR #111) and produces no artifacts, v2 is on-chain (Execution Step, PR #139) with `artifacts/execution_attempt_v2/` present. → **v2 canonical; v1 retire-candidate pending furnace evidence.**\n- **ADR-0002 — execution record:** chain writes **`ExecutionReport`** (`orchestrator.py:49,521`, PR #142); `ExecutionTrace`/`persistence.py` (initial-foundation SQLite) is off-chain. → **ExecutionReport canonical for the loop; ExecutionTrace retained as active adapter/job store — not legacy.**\n- **ADR-0003 — Revit tool boundary:** real named-pipe bridge (`pipe_client`+`automation_bridge`, `simulate` fallback off-Windows) vs mock `mcp_layer.py`. → **pipe bridge is the canonical real boundary (`simulate=False` on Windows); MCP off-path, not retired** (per local-first / no-MCP rule). Real-mutation leg unproven → pending furnace evidence.\n\n## What did NOT change\n- No source code, no atlas structure, no CLI, no tests. No component deleted, renamed, or rewired. These are proposals awaiting Chief Architect approval; any future retirement is a separate, per-ADR, post-Phase-1 action.\n\n## Tests run\n- None — docs-only change (per tiered-testing policy). No Revit live validation required; 2024 baseline unaffected.\n\n## Factory relevance\nStrengthens evidence quality / anti-duplication by fixing the single canonical execution path the verification-factory loop runs through, preventing future PRs from re-forking attempt/record/boundary concepts.\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782876188-adr-canonical-machines",
+    "status": "merged",
+    "merge_commit_sha": "59f57a18f3afabf75e09829a49d12141f7f16892",
+    "created_at": "2026-07-01T03:23:48Z",
+    "updated_at": "2026-07-01T04:36:47Z",
+    "merged_at": "2026-07-01T04:36:47Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "3f2c5fbd30e4c20f56c12f551102f61bc50276b2",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "ADRs 0001-0003: canonical execution-attempt / execution-record / Revit tool boundary (proposals)\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-01T03:23:16Z"
+    }
+  ],
+  "files": [
+    {
+      "path": "docs/architecture/decisions/ADR-0001-canonical-execution-attempt-engine.md",
+      "status": "added",
+      "additions": 35,
+      "deletions": 0
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0002-canonical-execution-record.md",
+      "status": "added",
+      "additions": 34,
+      "deletions": 0
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0003-canonical-revit-tool-boundary.md",
+      "status": "added",
+      "additions": 32,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:58.534711+00:00"
+  }
+}

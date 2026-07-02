@@ -1,0 +1,74 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 1,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/1",
+    "title": "PR #112 — Execution Outcome Framework v1",
+    "description": "## Summary\n\nAdds the **Execution Outcome Framework v1**, the next link in the chain `Work Queue → Work Item Dependency → Work Prioritization → Execution Attempt → Execution Outcome`. Where the Execution Attempt Framework (#111) records *that* prioritized work was tried, this records *what resulted*: each attempt's produced outcome, with deterministic ordering, status counts, and immutable evidence bundles. It is pure governance/representation — no execution engine, schedulers, workers, autonomous execution, approvals, workflow routing, or merge behavior.\n\nMirrors the established framework pattern (dataclasses + `Engine(artifacts_root)` + 4-file evidence bundle + create/show/export CLI + command-registry registration + test-selection mapping), so it reads exactly like `execution_attempt.py`.\n\n### New module: `src/axiom_core/execution_outcome.py`\n\n```python\nclass ExecutionOutcomeType(str, Enum):   # success, failure, partial_success, cancelled, no_action\nclass ExecutionOutcomeStatus(str, Enum): # completed, failed, partial, cancelled\n\n@dataclass\nclass ExecutionOutcome:        # outcome_id, attempt_id, outcome_type, status, summary, created_at\n@dataclass\nclass ExecutionOutcomeReport:  # report_id, outcome_count, success/failure/partial/cancelled_count, created_at, outcomes\n@dataclass\nclass ExecutionOutcomeEvidence: # evidence_id, report_id, summary, created_at\n\nclass ExecutionOutcomeEngine:\n    create(outcomes) -> dict   # validates, sorts, counts, persists, writes evidence\n    get_report(report_id); list_reports(); export_report(report_id) -> md\n```\n\n- **Consumes `ExecutionAttempt`** via the required `attempt_id` on every outcome (empty `attempt_id` → `ValueError`).\n- **Counts are by `outcome_type`**: `success`/`failure`/`partial_success`/`cancelled`. `no_action` is recorded (in `outcome_count`) but intentionally lands in no bucket.\n- **Deterministic ordering**: sort key `(created_at, attempt_id, outcome_id)` — order-independent of input.\n- **Explicit pass/fail**: a report `passed` iff `failure_count == 0` (mirrors the attempt framework's failure-based gate).\n- **Path safety reused from the template**: `report_id` is segment-validated (rejects empty/whitespace/`..`/`/`/`\\`) and resolved inside an artifacts sandbox (rejects symlink escape).\n\n### Evidence output\n\nWritten under `artifacts/execution_outcomes/<report_id>/`:\n`execution_outcome_request.json`, `execution_outcome_result.json`, `execution_outcome_summary.md`, `pass_fail.json` (plus `report.json` for retrieval). This dir is added to `.gitignore` (generated run outputs).\n\n### CLI\n\n`axiom execution-outcome-create [--outcomes-file <f>] [--json-output]`, `execution-outcome-show <report_id>`, `execution-outcome-export <report_id>` — registered in `runner/command_registry.py` (READ_ONLY/SAFE, evidence outputs declared) and `tests/test_command_registry.py`'s expected set. `show`/`export` exit `2` on not-found and `1` on invalid id, matching the attempt commands.\n\n## Behavior changed / not changed\n- **Changed**: new module, 3 new CLI commands, 3 new registry entries, 1 new test-selection mapping.\n- **Not changed**: no existing capability, agent, adapter, or service touched; Revit 2024 baseline untouched; no new dependencies; no network calls.\n\n## What did not change / Non-goals\nNo execution engine, schedulers, worker orchestration, autonomous execution, architecture changes, or broad refactoring.\n\n## Validation\n- `poetry run pytest -q` → **3551 passed, 1 skipped** (+35 new tests in `tests/test_execution_outcome.py`; baseline #111 was 3516 passed, 1 skipped).\n- `poetry run ruff check src/ tests/` → **0 errors**.\n- Manual CLI smoke (create → show → export, error paths, evidence files written) verified.\n\n## Risks\nLow. Self-contained, deterministic, read-only governance module following an established, tested pattern. No Revit live validation required; 2024 baseline unaffected.\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "devin-ai-integration[bot]",
+    "branch_name": "devin/1782176775-execution-outcome-framework",
+    "status": "merged",
+    "merge_commit_sha": "c6b4e5dd9879d1ae7cbb790817f6aaa06ac277db",
+    "created_at": "2026-06-23T01:09:07Z",
+    "updated_at": "2026-06-23T01:51:14Z",
+    "merged_at": "2026-06-23T01:51:14Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "55e62ee7669e7849e49a67efcee4c8f075e56fe0",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #112 — Execution Outcome Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-23T01:08:47Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 146,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/execution_outcome.py",
+      "status": "added",
+      "additions": 371,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 50,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_execution_outcome.py",
+      "status": "added",
+      "additions": 379,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:20.635225+00:00"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 65,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/65",
+    "title": "Add Lane-3A Revit read-only validation runbook (Revit 2026 operator target)",
+    "description": "## Summary\n\nOperator-approved Lane-3A runbook at `docs/runbooks/lane3a-revit-readonly-validation-runbook.md` — the gate between lane-2 (Windows non-Revit loop, passed 2026-07-02) and lane-3B (real-Revit mutation / PR C).\n\n8-gate read-only validation on the furnace: environment discovery → **Revit 2026** add-in build/deploy (2024 baseline / 2027 Program Files paths mentioned only as background context; no verified 2026 build target exists yet, so the exact MSBuild `RevitVersion`-override commands used become part of the returned evidence — a 2026 build failure is a lane-3A finding, not a reason to silently fall back) → add-in load smoke → read-only InventoryModel (summary + at most one constrained follow-up; full/whole-model modes explicitly forbidden per BUG-017) → artifact capture under `artifacts/model_inventory_runs/` → Local Runner compatibility (allowlist has no Revit-attached action by design) → `emit_evidence_summary` (attested → captured) → commit evidence.\n\nRules carried per the operator's spec: read-only only (no SetParameterValue, no batch mutation, no save-required operation); explicit rule that **lane-3A success does not imply lane-3B mutation readiness**; unwired artifact/evidence paths are recorded as gaps instead of inventing proof; **close-without-saving** default cleanup. Includes the operator-fields table (Revit 2026 version/build, model name/path, disposable/copied/backed-up confirmation, add-in path, manifest path, expected artifact dirs, cleanup action), per-gate PASS/FAIL criteria, and the evidence-to-return list.\n\nDocs-only (tier 1 — no pytest run). No behavior change, no ledger entry needed; 2024 baseline unaffected. The runbook itself is the live-validation procedure — no Revit validation required for this PR.\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782966504-lane3a-runbook",
+    "status": "merged",
+    "merge_commit_sha": "2307ad9e403700ac3774bc898a0d84ec59bb47bf",
+    "created_at": "2026-07-02T04:29:25Z",
+    "updated_at": "2026-07-02T04:32:43Z",
+    "merged_at": "2026-07-02T04:32:43Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "d34e07f1c85f0023cabb1277245688a919dd7d29",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Add Lane-3A Revit read-only validation runbook (Revit 2026 operator target)\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-02T04:28:24Z"
+    },
+    {
+      "commit_sha": "97cad67ee8f19e27c366444ffb5a31bedaa1e05f",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Lane-3A runbook: record unwired artifact/evidence paths as gaps, not proof\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-02T04:29:09Z"
+    }
+  ],
+  "files": [
+    {
+      "path": "docs/runbooks/lane3a-revit-readonly-validation-runbook.md",
+      "status": "added",
+      "additions": 241,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:25:10.926476+00:00"
+  }
+}

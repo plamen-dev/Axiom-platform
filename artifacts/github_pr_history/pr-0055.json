@@ -1,0 +1,68 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 55,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/55",
+    "title": "Local Runner: fix Windows-safe invocation via direct venv module execution (no recursive poetry) (#52 rework)",
+    "description": "## Summary\n\nReworks PR #52 (`_windows_safe_command`), which was **broken on Windows**. #52 rewrote a leading `poetry ...` to `[sys.executable, \"-m\", \"poetry\", ...]`, but the Local Runner runs *inside* Poetry's managed project venv, whose interpreter has **no `poetry` module** — so the rewrite self-defeated with `No module named poetry`. The bare `.exe` shim path had already failed with WDAC `WinError 4551`. Net: Local Runner tool actions never ran on Windows.\n\nFix: on Windows, drop the poetry wrapper entirely and invoke project-installed tools **directly with the current venv interpreter**:\n\n```\npoetry run ruff ...    ->  [sys.executable, \"-m\", \"ruff\",     ...]\npoetry run pytest ...  ->  [sys.executable, \"-m\", \"pytest\",   ...]\npoetry run axiom ...   ->  [sys.executable, \"-m\", \"axiom_cli\", ...]\ngit/dotnet/powershell  ->  unchanged\n```\n\nDriven by a small table `_WINDOWS_TOOL_MODULE = {\"ruff\": \"ruff\", \"pytest\": \"pytest\", \"axiom\": \"axiom_cli\"}`. Only a leading `poetry run <tool> ...` shape is rewritten; anything else is untouched. **No-op off Windows** (`is_windows=False`), so Linux/CI keep `poetry run ...`.\n\n`axiom` needs a module target because `axiom.exe` is WDAC-blocked and `axiom_core.cmd` does not exist. New file `src/axiom_cli/__main__.py` provides one, calling the **same callable** as the console script (`[tool.poetry.scripts] axiom = \"axiom_cli.main:cli\"`):\n\n```python\nfrom axiom_cli.main import cli\nif __name__ == \"__main__\":\n    cli()\n```\n\nso `python -m axiom_cli ...` is an exact equivalent of `axiom ...` on both platforms.\n\n## What changed\n- `tools/local_runner/local_runner.py` — rewrote `_windows_safe_command`; replaced `_WINDOWS_MODULE_TOOLS` with `_WINDOWS_TOOL_MODULE`.\n- `src/axiom_cli/__main__.py` (new) — module entrypoint backed by `axiom_cli.main:cli`.\n- `tests/test_local_runner.py` — rewrote `TestWindowsSafeCommand`; added `TestAxiomCliModuleEntrypoint` (`python -m axiom_cli --help` / `execution-chain-run --help` exit 0; `__main__.cli is main.cli`).\n- Docs/logs: `docs/runbooks/local-runner-runbook.md` (Windows-safe section), `docs/logs/bug-validation-log.md` (BUG-020), `docs/logs/behavior-change-ledger.md` (BHV-033).\n\n## What did NOT change\n- The allowlist remains the command boundary; no new action names, task schema, or workspace policy.\n- No arbitrary-argument execution — pure argv transform of an already-allowlisted command.\n- No promotion / confidence / readiness / evidence semantics; no Revit behavior; 2024 baseline unaffected.\n- Poetry is **not** installed into the project venv.\n\n## Tests run\n- `ruff check` on changed files — clean.\n- `pytest tests/test_local_runner.py` — 66 passed, 1 skipped.\n- `python -m axiom_cli --help` and `execution-chain-run --help` — exit 0.\n- Broader targeted set (`test_command_registry`, `test_execution_chain_orchestrator`, `test_evidence_promotion`): all pass except the **pre-existing** `test_all_builtin_axiom_commands_cataloged` drift (`context-preflight`, `model-health-evidence-apply`, `model-health-evidence-history`) — confirmed failing on `main` independently of this change, unrelated to the runner.\n\n## Validation still pending\nWindows lane-2 is **not** claimed validated. Requires operator re-run on `C:\\Dev\\Axiom\\Code\\Axiom-platform` after merge: Local Runner `ruff` / `execution_chain_run` / `capability_evidence_apply` should no longer hit `WinError 4551` or `No module named poetry`.\n\n## Factory relevance\nInfrastructure/runner hardening that unblocks the Windows lane-2 evidence path (execution-chain + evidence-apply loop) so the verification factory can run end-to-end on the target environment.\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782914414-runner-windows-safe-invocation-rework",
+    "status": "merged",
+    "merge_commit_sha": "18d005ce9f871df23b0c527b3c677932d76bb753",
+    "created_at": "2026-07-01T14:08:00Z",
+    "updated_at": "2026-07-01T17:42:10Z",
+    "merged_at": "2026-07-01T17:42:10Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "5705ce1090302914163a9c391365853bf9a6c2b1",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Local Runner: fix Windows-safe invocation via direct venv module execution (no recursive poetry) (#52 rework)\n\nDrop the poetry wrapper on Windows: rewrite poetry run <tool> ... to\n[sys.executable, -m, <module>, ...]. Add src/axiom_cli/__main__.py module\nentrypoint backed by axiom_cli.main:cli so axiom normalizes to\npython -m axiom_cli. Fixes BUG-020 (No module named poetry); BHV-033.\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-01T14:07:14Z"
+    }
+  ],
+  "files": [
+    {
+      "path": "docs/logs/behavior-change-ledger.md",
+      "status": "modified",
+      "additions": 17,
+      "deletions": 0
+    },
+    {
+      "path": "docs/logs/bug-validation-log.md",
+      "status": "modified",
+      "additions": 17,
+      "deletions": 0
+    },
+    {
+      "path": "docs/runbooks/local-runner-runbook.md",
+      "status": "modified",
+      "additions": 21,
+      "deletions": 11
+    },
+    {
+      "path": "src/axiom_cli/__main__.py",
+      "status": "added",
+      "additions": 14,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_local_runner.py",
+      "status": "modified",
+      "additions": 91,
+      "deletions": 33
+    },
+    {
+      "path": "tools/local_runner/local_runner.py",
+      "status": "modified",
+      "additions": 32,
+      "deletions": 30
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:25:03.122280+00:00"
+  }
+}

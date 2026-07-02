@@ -471,3 +471,111 @@ class TestPathSafety:
         engine = _tmp_engine()
         with pytest.raises(ValueError):
             engine.export_report(bad, fmt="json")
+
+# ---------------------------------------------------------------------------
+# Backfill + sequence ledger
+# ---------------------------------------------------------------------------
+
+
+def _write_payload(directory, pr_number: int, title: str, **pr_overrides):
+    payload = _metadata()
+    payload.pop("global_capability_number", None)
+    payload["pr"]["repository_pr_number"] = pr_number
+    payload["pr"]["title"] = title
+    payload["pr"].update(pr_overrides)
+    path = directory / f"pr-{pr_number:04d}.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+class TestBackfill:
+    def test_canonical_number_from_title(self) -> None:
+        from axiom_core.github_metadata_import import (
+            canonical_number_from_title,
+        )
+
+        assert canonical_number_from_title("PR #112 — Framework v1") == 112
+        assert (
+            canonical_number_from_title("Integration PR #143 — Loop v1")
+            == 143
+        )
+        assert canonical_number_from_title("Fix CSV export bug") == 0
+        assert canonical_number_from_title("") == 0
+
+    def test_backfill_imports_and_derives_canonical(self, tmp_path) -> None:
+        engine = GitHubMetadataImportEngine(
+            artifacts_root=str(tmp_path / "artifacts")
+        )
+        payload_dir = tmp_path / "payloads"
+        payload_dir.mkdir()
+        _write_payload(payload_dir, 1, "PR #112 — Execution Outcome v1")
+        _write_payload(payload_dir, 2, "PR #113 — Failure Classification v1")
+        _write_payload(payload_dir, 3, "Fix CSV export bug")
+
+        summary = engine.backfill(payload_dir)
+        assert summary["imported_count"] == 3
+        assert summary["failed_count"] == 0
+        assert summary["canonical_gaps"] == [3]
+        by_pr = {
+            r["repository_pr_number"]: r["global_capability_number"]
+            for r in summary["imported"]
+        }
+        assert by_pr == {1: 112, 2: 113, 3: 0}
+
+    def test_backfill_is_rerunnable_duplicates_skipped(
+        self, tmp_path
+    ) -> None:
+        engine = GitHubMetadataImportEngine(
+            artifacts_root=str(tmp_path / "artifacts")
+        )
+        payload_dir = tmp_path / "payloads"
+        payload_dir.mkdir()
+        _write_payload(payload_dir, 1, "PR #112 — Execution Outcome v1")
+
+        first = engine.backfill(payload_dir)
+        second = engine.backfill(payload_dir)
+        assert first["imported_count"] == 1
+        assert second["imported_count"] == 0
+        assert second["skipped_duplicates"] == [1]
+
+    def test_backfill_records_malformed_payload_as_failed(
+        self, tmp_path
+    ) -> None:
+        engine = GitHubMetadataImportEngine(
+            artifacts_root=str(tmp_path / "artifacts")
+        )
+        payload_dir = tmp_path / "payloads"
+        payload_dir.mkdir()
+        (payload_dir / "bad.json").write_text("{not json", encoding="utf-8")
+
+        summary = engine.backfill(payload_dir)
+        assert summary["imported_count"] == 0
+        assert summary["failed_count"] == 1
+        assert summary["failed"][0]["file"] == "bad.json"
+
+    def test_backfill_missing_dir_rejected(self, tmp_path) -> None:
+        engine = GitHubMetadataImportEngine(
+            artifacts_root=str(tmp_path / "artifacts")
+        )
+        with pytest.raises(ValueError):
+            engine.backfill(tmp_path / "nope")
+
+    def test_sequence_ledger_sorted_with_gaps(self, tmp_path) -> None:
+        engine = GitHubMetadataImportEngine(
+            artifacts_root=str(tmp_path / "artifacts")
+        )
+        payload_dir = tmp_path / "payloads"
+        payload_dir.mkdir()
+        _write_payload(payload_dir, 2, "PR #113 — Failure Classification v1")
+        _write_payload(payload_dir, 1, "PR #112 — Execution Outcome v1")
+        _write_payload(payload_dir, 3, "Fix CSV export bug")
+        engine.backfill(payload_dir)
+
+        ledger = engine.generate_sequence_ledger()
+        lines = [line for line in ledger.splitlines() if line.startswith("|")]
+        # header + separator + 3 rows, sorted by GitHub PR number
+        assert len(lines) == 5
+        assert "| 112 | #1 |" in lines[2]
+        assert "| 113 | #2 |" in lines[3]
+        assert "| — (gap) | #3 |" in lines[4]
+        assert "Canonical gaps" in ledger

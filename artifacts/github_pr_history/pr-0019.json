@@ -1,0 +1,74 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 19,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/19",
+    "title": "PR #130 — Capability Validation Knowledge Framework v1",
+    "description": "## Summary\n\nThe validation knowledge layer: how a capability has been validated, tested, reviewed, and verified, captured as a first-class capability object. Where #122 establishes identity, #129 establishes location, and #128 establishes meaning, this layer establishes *validation history*.\n\nSame deterministic, append-only, evidence-bundle pattern as #122–#129. Consumes Registry #122 + Relationship #127 + File Knowledge #129 + Devin Session Import #126 read-only — nothing is mutated. Non-goals respected: no automatic test execution, no CI integration, no orchestration, no graph engine, no dashboards, no network calls.\n\n### Models (`src/axiom_core/capability_validation_knowledge.py`)\n- `CapabilityValidationRecord` — `validation_type` ∈ {PYTEST, RUFF, CI, DEVIN_REVIEW, CLI_TEST, MANUAL_TEST, INTEGRATION_TEST, REGRESSION_TEST}; `validation_status` ∈ {PASSED, FAILED, PARTIAL, WARNING}; `validator`, `summary`, `raw_payload`, `schema_version`\n- `CapabilityValidationFinding` — `severity` ∈ {INFO, WARNING, ERROR, CRITICAL}, `resolved` flag, linked to a record via `validation_id`\n- `CapabilityValidationArtifact` — `validation_id`, `artifact_path`, `summary`\n- `CapabilityValidationKnowledge` — per-capability `validation_count`, `finding_count`, `unresolved_count`, `validation_type_counts`\n- `CapabilityValidationKnowledgeReport` / `...Evidence` / `...Engine`\n\n### Determinism & aggregation\n- Records ordered by `(capability_id, validation_type, validation_status, validator, validation_id)`; findings by `(validation_id, severity, finding_id)`; artifacts by `(validation_id, artifact_path, artifact_id)`.\n- **Duplicate detection**: same `(capability_id, validation_type, validation_status, validator)` (case-insensitive type/status) → first kept, rest dropped + counted.\n- **Unresolved detection**: findings mapped to their capability via `validation_id`; `unresolved_count` = findings with `resolved == false`.\n- **Pass/fail gate**:\n```\npassed = validation_count > 0\n         and duplicate_validation_count == 0\n         and unresolved_count == 0\n```\n\n### CLI (`axiom capability-validation-create / capability-validations / capability-validation-show / capability-validation-export`)\nJSON/Markdown/CSV exports; CSV rows = header + N validations + M findings + K artifacts. 4-file evidence bundle (`capability_validation_request.json`, `capability_validation_result.json`, `capability_validation_summary.md`, `pass_fail.json`) always written under `artifacts/capability_validation_knowledge/<run_id>/`.\n\n### Registration\nRegistered the 4 commands in `command_registry.py` (READ_ONLY/SAFE, POETRY_ENV, evidence outputs) and `EXPECTED_AXIOM_COMMANDS`; added module→test mapping in `test_selection_engine.py`; gitignored the artifacts dir.\n\n## Validation\n- `poetry run pytest -q` → **4319 passed, 1 skipped** (+55; baseline 4264 at #129)\n- `poetry run ruff check src/ tests/` → **0 errors**\n- CLI smoke verified: dedup (case-insensitive), type/status/severity normalization, unresolved-finding detection, deterministic ordering, all 3 export formats.\n\n## What did NOT change\nNo existing modules' behavior; Revit 2024 baseline unaffected. Consumed layers read-only.\n\n## Risks\nLow — additive framework following the established #122–#129 template; no shared infrastructure touched.\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782255519-capability-validation-knowledge",
+    "status": "merged",
+    "merge_commit_sha": "34a234c30db535203d548c276ed2a4758f361597",
+    "created_at": "2026-06-23T23:02:48Z",
+    "updated_at": "2026-06-23T23:40:10Z",
+    "merged_at": "2026-06-23T23:40:09Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "c0dbf567f6764229959477341b5c3a6f8423d589",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #130 — Capability Validation Knowledge Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-23T23:02:29Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 198,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/capability_validation_knowledge.py",
+      "status": "added",
+      "additions": 924,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 79,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_capability_validation_knowledge.py",
+      "status": "added",
+      "additions": 670,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:34.935063+00:00"
+  }
+}

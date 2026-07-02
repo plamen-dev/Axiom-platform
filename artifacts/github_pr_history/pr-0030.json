@@ -1,0 +1,74 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 30,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/30",
+    "title": "PR #140 — Execution Result Framework v1",
+    "description": "## Summary\n\nAdds the **execution-result** layer on top of the Execution Attempt v2 / Execution Step / Capability Knowledge Graph layers — the next step in the execution roadmap (`Attempt = a specific attempt` → `Result = what the attempt produced`). Same deterministic, append-only, observational-only pattern as the prior execution layers; no execution/orchestration/scheduling/optimization/worker-assignment (per non-goals). Upstream layers are consumed read-only.\n\nNew module `src/axiom_core/execution_result.py` (`ExecutionResult` / `ExecutionResultType` / `ExecutionResultStatus` / `ExecutionResultReference` / `ExecutionResultReport` / `ExecutionResultEvidence` / `ExecutionResultEngine`) + 4 CLI commands + 55 tests. Clean v1 — no name collision.\n\nModel:\n```\nExecutionResult(result_id, attempt_id, step_id, capability_id,\n                result_type ∈ OUTPUT|VALIDATION|ERROR|ARTIFACT|REPORT|NO_ACTION|OTHER,\n                status ∈ PRODUCED|FAILED|PARTIAL|EMPTY|UNKNOWN,\n                references[ATTEMPT|STEP|CAPABILITY|FILE|ARTIFACT|VALIDATION|KNOWLEDGE_NODE|OTHER],\n                summary, created_at, schema_version, raw_payload)\nExecutionResultReport(report_id, result_count, status_counts, result_type_counts,\n                      failed_count, empty_count, produced_count,\n                      duplicate_result_count, created_at)\n```\n\nEngine behavior (mirrors the attempt layer, minus duration):\n- **Deterministic ordering** by `(attempt_id, step_id, capability_id, result_type, status, result_id)`; references sorted by `(reference_type, reference_value, reference_id)`.\n- **Dedup** by `(attempt_id, step_id, capability_id, result_type)`, keep first in sorted order, count surplus.\n- Status / result-type aggregation; failed/empty/produced detection (counts of `FAILED`/`EMPTY`/`PRODUCED` statuses).\n- Case-insensitive normalization of status/result_type/reference_type; validation rejects unknown enums / missing required fields.\n- Evidence bundle always written under `artifacts/execution_result/<run_id>/` (`execution_result_request.json`, `execution_result_result.json`, `execution_result_summary.md`, `pass_fail.json`, plus `report.json`).\n\nPass/fail gate: `passed = result_count > 0 and failed_count == 0 and empty_count == 0` (empty report → fail).\n\nCLI: `execution-result-create` (`--result-file`, `--json-output`), `execution-results`, `execution-result-show <id>`, `execution-result-export <id> --format markdown|json|csv`. Registered in `command_registry.py`; `test_command_registry` EXPECTED set, `test_selection_engine` map, and `.gitignore` updated.\n\n## Validation\n- New tests: `tests/test_execution_result.py` (+55).\n- `poetry run pytest -q` → **4860 passed, 1 skipped** (baseline 4805 at #139).\n- `poetry run ruff check src/ tests/` → 0 errors.\n- CLI smoke (adversarial fixture: 5 results → 1 case-insensitive duplicate `(att-1,stp-1,cap-1,OUTPUT)`, 1 FAILED, 1 EMPTY, lowercase status/type, out-of-order refs) → result_count 4, failed 1, empty 1, produced 2, duplicate 1; status `{EMPTY:1,FAILED:1,PRODUCED:2}`; deterministic order; refs sorted ATTEMPT→STEP.\n\n## Scope / Risk\nFully additive new module + CLI; no changes to existing frameworks or the Revit 2024 baseline. Observational/declarative only.\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782324977-execution-result-framework",
+    "status": "merged",
+    "merge_commit_sha": "47bad440c5a64f8aff33f6d333d3e2b9d24fd2b8",
+    "created_at": "2026-06-24T18:21:35Z",
+    "updated_at": "2026-06-24T18:43:39Z",
+    "merged_at": "2026-06-24T18:43:39Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "2a723117aee4f94d417d9519f2976c06b36eb239",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #140 — Execution Result Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-24T18:21:12Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 170,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/execution_result.py",
+      "status": "added",
+      "additions": 724,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 71,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_execution_result.py",
+      "status": "added",
+      "additions": 750,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:43.723374+00:00"
+  }
+}

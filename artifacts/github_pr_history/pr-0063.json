@@ -1,0 +1,74 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 63,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/63",
+    "title": "Confidence scoring: evidence-mass damping — score = ratio × n/(n+2) (staged option A, BHV-037)",
+    "description": "## Summary\n\nStaged design option A (approved after option B / #62): the confidence **score itself** now discounts the success ratio by evidence mass, so the number is honest about how little evidence supports it — one successful run no longer scores 1.0.\n\nIn `_compute_score` (shared by the confidence CLI and the promotion loop):\n\n```\nbase = success_ratio (+ recovery bonus, unchanged)\nscore = base * n / (n + 2)        # n = execution_count\n```\n\nDamped curve (all-pass): 1/1 → 0.3333 `low`, 2/2 → 0.5 `medium`, 5/5 → 0.7143 `high`/ready, 18/18 → 0.9 `very_high`, converging to the raw ratio as n grows. Failures still bite immediately (5/6 → 0.625 drops `high`→`medium` in one application).\n\n**This is a scoring-doctrine change (BHV-037)**: the same factors now yield a lower score than before. Previously persisted confidence reports and committed evidence summaries show scores computed under the old undamped rule and are historical evidence — not recomputed.\n\nInteraction with the #62 single-step ladder (this PR is stacked on it — base is the #62 branch; merge #62 first): the ladder remains as a guard, but on the damped curve an all-pass history already climbs at most one level per run, so `promotion.clamped` is rarely `true` in practice. Belt (damped measurement) and suspenders (rate-limited transitions).\n\nUnchanged: level thresholds (0.9/0.7/0.5/0.3), readiness mapping, recovery-bonus semantics (applied to the ratio before damping), chain/quality/quarantine/duplicate semantics, Revit behavior (2024 baseline unaffected; no live validation required).\n\nLedger: BHV-037. Skill: `testing-evidence-promotion` checklist items 2 and 13 updated to the damped curve in the same PR.\n\nTests (tier 2 — targeted): new damping-curve tests in `tests/test_capability_confidence.py` (1/1, 5/5, 18/18, convergence); updated expectations across `tests/test_evidence_promotion.py`, `tests/test_evidence_summary.py`, `tests/test_model_health_evidence.py`, `tests/test_artifact_paths.py`, plus atlas/local-runner/quality/orchestrator suites — 239 passed, 1 skipped; ruff clean. Full pytest runs in CI.\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782961746-evidence-mass-damping-a",
+    "status": "merged",
+    "merge_commit_sha": "017fb1ee02b493edfa132acbfec3035899bfd92f",
+    "created_at": "2026-07-02T03:13:45Z",
+    "updated_at": "2026-07-02T03:35:45Z",
+    "merged_at": "2026-07-02T03:35:45Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "d2e5ccd8a05691b6518254b496b86435c5e058ea",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Promotion: single-step confidence ladder (rate-limit upward level transitions)\n\nOne accepted evidence application can no longer jump a capability\nvery_low -> very_high / blocked -> ready. The published confidence level\nrises at most one ladder rung per accepted application; drops are never\nclamped. Raw vs effective level + clamped flag are recorded on the\nintake record's promotion field. Score doctrine unchanged (still the\npure success ratio). BHV-036.\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-02T03:06:53Z"
+    },
+    {
+      "commit_sha": "96259038360bba23126f0ae620e193dea504f5ea",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Confidence scoring: evidence-mass damping (score = ratio * n/(n+2))\n\nScoring-doctrine change (BHV-037, staged option A after BHV-036): the\nconfidence score now discounts the success ratio by evidence mass, so a\nsingle successful run scores ~0.33 (low) instead of 1.0 (very_high).\nDamped score converges to the raw ratio as evidence accumulates\n(5/5 ~ 0.71 high, 18/18 = 0.9 very_high). Level thresholds, readiness\nmapping, and the BHV-036 single-step ladder are unchanged; on the\ndamped curve the ladder acts as a guard and rarely needs to clamp.\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-02T03:13:28Z"
+    },
+    {
+      "commit_sha": "5559bb414129808a3168ce777093cd55577e931a",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Merge origin/main (squash-merged #62) into evidence-mass-damping branch\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-02T03:24:14Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".agents/skills/testing-evidence-promotion/SKILL.md",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 2
+    },
+    {
+      "path": "docs/logs/behavior-change-ledger.md",
+      "status": "modified",
+      "additions": 19,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/capability_confidence.py",
+      "status": "modified",
+      "additions": 12,
+      "deletions": 2
+    },
+    {
+      "path": "tests/test_capability_confidence.py",
+      "status": "modified",
+      "additions": 31,
+      "deletions": 15
+    },
+    {
+      "path": "tests/test_evidence_promotion.py",
+      "status": "modified",
+      "additions": 34,
+      "deletions": 21
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:25:09.397321+00:00"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 52,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/52",
+    "title": "Local Runner: Windows-safe module invocation to bypass WDAC exe-shim block (WinError 4551)",
+    "description": "## Summary\n\nWindows lane-2 revalidation found the Local Runner's allowlisted actions fail on Plamen's machine with `[WinError 4551] An Application Control policy has blocked this file` — Windows Application Control (WDAC / Device Guard) blocks the console-script `.exe` shims (`poetry.exe`, `ruff.exe`, `pytest.exe`) that the runner spawns. Direct **module** invocation (`python -m poetry ...`, `python -m ruff/pytest`) runs identical code without hitting the shim. This PR makes the runner emit that module form automatically, **on Windows only**.\n\n**Approach:** a pure argv transform applied at execution time. No new arguments, no new action surface — the allowlist stays the security boundary.\n\n```python\n# execution loop (tools/local_runner/local_runner.py)\nfor cmd in commands:\n    cmd = _windows_safe_command(cmd)   # no-op unless os.name == \"nt\"\n    executed_commands.append(cmd)\n    subprocess.run(cmd, ...)\n\n# _windows_safe_command, Windows only:\n#   [\"poetry\", \"run\", \"ruff\",  ...]  -> [sys.executable, \"-m\", \"poetry\", \"run\", \"python\", \"-m\", \"ruff\",  ...]\n#   [\"poetry\", \"run\", \"pytest\",...]  -> [sys.executable, \"-m\", \"poetry\", \"run\", \"python\", \"-m\", \"pytest\",...]\n#   [\"poetry\", \"run\", \"axiom\", ...]  -> [sys.executable, \"-m\", \"poetry\", \"run\", \"axiom\", ...]\n#   [\"poetry\", \"install\"]            -> [sys.executable, \"-m\", \"poetry\", \"install\"]\n#   [\"git\", \"status\", ...]           -> unchanged (non-poetry heads untouched)\n```\n\nThe inner interpreter stays the bare string `\"python\"` so `poetry run` resolves the project venv's interpreter (matches the forms Plamen proved work). `command_display` is updated post-loop to reflect what actually ran, so run logs stay honest.\n\n**What did not change:** task.json schema, action names, the allowlist, workspace/trusted-root policy, and **all Linux/CI behavior** (the transform is a no-op off Windows, so `poetry`/`ruff` resolve exactly as before — `python -m poetry` may not even exist in CI).\n\n**Tests** (`tests/test_local_runner.py`, new `TestWindowsSafeCommand`): per-rule normalization (leading poetry, `run ruff`, `run pytest`, `run axiom`, non-poetry untouched, no-op off Windows / on empty); a **simulated-Windows guarantee** that iterates every allowlisted action and asserts no bare `poetry`/`ruff`/`pytest` shim head survives; and an execution-path test asserting the rewritten argv is what reaches `subprocess.run`. `61 passed, 1 skipped`; ruff clean.\n\n**Docs:** WDAC `WinError 4551` symptom + `python -m poetry ...` direct-CLI fallback added to `windows-post-151-revalidation-runbook.md` (incl. a note that PowerShell `>` writes UTF-16, which is what broke the operator's JSON count commands — an encoding artifact, not empty data), and a Windows-safe-invocation section in `local-runner-runbook.md`.\n\n**Factory relevance:** unblocks the Local Runner as the loop-execution substrate on the real target environment (lane 2).\n\n## Validation still pending / not claimed\n- **Windows lane-2 is NOT validated by this PR.** It must be confirmed by Plamen re-running the runner actions (`git_status`, `ruff`, `execution_chain_run`, `capability_evidence_apply`) on `C:\\Dev\\Axiom\\Code\\Axiom-platform` — the fix is verified here only via Linux unit tests + simulated-Windows assertions.\n- Does not touch Revit; 2024 baseline unaffected; no Revit-live validation required.\n- **Separate, still-open item:** the semantic evidence-quality gate (Finding 2 — chain `PASS` with `module_count=0` promoted to `very_high`) is intentionally NOT in this PR; design diff pending approval.\n\n## Known risks\n- Low. If `python -m poetry` is somehow unavailable on a given Windows box, that action would fail — but that path only activates on Windows, where the operator already confirmed `python -m poetry` works.\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782884160-runner-windows-safe-invocation",
+    "status": "merged",
+    "merge_commit_sha": "e2b1f2f7250e4935b6c90dfbe0c5fcc7e59168ff",
+    "created_at": "2026-07-01T05:40:00Z",
+    "updated_at": "2026-07-01T13:36:44Z",
+    "merged_at": "2026-07-01T13:36:44Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "ce6289cfc96d908a4944ffdcfcccad88d5104459",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Local Runner: Windows-safe module invocation to bypass WDAC exe-shim block (WinError 4551)\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-01T05:39:25Z"
+    }
+  ],
+  "files": [
+    {
+      "path": "docs/runbooks/local-runner-runbook.md",
+      "status": "modified",
+      "additions": 14,
+      "deletions": 0
+    },
+    {
+      "path": "docs/runbooks/windows-post-151-revalidation-runbook.md",
+      "status": "modified",
+      "additions": 30,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_local_runner.py",
+      "status": "modified",
+      "additions": 122,
+      "deletions": 0
+    },
+    {
+      "path": "tools/local_runner/local_runner.py",
+      "status": "modified",
+      "additions": 59,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:25:00.739844+00:00"
+  }
+}

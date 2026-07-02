@@ -1,0 +1,68 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 13,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/13",
+    "title": "PR #124 — GitHub Metadata Import Framework v1",
+    "description": "## Summary\n\nAdds the **GitHub Metadata Import Framework v1**: deterministic, read-only ingestion of structured GitHub PR metadata into shapes consumable by the Global Capability Registry (#122) and the Capability Event Timeline (#123). It replaces manual data entry with metadata ingestion while preserving raw payloads, schema versioning, and manual override capability. No network/GitHub API, no GitHub mutation, no orchestration.\n\nInput is a metadata payload (a fixture file — no network). The engine parses PR/commit/file/label metadata, then **builds (never mutates)** a derived registry entry and lifecycle timeline events:\n\n```\nimport_metadata(metadata, repo=None, pr_number=None, global_capability_number=None):\n    pr = GitHubPRMetadata.from_dict(...)        # manual overrides win over payload\n    require owner / name / pr_number            # else -> ValueError \"Malformed PR metadata\"\n    reject if (owner, name, pr_number) already imported   # -> \"Duplicate import\"\n    commits sorted by (timestamp, commit_sha)   # malformed (no sha) skipped -> PARTIAL_IMPORT\n    files   sorted by (path)                     # malformed (no path) skipped -> PARTIAL_IMPORT\n    labels  sorted by (name)                     # malformed (no name) skipped -> PARTIAL_IMPORT\n    registry_entry  = GlobalCapabilityEntry(... status via _PR_STATUS_TO_REGISTRY_STATUS ...)\n    timeline_events = [PR_CREATED@created_at, PR_READY@updated_at, PR_MERGED@merged_at]\n                      # only emitted when the timestamp is present; sorted by timeline key\n    status = PARTIAL_IMPORT if skipped else IMPORTED\n    persist report.json + 4 evidence files\n```\n\n**Pass/fail:** `passed = (status == IMPORTED)` — any skipped sub-record flips the import to `PARTIAL_IMPORT` and `passed: false`.\n\n**Status enum:** `IMPORTED` / `PARTIAL_IMPORT` / `FAILED`.\n\n## What changed\n\n- `src/axiom_core/github_metadata_import.py` (new): models `GitHubPRMetadata` / `GitHubCommitMetadata` / `GitHubFileChangeMetadata` / `GitHubLabelMetadata` / `GitHubMetadataImport` / `GitHubMetadataImportReport` / `GitHubMetadataImportEvidence` + `GitHubMetadataImportEngine` (consumes the registry + timeline dataclasses). Path-sandboxed evidence under `artifacts/github_metadata_import/<run_id>/`; JSON/Markdown/CSV export.\n- `src/axiom_cli/main.py`: `axiom github-import` (`--metadata-file`, `--repo`, `--pr`, `--global-capability-number`, `--json-output`), `github-import-show`, `github-import-export`. Example: `axiom github-import --repo owner/name --pr 10 --global-capability-number 124 --metadata-file <f>`.\n- Registered in `command_registry.py`, `test_selection_engine.py`, `tests/test_command_registry.py`.\n- `tests/test_github_metadata_import.py` (new): models, deterministic ordering, registry population, PR_CREATED/READY/MERGED event creation, manual overrides, duplicate rejection, malformed (partial) handling, exports, evidence bundle, pass/fail, path safety.\n\n## What did NOT change\n\nNo architecture changes, no broad refactoring, no new dependencies, no network calls, no GitHub mutation, no Devin import, no orchestration. Revit 2024 baseline unaffected. Existing registry/timeline artifacts are never mutated — the framework only produces new derived shapes within its own evidence bundle.\n\n## Validation\n\n- `poetry run pytest -q` → **4023 passed, 1 skipped** (+48; baseline 3975 at #123).\n- `poetry run ruff check src/ tests/` → **0 errors**.\n- CLI smoke: import (IMPORTED, deterministic commit/file/label ordering), duplicate import → exit 1, `github-import-show missing` → exit 2, `github-import-export ../../etc` → path-safety exit 1, all 3 export formats verified.\n\n## Risks\n\nLow. Self-contained new module + additive CLI commands; no changes to existing runtime behavior. No Revit live validation required; 2024 baseline unaffected.\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782236315-github-metadata-import",
+    "status": "merged",
+    "merge_commit_sha": "98104c3da7200499749fd0d599cfd2b673e07a7e",
+    "created_at": "2026-06-23T17:43:15Z",
+    "updated_at": "2026-06-23T19:04:50Z",
+    "merged_at": "2026-06-23T19:04:50Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "ffffdda6442591007d1bd90f282ea4a7b4b70cec",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #124 — GitHub Metadata Import Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-23T17:42:55Z"
+    }
+  ],
+  "files": [
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 152,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/github_metadata_import.py",
+      "status": "added",
+      "additions": 888,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 56,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_github_metadata_import.py",
+      "status": "added",
+      "additions": 473,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:30.144249+00:00"
+  }
+}

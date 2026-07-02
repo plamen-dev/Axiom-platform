@@ -1,0 +1,74 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 26,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/26",
+    "title": "PR #136 — Execution Readiness Framework v1",
+    "description": "## Summary\n\nAdds the **readiness** layer of the execution roadmap, on top of Constraint (#135). Where prior layers describe state / location / requirements / boundaries, this layer determines **whether execution can proceed** for a given `(context, environment, resource, constraint, capability)` tuple: its `readiness_status` plus the typed readiness `checks` that were evaluated. Observational/evaluative only — no execution, orchestration, scheduling, optimization, or worker assignment (per non-goals). Upstream layers are consumed read-only.\n\nSame deterministic, append-only pattern as the rest of the family (`execution_constraint.py` is the direct template):\n\n- **`ExecutionReadiness`** — `readiness_id, context_id, environment_id, resource_id, constraint_id, capability_id, readiness_status ∈ {READY, NOT_READY, DEGRADED, UNKNOWN}, checks[], summary, created_at, schema_version, raw_payload`\n- **`ExecutionReadinessCheck`** — `check_id, check_type ∈ {CONTEXT_CHECK, ENVIRONMENT_CHECK, RESOURCE_CHECK, CONSTRAINT_CHECK, VALIDATION_CHECK, OTHER}, status, summary`\n- **`ExecutionReadinessReport`** — `report_id, readiness_count, readiness_status_counts, check_type_counts, check_count, ready_count, degraded_count, not_ready_count, duplicate_readiness_count, created_at`\n- **`ExecutionReadinessEvidence`** + **`ExecutionReadinessEngine`**\n\nBehavior:\n- **Normalization**: `readiness_status`, `check_type`, and check `status` upper-cased; unknown enum values rejected.\n- **Deterministic ordering**: readinesses sorted by `(context_id, environment_id, resource_id, constraint_id, capability_id, readiness_status, readiness_id)`; checks by `(check_type, status, check_id)`.\n- **Duplicate detection**: 5-tuple `(context_id, environment_id, resource_id, constraint_id, capability_id)`, keep first, count the rest.\n- **Aggregation**: status counts + check-type counts (sorted); `ready/degraded/not_ready_count` derived from status counts.\n- **Pass/fail**: `passed = readiness_count > 0 and not_ready_count == 0 and degraded_count == 0` (empty → fail).\n- **Evidence bundle** always written under `artifacts/execution_readiness/<run_id>/`: `execution_readiness_request.json`, `execution_readiness_result.json`, `execution_readiness_summary.md`, `pass_fail.json` (+ `report.json`).\n\nCLI (registered in the governed command registry, `READ_ONLY`/`SAFE`, `POETRY_ENV`):\n`axiom execution-readiness-create | execution-readinesses | execution-readiness-show | execution-readiness-export` (JSON/Markdown/CSV).\n\n### What did not change\n2024 Revit baseline unaffected. No architecture changes. No network calls. Upstream context/environment/resource/constraint layers consumed read-only.\n\n### Validation\n- `poetry run pytest -q` → **4633 passed, 1 skipped** (+52; baseline 4581 at #135)\n- `poetry run ruff check src/ tests/` → **0 errors**\n- CLI smoke (adversarial fixture: 4 records, 1 case-insensitive duplicate, 1 DEGRADED, 1 NOT_READY, lowercase statuses/checks, out-of-order checks) → readiness_count 3 / duplicate 1 / ready 1 / degraded 1 / not_ready 1 / checks 3; sorted status + check-type counts; deterministic order.\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782283074-execution-readiness-framework",
+    "status": "merged",
+    "merge_commit_sha": "9659221474247ff33db5bdb547265b08bfa386a7",
+    "created_at": "2026-06-24T06:42:05Z",
+    "updated_at": "2026-06-24T07:01:10Z",
+    "merged_at": "2026-06-24T07:01:10Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "b807bb42849537b4ec2c17559cc47700cc782066",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #136 — Execution Readiness Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-24T06:41:48Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 185,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/execution_readiness.py",
+      "status": "added",
+      "additions": 747,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 79,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_execution_readiness.py",
+      "status": "added",
+      "additions": 766,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:40.550321+00:00"
+  }
+}

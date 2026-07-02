@@ -1,0 +1,50 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 51,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/51",
+    "title": "Add Windows post-#151 revalidation runbook (lane-2 8-point gate)",
+    "description": "## Summary\n\nPhase-1a docs: a dedicated runbook operationalizing the **8-point post-#151 Windows revalidation** — the lane-2 gate that converts Windows evidence from *attested* to *captured* for the execution-chain / evidence-promotion paths. Until now this checklist lived only in a knowledge note and chat; this makes it a repeatable, source-linked runbook under `docs/runbooks/`.\n\nThe runbook is deliberately thin: it references the existing `windows-revit-build-test-runbook.md` and `local-runner-runbook.md` for environment/build detail instead of duplicating them, and adds only the revalidation-specific procedure:\n\n1. Local Runner `git_status`\n2. Local Runner `ruff`\n3. `execution-chain-run` (via the PR #50 runner action) → `artifacts\\execution_chain\\<run>\\evidence.json`\n4. `capability-evidence-apply` (via the PR #50 runner action) → confidence/intake records\n5. Targeted tests (`test_local_runner`, `test_command_registry`, `test_execution_chain_orchestrator`, `test_evidence_promotion`)\n6. CLI Validation Evidence Recorder (if in scope)\n7. No tracked source files modified\n8. Only gitignored artifact folders produced\n\nIncludes the pre-#151 context (`Resolved path escapes artifacts root: '<uuid>'`, 38/77/1 failure cluster), a required success status line, and a failure path that routes into `docs/logs/bug-validation-log.md` rather than a chat note.\n\n## Dependency\nSteps 3–4 use the `execution_chain_run` / `capability_evidence_apply` Local Runner actions added in **PR #50**. The runbook states `main` must be synced at/past #151 **and** #50 before running.\n\n## What did NOT change\n- Docs only. No code, no runtime behavior, no CLI, no tests. Does not itself run the revalidation — it is the operator procedure (Plamen executes on `C:\\Dev\\Axiom\\Code\\Axiom-platform`).\n\n## Tests run\n- None — docs-only change (per tiered-testing policy). No Revit live validation required; 2024 baseline unaffected.\n\n## Factory relevance\nStrengthens evidence quality: gives lane-2 a repeatable, captured-evidence gate so the substrate loop can be trusted on the real Windows target before Revit-live work.\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782880629-phase1a-runbooks",
+    "status": "merged",
+    "merge_commit_sha": "a40729e5e782a1876af9dde84688e4abe2e1f661",
+    "created_at": "2026-07-01T04:39:25Z",
+    "updated_at": "2026-07-01T05:36:59Z",
+    "merged_at": "2026-07-01T05:36:59Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "165d8a5a221c6d6f3b38e25cd4ccc5e8bc5b8589",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Add Windows post-#151 revalidation runbook (lane-2 8-point gate)\n\nOperationalizes the 8-point post-#151 Windows revalidation: Local Runner git_status/ruff, execution-chain-run + capability-evidence-apply (PR #50 actions), targeted chain/promotion tests, no-tracked-source-change and gitignored-artifacts checks. Turns lane-2 evidence from attested to captured. Docs only.\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-01T04:38:46Z"
+    },
+    {
+      "commit_sha": "ae081cf28e47a89955606ded98f4c39e67677efd",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Document execution_chain_run + capability_evidence_apply in Local Runner runbook\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-01T04:40:18Z"
+    }
+  ],
+  "files": [
+    {
+      "path": "docs/runbooks/local-runner-runbook.md",
+      "status": "modified",
+      "additions": 29,
+      "deletions": 0
+    },
+    {
+      "path": "docs/runbooks/windows-post-151-revalidation-runbook.md",
+      "status": "added",
+      "additions": 147,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:59.957232+00:00"
+  }
+}

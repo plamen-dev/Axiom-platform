@@ -1,0 +1,74 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 24,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/24",
+    "title": "PR #134 — Execution Resource Framework v1",
+    "description": "## Summary\n\nAdds the **resource layer** of the execution roadmap (`Execution Context = State → Execution Environment = Location → Execution Resource = Requirements`). Captures *what resources execution requires* as a deterministic, append-only report — observational/declarative only, no allocation/provisioning/scheduling/orchestration/optimization per non-goals. Upstream `ExecutionContext` / `ExecutionEnvironment` / `CapabilityKnowledgeGraph` are consumed read-only; nothing is mutated.\n\nMirrors the Execution Environment Framework (PR #133) exactly, with the resource-specific shape:\n\n- `ExecutionResource(resource_id, context_id, environment_id, capability_id, resource_type, status, requirements, summary, created_at, schema_version, raw_payload)`\n- `ExecutionResourceType` ∈ `CPU/MEMORY/STORAGE/NETWORK/GPU/REPOSITORY/TOOL/SOFTWARE/CREDENTIAL/OTHER`; `ExecutionResourceStatus` ∈ `AVAILABLE/UNAVAILABLE/DEGRADED/UNKNOWN`\n- `ExecutionResourceRequirement(requirement_id, requirement_type, requirement_value, summary)` — free-form type, required `type`+`value`\n- `ExecutionResourceReport(report_id, resource_count, resource_type_counts, status_counts, unavailable_count, degraded_count, requirement_count, duplicate_resource_count, created_at)`\n- `ExecutionResourceEvidence` + `ExecutionResourceEngine`\n\nEngine behavior:\n\n```\ncreate(resources, raw_metadata):\n  build+validate+normalize (type/status upper-cased)\n  sort by (context_id, environment_id, capability_id, resource_type, status, resource_id)\n  dedupe key = (context_id, environment_id, capability_id, resource_type)  # keep first\n  aggregate resource_type_counts / status_counts (sorted), requirement_count = sum(len(reqs))\n  unavailable_count / degraded_count from status_counts\n  persist report.json + 4-file evidence bundle  # always written\npassed = resource_count > 0 and unavailable_count == 0 and degraded_count == 0\n```\n\nCLI (`execution-resource-create / execution-resources / execution-resource-show / execution-resource-export`), JSON/Markdown/CSV exports, 4-file bundle under `artifacts/execution_resource/<run_id>/` (`execution_resource_request.json`, `execution_resource_result.json`, `execution_resource_summary.md`, `pass_fail.json`). Registered in the runner command registry (READ_ONLY / SAFE) and the test-selection map.\n\n## Validation\n- `poetry run pytest -q` → **4528 passed, 1 skipped** (+51; baseline 4477 at #133)\n- `poetry run ruff check src/ tests/` → **0 errors**\n- CLI smoke (adversarial: 4 resources, 1 case-insensitive duplicate `(ctx-1,env-1,cap-1,MEMORY)`, 1 UNAVAILABLE, 1 DEGRADED, lowercase types/statuses, out-of-order requirements) → resource_count 3 / duplicate 1 / unavailable 1 / degraded 1 / requirement_count 2; sorted status+type counts; requirements ordered `arch → min_gb`\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782273800-execution-resource-framework",
+    "status": "merged",
+    "merge_commit_sha": "f2acc2441a11b8fd328bf1c515b566145e6a2630",
+    "created_at": "2026-06-24T04:07:32Z",
+    "updated_at": "2026-06-24T04:33:45Z",
+    "merged_at": "2026-06-24T04:33:45Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "5a94e11c6e840225c5e6bbc62e0590d48882e884",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #134 — Execution Resource Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-24T04:07:18Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 179,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/execution_resource.py",
+      "status": "added",
+      "additions": 723,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 79,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_execution_resource.py",
+      "status": "added",
+      "additions": 674,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:38.923494+00:00"
+  }
+}

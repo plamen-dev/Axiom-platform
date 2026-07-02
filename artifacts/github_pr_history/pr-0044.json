@@ -1,0 +1,38 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 44,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/44",
+    "title": "PR #154 — Evidence Producer Inventory and Consumer Mapping v1",
+    "description": "## Summary\n\nDocs-only evidence-producer inventory answering what evidence-producer gap actually remains after PR #147/#148/#153, instead of assuming the next implementation is specifically a \"model-health evidence consumer.\"\n\nScope correction from the original PR #154 directive: converted from implementation to inventory/reconciliation after Program 1 determined the repo evidence should be mapped before committing to a specific consumer target.\n\n## Scope\n\nOne new file: `docs/architecture/integration/Evidence_Producer_Inventory_and_Consumer_Mapping_v1.md` (380 lines). No runtime code, no tests, no CLI changes, no confidence math, no evidence-promotion semantics, no execution-chain ID-flow changes.\n\n## Key Changes\n\nInventoried **9 evidence-producing tiers** across the repo:\n\n```\nProducer                → Current Consumer                    → Missing Consumer              → EVID-001 Status\n────────────────────────────────────────────────────────────────────────────────────────────────────────────────\nExecutionChainOrch.     → EvidencePromotionLoop → ConfEngine  → None                          → CLOSED (M2)\nEvidencePromotionLoop   → IS the consumer (audit output)      → None                          → N/A\nModelHealth             → Read-only: server_tools helpers     → NO state-mutating consumer    → OPEN\nEvidenceRunner          → CapStateReg + FailClass             → NO confidence consumer        → PARTIAL\nCapabilityRunner        → CapStateReg + FailClass             → NO confidence consumer        → PARTIAL\nCLIValidationRecorder   → None                               → NO consumer (by design)       → OPEN\nSetParameterValue       → ValidationLoop (SPV)                → NO confidence consumer        → PARTIAL\nDiscovery Reports       → CapStateReg (candidate ingest)      → NO confidence consumer        → PARTIAL\nCapabilityConfidence    → Terminal state store                 → None                          → TERMINAL\n```\n\nPlus ~70 Tier 2 framework engines with `write_evidence()` methods (audit/traceability only, not EVID-001 relevant).\n\n**EVID-001 assessment:** NOT fully closed. Closed for narrow M2 execution-chain slice only (PR #147/#148). The original finding — `model_health` readiness output has no state-mutating consumer — remains open. At least 4 other producers also lack confidence paths.\n\n**Recommendation:** Model Health Evidence Consumer (Candidate A) is confirmed as the correct next implementation target. The producer exists, the terminal consumer exists, the adapter is small (~200-300 lines), and it directly closes the named EVID-001 finding.\n\n## Validation\n\n- Docs/canonical-source only — tests not run per tiered testing policy\n- `git diff --stat`: 1 file changed, 380 insertions(+)\n- No runtime behavior changes\n\n## Non-Goals\n\n- No new evidence framework, registry, promotion doctrine, or object family\n- No implementation-worker behavior, retry loop, or GPR\n- No confidence math, evidence-promotion, or execution-chain changes\n- No Revit validation, canonical rewrite, or broad refactor\n\n## Architectural Significance\n\nThis inventory replaces speculative implementation with repo-evidence-backed mapping. It establishes which producers are orphaned, which consumers exist, and what the smallest correct next implementation is — preventing overclaiming EVID-001 closure or building a consumer for a producer that doesn't exist in the expected form.\n\n## Purpose-to-Workflow Reconciliation\n\n1. **What existing PR/component/capability does this use?** Reads and maps outputs of PR #147 (evidence promotion), PR #148 (safety hardening), PR #153 (CLI validation recorder), and all pre-existing evidence producers.\n2. **What workflow does it participate in?** Evidence-to-promotion pipeline documentation; EVID-001 gap closure tracking.\n3. **What consumes its output?** Program 0 sequencing decisions; future implementation PRs targeting specific producer→consumer gaps.\n4. **What evidence proves it works?** The inventory itself — inspected 80+ files with `write_evidence`, 9 artifact directories, 18 EVID-001 references, all evidence schemas.\n5. **Disposition:** Investigation/reconciliation — no runtime behavior.\n6. **What existing structure was checked before adding anything new?** `M2_Evidence_Promotion_Validation_Packet.md`, behavior-change ledger (BHV-026/027), EVID-001 references in evidence_promotion.py and tests, server_tools read-only helpers, capability_state.py lifecycle scanning, failure_classification.py pass_fail consumption, validation_loop.py SPV scanning.\n7. **What complexity/risk does this introduce?** None — docs only.\n8. **What should be deleted/merged/preserved/left alone?** Preserved: all existing producers and consumers. Left alone: confidence math, promotion semantics, ID flow. Identified for future: model_health→confidence adapter.\n\n## Pre-Review Self-Audit\n\n1. ✅ Inspected repo before assuming \"model health\" exists — confirmed via `model_health.py` (685 lines)\n2. ✅ Avoided implementing a consumer without confirming the producer\n3. ✅ Distinguished evidence producers from evidence consumers\n4. ✅ Distinguished artifact evidence from capability-state mutation\n5. ✅ Identified what PR #147/#148/#153 already closed\n6. ✅ Avoided overclaiming EVID-001 closure — explicitly states \"NOT fully closed\"\n7. ✅ Avoided creating a new framework or registry\n8. ✅ Avoided runtime behavior changes\n9. ✅ Clearly recommended next implementation step (Candidate A: Model Health Evidence Consumer)\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782688892-evidence-producer-inventory",
+    "status": "merged",
+    "merge_commit_sha": "b6cfc1eb90efb2e163f188186ccd89be0bc47532",
+    "created_at": "2026-06-28T23:25:38Z",
+    "updated_at": "2026-06-28T23:37:40Z",
+    "merged_at": "2026-06-28T23:37:40Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "e7566795662d437b48c735c3c437bb6e03b36f5c",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #154 — Evidence Producer Inventory and Consumer Mapping v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-28T23:24:35Z"
+    }
+  ],
+  "files": [
+    {
+      "path": "docs/architecture/integration/Evidence_Producer_Inventory_and_Consumer_Mapping_v1.md",
+      "status": "added",
+      "additions": 380,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:54.655923+00:00"
+  }
+}

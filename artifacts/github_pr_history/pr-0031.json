@@ -1,0 +1,74 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 31,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/31",
+    "title": "PR #141 — Execution Artifact Framework v1",
+    "description": "## Summary\n\nAdds the **execution-artifact** layer on top of the Execution Result Framework (#140), continuing the deterministic execution roadmap: `… → Result → Artifact`. Where the result layer represents *what an attempt produced*, this layer represents *the artifacts produced or referenced by those results*. Clean **v1** — no prior `execution_artifact` module/CLI exists, so no `-v2` suffixing needed.\n\nObservational/declarative only: consumes ExecutionResult + ExecutionAttempt v2 + CapabilityKnowledgeGraph **read-only**. Per non-goals it does **not** generate artifacts, scan files, upload, execute, orchestrate, schedule, optimize, or assign workers — it only records, validates, dedups, orders, and aggregates artifact records. Revit 2024 baseline unaffected.\n\nNew module `src/axiom_core/execution_artifact.py` mirrors the established pattern (`ExecutionArtifact` / `ExecutionArtifactReference` / `ExecutionArtifactReport` / `ExecutionArtifactEvidence` / `ExecutionArtifactEngine`):\n\n- **Artifact**: `artifact_id, result_id, attempt_id, capability_id, artifact_type, status, artifact_path, artifact_url, references, summary, created_at, schema_version, raw_payload`\n- **Types**: `FILE / REPORT / LOG / SCREENSHOT / RECORDING / EVIDENCE_BUNDLE / TEST_OUTPUT / PR_COMMENT / OTHER`\n- **Statuses**: `CREATED / REFERENCED / MISSING / INVALID / UNKNOWN`\n- **Reference types**: `RESULT / ATTEMPT / CAPABILITY / FILE / URL / VALIDATION / KNOWLEDGE_NODE / OTHER`\n- **Report**: `artifact_count, status_counts, artifact_type_counts, missing_count, invalid_count, created_count, referenced_count, duplicate_artifact_count`\n\nDeterministic ordering, dedup, and pass/fail gate:\n\n```\nsort key  = (result_id, attempt_id, capability_id, artifact_type, status, artifact_id)\ndedup key = (result_id, attempt_id, capability_id, artifact_type, artifact_path, artifact_url)  # keep first in sorted order, count surplus\npassed    = artifact_count > 0 and missing_count == 0 and invalid_count == 0   # empty report -> fail\n```\n\nCLI (4 commands, JSON/Markdown/CSV exports), registered in `command_registry.py`:\n\n```\naxiom execution-artifact-create [--artifact-file <af>] [--json-output]\naxiom execution-artifacts [--json-output]\naxiom execution-artifact-show <report_id> [--json-output]\naxiom execution-artifact-export <report_id> [--format markdown|json|csv]\n```\n\nEvidence bundle always written under `artifacts/execution_artifact/<run_id>/` (5 files: `execution_artifact_request.json`, `execution_artifact_result.json`, `execution_artifact_summary.md`, `pass_fail.json`, `report.json`); directory git-ignored.\n\n## Validation\n\n- **New tests:** +57 (`tests/test_execution_artifact.py`, 72 cases) + `test_command_registry.py`/`test_selection_engine` updates\n- **Full pytest:** `poetry run pytest -q` → **4917 passed, 1 skipped** (baseline 4860 at #140)\n- **Ruff:** `poetry run ruff check src/ tests/` → 0 errors\n- **CLI smoke (shell-authoritative):** adversarial fixture (5 artifacts → 1 case-insensitive duplicate `(res-1,att-1,cap-1,FILE,out/a.txt)`, 1 MISSING, 1 INVALID, lowercase types/statuses, out-of-order refs) → artifact_count 4 / missing 1 / invalid 1 / created 1 / referenced 1 / duplicate 1; status `{CREATED:1,INVALID:1,MISSING:1,REFERENCED:1}`; deterministic order; show round-trips identically; markdown/CSV(header+4 artifacts+2 refs=7 rows)/JSON exports valid; error paths show-missing exit 2, traversal exit 1; pass_fail `false` adversarial, `true` clean, `false` empty\n\n## What did NOT change\n\n- No modification to ExecutionResult (#140) or any prior layer\n- No execution / orchestration / scheduling / optimization / worker assignment / artifact generation / file scanning / uploading / network calls / architecture changes\n- Revit 2024 baseline unaffected\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782326895-execution-artifact-framework",
+    "status": "merged",
+    "merge_commit_sha": "949303fdbf648153c0e8f3c3bf05598d8101b255",
+    "created_at": "2026-06-24T18:53:20Z",
+    "updated_at": "2026-06-24T23:21:21Z",
+    "merged_at": "2026-06-24T23:21:21Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "bd5a7b43d199c2674e7a2b6d9e711ff51cd20a97",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #141 — Execution Artifact Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-24T18:53:01Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 177,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/execution_artifact.py",
+      "status": "added",
+      "additions": 766,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 71,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_execution_artifact.py",
+      "status": "added",
+      "additions": 804,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:44.475239+00:00"
+  }
+}

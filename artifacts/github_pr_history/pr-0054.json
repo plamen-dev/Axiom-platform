@@ -1,0 +1,68 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 54,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/54",
+    "title": "Evidence-quality substance gate: quarantine semantically empty evidence (Finding 2, option A)",
+    "description": "## Summary\n\nCloses Finding 2: an execution-chain run whose self-model produced **zero modules** returned `status=PASS`, and `capability-evidence-apply` then promoted confidence `very_low -> very_high` and readiness `blocked -> ready` in a single application. This adds a **substance verdict** that travels with the evidence bundle and a **promotion gate** that quarantines semantically empty evidence — without touching the id-flow `status`, confidence scoring, or readiness projection.\n\nImplements the approved **option A** (\"chain stamps quality + promotion enforces quality\", with defensive recompute).\n\n### New: `axiom_core/evidence_quality.py` (shared rule, not a framework)\n\nOne pure function + a small per-capability table, used by both producer and consumer so there is no duplicated rule:\n\n```python\n_REQUIRED_METRICS = {\"self-model-build\": (\"module_count\",)}\n\ndef evaluate_quality(capability_id, metrics) -> dict:\n    # {\"verdict\": SUBSTANTIVE|EMPTY|NOT_EVALUATED,\n    #  \"required_metrics\": [...], \"zero_metrics\": [...], \"reason\": \"...\"}\n\ndef resolve_quality(capability_id, bundle) -> (quality, recomputed):\n    # use bundle[\"quality\"] iff well-formed; else recompute from bundle[\"metrics\"]\n```\n\n- `self-model-build` is `EMPTY` iff `module_count` is missing or `<= 0`. `import_edge_count` / `isolated_module_count` appear in the `reason` but are **not** required (a small/disconnected repo can legitimately have modules with no edges).\n- Capabilities with no configured rule are `NOT_EVALUATED` — current behavior preserved. Zero metrics are never globally invalid; only configured required metrics are enforced.\n\n### Producer — `execution_chain_orchestrator._write_evidence`\n\nStamps `quality` onto `evidence.json` so the verdict is part of the navigable record. The chain's id-flow `status` property is **unchanged** (still `PASS` iff every transition resolves `downstream == upstream`).\n\n```diff\n evidence = {\n     \"evidence_id\": ...,\n     \"references\": ...,\n     \"metrics\": metrics,\n+    \"quality\": evaluate_quality(trace.capability_id, metrics),\n     ...\n }\n```\n\n### Consumer — `EvidencePromotionEngine.apply`\n\nNew gate inserted **after** the identity/conflict/stale gates and **before** duplicate/accept/score accumulation:\n\n```python\nquality, recomputed = resolve_quality(resolved_capability, bundle)\nif quality[\"verdict\"] == EMPTY:\n    return self._record(..., EvidenceDecision.QUARANTINED, reason, ..., quality=quality)\n```\n\n- Reuses the existing `EvidenceDecision.QUARANTINED` + intake store — no new outcome family, no new framework.\n- Quarantine mutates **no** confidence / readiness / trust / promotion state; the intake record persists `evidence_quality` and stays inspectable.\n- **Defensive recompute**: when `quality` is absent or malformed (older / hand-authored bundles), the verdict is recomputed from `metrics` so empty evidence cannot bypass the gate. The `quality` verdict is now also recorded on the accepted/duplicate paths for auditability.\n\n## What did NOT change\n- Execution-chain id-flow `status` semantics.\n- Confidence math (`CapabilityConfidenceEngine`) and `_readiness_from_score`.\n- The accept / fail / missing / conflict / stale / duplicate decision paths.\n- Runner, worker, retry, GPR, Revit behavior. 2024 baseline unaffected.\n\n## Tests\n- `tests/test_evidence_quality.py` (new, 14): rule, per-capability table, `import_edge_count` not required, unknown-capability `NOT_EVALUATED`, zero-metrics-not-globally-invalid, stamped-vs-recompute paths.\n- `tests/test_evidence_promotion.py` (extended): empty evidence quarantined with no state change; no `very_low -> very_high`; no `blocked -> ready`; substantive still promotes; unknown capability still accepts; older bundle without `quality` recomputed + quarantined; malformed `quality` recomputed; producer stamps `EMPTY` while `status=PASS`; end-to-end empty-repo quarantine.\n- Result: `test_evidence_quality` 14 passed; `test_evidence_promotion` + `test_execution_chain_orchestrator` 53 passed; ruff clean on Ubuntu.\n\n## Validation still pending\n- Windows lane-2 is **not** validated. Operator must re-run (after #52/#53 merged): Local Runner `ruff` / `execution_chain_run` / `capability_evidence_apply`, `code-inventory --refresh`, `self-model-build --json-output`, `execution-chain-run --json-output`, targeted tests via `python -m pytest`.\n- No Revit live validation required (evidence-quality infrastructure, not a Revit capability).\n\n## Factory relevance\nPromotion-scoring / evidence-quality improvement — refuses to feed semantically empty evidence into confidence/readiness so the furnace cannot auto-promote a degenerate run.\n\nBehavior recorded as BHV-032 in `docs/logs/behavior-change-ledger.md`. Kept separate from PR #52 (Windows-safe runner invocation) and PR #53 (inventory path fix).\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782885994-evidence-quality-substance-gate",
+    "status": "merged",
+    "merge_commit_sha": "c22e72dc5860d1762ab2c8a21302b2c64adab5f2",
+    "created_at": "2026-07-01T06:07:43Z",
+    "updated_at": "2026-07-01T13:34:14Z",
+    "merged_at": "2026-07-01T13:34:13Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "174bf99d3a722377ce1281bf31b4112e5448846b",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Add evidence-quality substance gate: quarantine semantically empty evidence (Finding 2)\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-01T06:07:11Z"
+    }
+  ],
+  "files": [
+    {
+      "path": "docs/logs/behavior-change-ledger.md",
+      "status": "modified",
+      "additions": 17,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/evidence_promotion.py",
+      "status": "modified",
+      "additions": 29,
+      "deletions": 1
+    },
+    {
+      "path": "src/axiom_core/evidence_quality.py",
+      "status": "added",
+      "additions": 157,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/execution_chain_orchestrator.py",
+      "status": "modified",
+      "additions": 8,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_evidence_promotion.py",
+      "status": "modified",
+      "additions": 169,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_evidence_quality.py",
+      "status": "added",
+      "additions": 101,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:25:02.347925+00:00"
+  }
+}

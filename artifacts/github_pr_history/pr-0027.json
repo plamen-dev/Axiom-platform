@@ -1,0 +1,74 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 27,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/27",
+    "title": "PR #137 — Execution Plan Framework v1",
+    "description": "## Summary\n\nAdds the **execution-plan layer** — the seventh layer of the execution roadmap, on top of Execution Readiness. Where Readiness answers *can execution proceed?*, this layer represents *what execution would do*: a deterministic, append-only set of typed execution plans (capability/readiness/chain) composed of ordered steps. Declarative/observational only — no execution, scheduling, orchestration, optimization, or worker assignment (consumes ExecutionReadiness + CapabilityChain + CapabilityKnowledgeGraph read-only).\n\nMirrors the established framework pattern (validation → uppercase normalization → deterministic sort/dedup → aggregation → evidence bundle + pass/fail gate), so the diff is mostly analogous to `execution_readiness.py`.\n\n**Model**\n```\nExecutionPlan       = plan_id, capability_id, readiness_id, chain_id,\n                      plan_type, status, steps[], summary, created_at,\n                      schema_version, raw_payload\nExecutionPlanStep   = step_id, plan_id, order_index, step_name, summary, created_at\nExecutionPlanReport = report_id, plan_count, step_count, status_counts,\n                      plan_type_counts, blocked_count, failed_count,\n                      duplicate_plan_count, created_at\nplan_type ∈ IMPLEMENTATION|VALIDATION|REPAIR|REVIEW|REPORTING|INVESTIGATION|CUSTOM\nstatus    ∈ CREATED|READY|BLOCKED|COMPLETED|FAILED\n```\n\n**Determinism**\n- plan sort key = `(capability_id, readiness_id, chain_id, plan_type, status, plan_id)`\n- step sort key = `(order_index, step_name, step_id)`\n- duplicate plan = case-insensitive `(capability_id, readiness_id, chain_id, plan_type)`, keep first, count the rest\n\n**Pass/Fail**\n```\npassed = plan_count > 0 and blocked_count == 0 and failed_count == 0   # empty → fail\n```\n\n**CLI** (`execution-plan-create / execution-plans / execution-plan-show / execution-plan-export`, JSON/Markdown/CSV) + rich renderer; registered in `command_registry.py` (READ_ONLY, SAFE, POETRY_ENV). Evidence bundle under `artifacts/execution_plan/<run_id>/`: `execution_plan_request.json`, `execution_plan_result.json`, `execution_plan_summary.md`, `pass_fail.json` (+ `report.json`).\n\n## Validation\n- `poetry run pytest -q` → **4686 passed, 1 skipped** (+53; baseline 4633 at #136)\n- `poetry run ruff check src/ tests/` → **0 errors**\n- New tests: `tests/test_execution_plan.py` (53) — models/round-trip, create/determinism, step ordering, normalization, validation, duplicate detection, blocked/failed detection, pass/fail gates, append-only, retrieval/exports, path safety\n\n## What did not change\n- No execution/orchestration/scheduling/optimization/worker-assignment (per non-goals); upstream layers consumed read-only.\n- Revit 2024 baseline unaffected. No architecture changes.\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782284536-execution-plan-framework",
+    "status": "merged",
+    "merge_commit_sha": "8691c7aa7ad41813053e5fa4c10446b8d0259e03",
+    "created_at": "2026-06-24T07:06:25Z",
+    "updated_at": "2026-06-24T13:32:48Z",
+    "merged_at": "2026-06-24T13:32:48Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "d7c18913081f477192605851111e804793168ccd",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #137 — Execution Plan Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-24T07:06:04Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 169,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/execution_plan.py",
+      "status": "added",
+      "additions": 703,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 70,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_execution_plan.py",
+      "status": "added",
+      "additions": 729,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:41.391209+00:00"
+  }
+}

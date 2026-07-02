@@ -6100,6 +6100,35 @@ _register(
 
 _register(
     CommandSpec(
+        name="github-import-backfill",
+        command=(
+            "axiom github-import-backfill --payload-dir <dir> "
+            "[--ledger-out <path>] [--json-output]"
+        ),
+        description=(
+            "Batch-import GitHub PR metadata payloads and render the "
+            "canonical PR sequence ledger."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("github_import_request.json", required=True),
+            EvidenceOutput("github_import_result.json", required=True),
+            EvidenceOutput("github_import_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=300,
+        failure_modes=(FM_NONZERO,),
+        notes=(
+            "Read-only batch ingestion from local payload files; duplicate "
+            "imports are skipped so the backfill is safely re-runnable."
+        ),
+    )
+)
+
+_register(
+    CommandSpec(
         name="github-import-show",
         command="axiom github-import-show <report_id> [--json-output]",
         description="Show a GitHub metadata import.",

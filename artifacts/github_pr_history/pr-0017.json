@@ -1,0 +1,74 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 17,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/17",
+    "title": "PR #128 — Capability Impact Framework v1",
+    "description": "## Summary\n\nAdds the first formal **impact** layer for capabilities — the *meaning* layer on top of identity (Registry #122), memory (Timeline #123), understanding (Summary #125), and relationships (#127). Where relationships provide context, impact answers: what changed, why it matters, and what became possible.\n\nNew module `axiom_core/capability_impact.py` follows the same deterministic, append-only, evidence-bundle pattern as #122–#127. It is structure-only — no graph engine/queries/viz/dashboards/twin, no automatic opportunity generation, no network calls. Registry/Summary/Relationship layers are consumed read-only; nothing is mutated.\n\n**Models**\n- `CapabilityImpact` (capability_id, impact_type, impact_area, impact_summary, significance, raw_payload, schema_version)\n- `CapabilityImpactType` = {ENABLED, IMPROVED, AUTOMATED, SIMPLIFIED, VALIDATED, DOCUMENTED, CONNECTED, EXTENDED}\n- `CapabilityImpactArea` = {ENGINEERING, OPERATIONS, KNOWLEDGE, TESTING, WORKERS, GOVERNANCE, ORGANIZATION}\n- `CapabilityOpportunity` (title, description, priority, related_capability_ids); priority ∈ {LOW, NORMAL, HIGH, STRATEGIC}\n- `CapabilityImpactReport` (impact_count, impact_type_counts, impact_area_counts, opportunity_count, strategic_opportunity_count)\n- `CapabilityImpactEvidence` + `CapabilityImpactEngine`\n\n**Determinism / behavior**\n- Impacts sorted by `(capability_id, impact_area, impact_type, impact_id)`; opportunities by `(capability_id, title, opportunity_id)` — fully input-independent.\n- Impacts are NOT deduplicated (multiple impacts of the same type/area on a capability are legitimate); spec lists duplicate detection only for the relationship layer.\n- `strategic_opportunity_count` = count of `priority == STRATEGIC`.\n- Types/areas/priorities normalized to uppercase + validated; `capability_id` required on impacts, `capability_id`+`title` required on opportunities; `related_capability_ids` deduped+sorted.\n- `pass_fail.json` `passed = impact_count > 0` (an impact report with no impacts fails).\n\n**CLI** (`axiom_cli/main.py`): `capability-impact-create --impact-file` / `capability-impacts` / `capability-impact-show <id>` / `capability-impact-export <id> --format markdown|json|csv`. Rich renderer escapes bracketed tokens so `[AUTOMATED]`/`[STRATEGIC]` render literally. Error paths: not-found → exit 2, traversal/invalid → exit 1.\n\n**Evidence bundle** under `artifacts/capability_impacts/<run_id>/`: `capability_impact_request.json`, `capability_impact_result.json`, `capability_impact_summary.md`, `pass_fail.json` (+ `report.json`).\n\n**Wiring**: registered 4 commands in `runner/command_registry.py` (READ_ONLY/SAFE); added module→test mapping in `test_selection_engine.py`; added the 4 commands to `EXPECTED_AXIOM_COMMANDS`; gitignored the artifacts dir.\n\n## Validation\n- `poetry run pytest -q` → **4213 passed, 1 skipped** (+45; baseline 4168 at #127)\n- `poetry run ruff check src/ tests/` → **0 errors**\n- CLI smoke: deterministic ordering, type/area counts, strategic-opportunity count, all 3 export formats, not-found→exit 2, traversal→exit 1\n\nRevit 2024 baseline unaffected (Python CLI/framework only).\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782252529-capability-impact",
+    "status": "merged",
+    "merge_commit_sha": "a53c3427473130c6b92d8c12cfe02d07d3aff6fc",
+    "created_at": "2026-06-23T22:12:49Z",
+    "updated_at": "2026-06-23T22:34:50Z",
+    "merged_at": "2026-06-23T22:34:50Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "8f3150a8cb8f83160517b287172459c5ddb0c155",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #128 — Capability Impact Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-23T22:12:29Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 172,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/capability_impact.py",
+      "status": "added",
+      "additions": 682,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 71,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_capability_impact.py",
+      "status": "added",
+      "additions": 507,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:33.320776+00:00"
+  }
+}

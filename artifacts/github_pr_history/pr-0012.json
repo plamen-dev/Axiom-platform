@@ -1,0 +1,74 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 12,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/12",
+    "title": "PR #123 — Capability Event Timeline Framework v1",
+    "description": "## Summary\n\nAdds a **capability event timeline** so Axiom captures everything that happened around a capability (PR lifecycle, CI, review, bug fixes, tests, artifacts, recordings, screenshots, skills, warnings, notes) — not just the PR itself. Events are **append-only** and ordered deterministically. This is additive identity/registry-layer metadata; no GitHub/Devin ingestion and no orchestration.\n\nNew module `src/axiom_core/capability_event_timeline.py`:\n- `CapabilityEventType` — 16 event types: `PR_CREATED, CI_GREEN, REVIEW_STARTED, REVIEW_FINDING, BUG_FIXED, TEST_STARTED, TEST_COMPLETED, ARTIFACT_CREATED, VIDEO_RECORDED, SCREENSHOT_CAPTURED, SKILL_PROPOSED, SKILL_APPROVED, PR_READY, PR_MERGED, WARNING, NOTE`.\n- `CapabilityEventReference` — `reference_type/target/label` (files, commits, artifacts, screenshots, recordings, markdown reports, skills, PR URLs).\n- `CapabilityEventArtifact` — `artifact_type/path/description`.\n- `CapabilityEvent` — `event_id, global_capability_id, timestamp, event_sequence, worker, source, event_type, summary, references[], artifacts[], raw_payload, schema_version`.\n- `CapabilityEventTimeline` — append-only ordered collection (`timeline_id, global_capability_id, events[], event_count, created_at, schema_version`).\n- `CapabilityEventSummary` — `event_count, event_type_counts, first/last_timestamp, duplicate_sequence_count`.\n- `CapabilityEventEvidence` + `CapabilityEventTimelineEngine` (`create / append / get_report / list_reports / export_report`).\n\n**Authoritative timeline ordering** (`_sort_key`):\n```python\n(timestamp, event_sequence, event_type, event_id)\n```\nInput order is irrelevant — `create`/`append` re-sort deterministically.\n\n**Append-only**: `append(timeline_id, events)` loads the existing timeline, preserves every existing event verbatim (never removes), adds the new events, and re-sorts. **Raw payload preserved** verbatim. **Schema versioning** via `SCHEMA_VERSION = \"1.0\"` (overridable per event).\n\nCLI (registered in `command_registry.py`, `test_selection_engine.py`, `test_command_registry.py`):\n- `axiom capability-event-create [--timeline-file <tf>] [--json-output]`\n- `axiom capability-event-append <timeline_id> [--timeline-file <tf>] [--json-output]`\n- `axiom capability-event-list [--json-output]`\n- `axiom capability-event-show <timeline_id> [--json-output]`\n- `axiom capability-event-export <timeline_id> [--format markdown|json|csv]`\n\n**Three export formats**: JSON, Markdown timeline (`- [seq] ts [TYPE] summary` with nested refs/artifacts), CSV (flattened per-event columns). Evidence bundle under `artifacts/capability_event_timeline/<timeline_id>/`: `capability_event_request.json`, `capability_event_result.json`, `capability_event_summary.md`, `capability_event_timeline.csv`, `pass_fail.json` (+ `report.json`).\n\n**Pass/fail**: `passed = event_count > 0 AND duplicate_sequence_count == 0` (append-only monotonic-sequence integrity).\n\n## What changed / didn't\n- **Changed behavior**: new additive event timeline + 5 CLI commands. No existing framework modified.\n- **Did not change**: Revit 2024 baseline, architecture/doctrine, dependencies. No GitHub ingestion, no Devin ingestion, no orchestration.\n- **Strategic fit**: identity/registry layer — capability metadata belongs in registries; this makes per-capability history machine-traceable (evidence quality).\n\n## Validation\n- `poetry run pytest -q` → **3975 passed, 1 skipped** (+47 new; PR #122 baseline 3928).\n- `poetry run ruff check src/ tests/` → **0 errors**.\n- CLI create/append/list/show/export verified incl. all 3 export formats, deterministic ordering, append-only preservation, and error paths (not-found → exit 2, path-traversal → exit 1).\n- Revit live validation: not required (no adapter/baseline changes).\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782231022-capability-event-timeline",
+    "status": "merged",
+    "merge_commit_sha": "b41521e2d9efa798d75995ba4a27387b445072b5",
+    "created_at": "2026-06-23T16:16:42Z",
+    "updated_at": "2026-06-23T17:35:31Z",
+    "merged_at": "2026-06-23T17:35:31Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "23ed95a8181a240fbbb95eb393907e0a8a761e93",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #123 — Capability Event Timeline Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-23T16:16:15Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 196,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/capability_event_timeline.py",
+      "status": "added",
+      "additions": 628,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 95,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_capability_event_timeline.py",
+      "status": "added",
+      "additions": 568,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:29.320292+00:00"
+  }
+}

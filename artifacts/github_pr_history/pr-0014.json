@@ -1,0 +1,68 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 14,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/14",
+    "title": "PR #125 — Capability Summary Framework v1",
+    "description": "## Summary\n\nAdds the **Capability Summary Framework v1** — the first *understanding* layer on top of the Global Capability Registry (#122, identity) and the Capability Event Timeline (#123, memory). Where the registry says *what* a capability is and the timeline says *what happened*, this layer says *what it means*: a human-readable purpose/summary/architectural-significance plus a deeper narrative (context, rationale, risks, lessons, future opportunities). Summaries and narratives are append-only and ordered deterministically; raw payloads and schema versions are preserved verbatim.\n\n> Note: the spec was titled \"#124\" but that number is the already-merged GitHub Metadata Import PR (#13), so this is **#125**. It consumes only the registry + timeline layers (both already on `main`) and does not depend on #124.\n\n```\ncreate(summaries, narratives, raw_metadata):\n    summaries  = [CapabilitySummary.from_dict(s) for s in summaries]   # require capability_id + capability_name\n    narratives = [CapabilityNarrative.from_dict(n) for n in narratives] # require capability_id\n    summaries.sort(key=(created_at, capability_id, capability_name))    # deterministic\n    narratives.sort(key=(created_at, capability_id, narrative_id))      # deterministic\n    capability_counts = sorted {capability_id: #summaries+#narratives}\n    persist report.json + evidence bundle\nappend(report_id, ...): existing items preserved verbatim, new items added, whole set re-sorted (append-only)\n```\n\n**Pass/fail:** `passed = (summary_count > 0)` — a report with at least one summary carries understanding; an empty report fails.\n\n## What changed\n\n- `src/axiom_core/capability_summary.py` (new): models `CapabilitySummary` / `CapabilityNarrative` / `CapabilitySummaryReport` (with `capability_counts`) / `CapabilitySummaryEvidence` + `CapabilitySummaryEngine`. Path-sandboxed evidence under `artifacts/capability_summary/<run_id>/`; JSON/Markdown/CSV export. Engine exposes `create` / `append` (append-only) / `get_report` / `list_reports` / `export_report`.\n- `src/axiom_cli/main.py`: `axiom capability-summary-create` (`--summary-file`, `--json-output`), `capability-summary-show`, `capability-summary-export` (`--format markdown|json|csv`). Generates `capability_summary.md` + `capability_narrative.md` as dedicated understanding documents within the evidence bundle.\n- Registered in `command_registry.py`, `test_selection_engine.py`, `tests/test_command_registry.py`.\n- `tests/test_capability_summary.py` (new): models round-trip, deterministic ordering, capability counts, raw payload + schema preservation, append-only behavior, exports, evidence bundle, pass/fail, path safety.\n\n## What behavior changed\nNew additive CLI commands + module. No existing runtime behavior changed.\n\n## What did NOT change\nNo architecture changes, no broad refactoring, no new dependencies, no network calls, no GitHub API, no metadata ingestion, no orchestration/routing/planning/repair/graph-engine. Existing registry/timeline artifacts are never mutated. Revit 2024 baseline unaffected.\n\n## Tests run\n- `poetry run pytest -q` → **4061 passed, 1 skipped** (+38; baseline 4023 at #124).\n- `poetry run ruff check src/ tests/` → **0 errors**.\n- CLI smoke: create (3 summaries / 2 narratives, deterministic ordering by `(created_at, capability_id)`, sorted `capability_counts`), show round-trip, all 3 export formats, `show missing` → exit 2, `export ../../etc` → path-safety exit 1.\n\n## Validation still pending\nOptional recorded CLI walkthrough (adversarial out-of-order fixture) on request.\n\n## Known risks\nLow. Self-contained new module + additive CLI commands; no changes to existing runtime behavior. No Revit live validation required; 2024 baseline unaffected.\n\n## Strategic fit\nExtends the identity → memory → understanding progression: registry (identity) + timeline (memory) + summary (understanding) form the first three pillars of a future organizational graph. Evidence bundles feed the registry/promotion direction rather than remaining isolated run outputs.\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782241448-capability-summary",
+    "status": "merged",
+    "merge_commit_sha": "7bb21bfcef81583cd2b1aab8874fce938369c64e",
+    "created_at": "2026-06-23T19:09:09Z",
+    "updated_at": "2026-06-23T21:02:57Z",
+    "merged_at": "2026-06-23T21:02:56Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "9a3bacc52c5d047d3e08d6db70947c770f7950cd",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #125 — Capability Summary Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-23T19:08:43Z"
+    }
+  ],
+  "files": [
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 126,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/capability_summary.py",
+      "status": "added",
+      "additions": 560,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 56,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_capability_summary.py",
+      "status": "added",
+      "additions": 390,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:30.919560+00:00"
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 57,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/57",
+    "title": "Add non-blocking advisory context-preflight CI check (always exit 0)",
+    "description": "## Summary\n\nWires the existing `context-preflight` into CI as a **non-blocking advisory signpost** on every PR. It surfaces repo-context concerns as GitHub Actions `::warning::` annotations but **never fails the build** — the script always returns exit 0. This is the advisory-preflight item from the loop-enablement plan (greenlit), kept deliberately separate from any hard gate.\n\n```\nAdvisory Preflight (new workflow, pull_request) → poetry run python tools/ci/advisory_preflight.py\n  → collect_advisories(base, PR_BODY) → print ::warning:: lines → return 0   # always\n```\n\nAdvisories emitted (all judgement prompts, never blockers):\n- working-tree warnings carried straight from `context-preflight` (`git_state.warnings`);\n- changes to **high-overlap \"protected\" components** (read from the context-preflight system atlas — `overlap_risk` starting with `high`) without a `Context Basis` section in the PR body;\n- new **runner/worker/evidence/attempt** concept modules under `src/` added without a relationship note;\n- **provenance wording** (`legacy`, `old-foundation`, `pre-#NNN`, `deprecated`) *added* by the diff without an adjacent evidence link (`#123`, URL, `artifacts/`/`docs/` path, or `BUG-`/`BHV-`/`ADR-` id);\n- PR body missing a `Context Basis` section.\n\nReuses `axiom_core.context_preflight._COMPONENT_FAMILIES` as the source of truth for \"protected\" components — **no new registry/framework**.\n\n## What changed\n- `tools/ci/advisory_preflight.py` (+`tools/ci/__init__.py`) — advisory logic + `main()` that always exits 0.\n- `.github/workflows/advisory-preflight.yml` — new `pull_request` job running the script.\n- `.github/workflows/python-ci.yml` — added `tests/test_advisory_preflight.py` to the CI pytest list.\n- `tests/test_advisory_preflight.py` — 22 tests.\n\n## What behavior changed\n- New advisory CI check appears on PRs (green/neutral only). No existing check, runtime path, promotion/evidence semantics, or Revit behavior is altered.\n\n## What did NOT change\n- No change to `context-preflight` output or any runtime module. No new evidence framework. 2024 baseline unaffected.\n\n## Tests run\n- `pytest tests/test_advisory_preflight.py` → 22 passed.\n- `ruff check tools/ci tests/test_advisory_preflight.py` → clean.\n- Ran the script locally against `main`: emits annotations and exits 0.\n- Tiered testing: CLI/CI-only change → targeted tests only; full suite intentionally skipped (no broad shared infra touched).\n\n## Validation still pending\n- None. Not Windows- or Revit-dependent.\n\n## Known risks\n- Low. The check is advisory by construction (`main()` returns 0 unconditionally; `run_preflight` wrapped so a scan failure degrades to an advisory, not a failure). Worst case is a noisy or missing annotation, never a blocked PR.\n\n## Factory relevance\nStrengthens the verification factory's governance/review layer: makes context/overlap risks visible at review time without adding a hard gate or new framework.\n\n## Revit live validation required?\nNo. 2024 baseline unaffected.\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782928428-advisory-preflight-ci",
+    "status": "merged",
+    "merge_commit_sha": "df7a8b84f142fce7cdae2600d22d55432dd53b3c",
+    "created_at": "2026-07-01T17:56:01Z",
+    "updated_at": "2026-07-01T19:13:51Z",
+    "merged_at": "2026-07-01T19:13:51Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "5d3e1b4a75a79200031e20e7c10397e6026adcbb",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Add non-blocking advisory context-preflight CI check (always exit 0)\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-01T17:55:39Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".github/workflows/advisory-preflight.yml",
+      "status": "added",
+      "additions": 38,
+      "deletions": 0
+    },
+    {
+      "path": ".github/workflows/python-ci.yml",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_advisory_preflight.py",
+      "status": "added",
+      "additions": 171,
+      "deletions": 0
+    },
+    {
+      "path": "tools/ci/__init__.py",
+      "status": "added",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tools/ci/advisory_preflight.py",
+      "status": "added",
+      "additions": 262,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:25:04.651663+00:00"
+  }
+}

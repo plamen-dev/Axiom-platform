@@ -23,6 +23,7 @@ import csv
 import io
 import json
 import os
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -43,6 +44,16 @@ from axiom_core.global_capability_registry import (
 )
 
 SCHEMA_VERSION = "1.0"
+
+# Canonical (cross-account) PR number encoded in titles like
+# "PR #112 — ..." or "Integration PR #143 — ...".
+_CANONICAL_TITLE_RE = re.compile(r"^(?:Integration\s+)?PR\s*#(\d+)\b")
+
+
+def canonical_number_from_title(title: str) -> int:
+    """Derive the canonical PR number from a title, or 0 when absent."""
+    match = _CANONICAL_TITLE_RE.match((title or "").strip())
+    return int(match.group(1)) if match else 0
 
 
 # ---------------------------------------------------------------------------
@@ -606,6 +617,135 @@ class GitHubMetadataImportEngine:
 
         events.sort(key=self._timeline_sort_key)
         return [e.to_dict() for e in events]
+
+    # ------------------------------------------------------------------
+    # Backfill (batch import from payload files)
+    # ------------------------------------------------------------------
+
+    def backfill(self, payload_dir: str | os.PathLike) -> dict[str, Any]:
+        """Import every PR metadata payload in ``payload_dir``.
+
+        Payload files are ``*.json`` in the same shape ``import_metadata``
+        accepts. Canonical numbers come from the payload
+        ``global_capability_number`` or, when absent, from the PR title
+        (``PR #<n> — ...``); PRs with neither are recorded as canonical
+        gaps, never invented. Duplicate imports are skipped, not fatal,
+        so the backfill is safely re-runnable.
+        """
+        directory = Path(payload_dir)
+        if not directory.is_dir():
+            raise ValueError(f"Payload directory not found: {directory}")
+
+        imported: list[dict[str, Any]] = []
+        skipped_duplicates: list[int] = []
+        failed: list[dict[str, Any]] = []
+        canonical_gaps: list[int] = []
+
+        for payload_file in sorted(directory.glob("*.json")):
+            try:
+                metadata = json.loads(
+                    payload_file.read_text(encoding="utf-8")
+                )
+            except (json.JSONDecodeError, OSError) as exc:
+                failed.append(
+                    {"file": payload_file.name, "error": str(exc)}
+                )
+                continue
+
+            pr_data = metadata.get("pr", {}) or {}
+            pr_number = int(pr_data.get("repository_pr_number", 0) or 0)
+            canonical = int(metadata.get("global_capability_number", 0) or 0)
+            if not canonical:
+                canonical = canonical_number_from_title(
+                    pr_data.get("title", "")
+                )
+
+            try:
+                report = self.import_metadata(
+                    metadata=metadata,
+                    global_capability_number=canonical or None,
+                )
+            except ValueError as exc:
+                if "Duplicate import" in str(exc):
+                    skipped_duplicates.append(pr_number)
+                else:
+                    failed.append(
+                        {"file": payload_file.name, "error": str(exc)}
+                    )
+                continue
+
+            if not canonical:
+                canonical_gaps.append(pr_number)
+            imported.append(
+                {
+                    "repository_pr_number": pr_number,
+                    "global_capability_number": canonical,
+                    "report_id": report.get("report_id", ""),
+                }
+            )
+
+        return {
+            "payload_dir": str(directory),
+            "imported_count": len(imported),
+            "skipped_duplicate_count": len(skipped_duplicates),
+            "failed_count": len(failed),
+            "canonical_gap_count": len(canonical_gaps),
+            "imported": imported,
+            "skipped_duplicates": sorted(skipped_duplicates),
+            "failed": failed,
+            "canonical_gaps": sorted(canonical_gaps),
+            "schema_version": SCHEMA_VERSION,
+        }
+
+    def generate_sequence_ledger(self) -> str:
+        """Render the canonical PR sequence ledger (markdown).
+
+        One row per imported PR, sorted by repository PR number,
+        reconciling this account's GitHub numbering with the canonical
+        cross-account sequence (``global_capability_number``). Rows
+        without a canonical number are explicit gaps.
+        """
+        rows: list[dict[str, Any]] = []
+        for report in self.list_reports():
+            pr = report.get("metadata_import", {}).get("pr", {})
+            rows.append(
+                {
+                    "canonical": report.get("global_capability_number", 0),
+                    "pr_number": pr.get("repository_pr_number", 0),
+                    "title": pr.get("title", ""),
+                    "status": pr.get("status", ""),
+                    "merged_at": pr.get("merged_at", ""),
+                    "author": pr.get("author", ""),
+                }
+            )
+        rows.sort(key=lambda r: (r["pr_number"], r["canonical"]))
+
+        gaps = [r["pr_number"] for r in rows if not r["canonical"]]
+        lines = [
+            "# PR Sequence Ledger",
+            "",
+            "Canonical cross-account PR sequence reconciled with this",
+            "repository's GitHub PR numbers. Generated by",
+            "`axiom github-import-backfill` from imported GitHub metadata —",
+            "do not edit rows by hand; re-run the backfill instead.",
+            "",
+            f"- Imported PRs: {len(rows)}",
+            f"- Canonical gaps (no `PR #<n>` in title): "
+            f"{sorted(gaps) if gaps else 'none'}",
+            "",
+            "| Canonical # | GitHub PR # | Title | Status | Merged at "
+            "| Author |",
+            "|---|---|---|---|---|---|",
+        ]
+        for r in rows:
+            canonical = str(r["canonical"]) if r["canonical"] else "— (gap)"
+            title = str(r["title"]).replace("|", "\\|")
+            lines.append(
+                f"| {canonical} | #{r['pr_number']} | {title} "
+                f"| {r['status']} | {r['merged_at'] or '—'} "
+                f"| {r['author']} |"
+            )
+        return "\n".join(lines) + "\n"
 
     # ------------------------------------------------------------------
     # Duplicate detection

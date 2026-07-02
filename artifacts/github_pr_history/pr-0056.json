@@ -1,0 +1,50 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 56,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/56",
+    "title": "Catalog context-preflight + model-health-evidence commands in command registry (BUG-021)",
+    "description": "## Summary\n\nFixes the preexisting failing test `test_command_registry.py::test_all_builtin_axiom_commands_cataloged` on `main`. Three commands were registered on the `axiom` CLI group but missing from the governance `CommandRegistry`, so they had no safety classification, prerequisites, evidence outputs, or failure modes:\n\n- `context-preflight` (PR #157)\n- `model-health-evidence-apply` (PR #156)\n- `model-health-evidence-history` (PR #156)\n\nThis is a **governance/catalog-only** change — no CLI behavior, promotion semantics, or Revit behavior is touched. Each new `CommandSpec` is `READ_ONLY` / `SAFE` with `POETRY_ENV` prerequisite and mirrors the command's real artifact outputs:\n\n```python\n_register(CommandSpec(\n    name=\"model-health-evidence-apply\",\n    evidence_outputs=(\n        EvidenceOutput(\"model_health_readiness_intake/<intake_id>/report.json\", required=True),\n        EvidenceOutput(\"model_health_readiness_intake/<intake_id>/pass_fail.json\", required=True),\n    ) + EV_CONSOLE, ...))\n\n_register(CommandSpec(\n    name=\"context-preflight\",\n    evidence_outputs=(\n        EvidenceOutput(\"context_preflight/<run_id>/context_preflight.json\", required=True),\n        EvidenceOutput(\"context_preflight/<run_id>/context_preflight.md\", required=True),\n    ) + EV_CONSOLE, ...))\n```\n\nThe coverage test asserts `set(cli.commands) ⊆ command_names()` and `command_names() == EXPECTED_AXIOM_COMMANDS | TOOLCHAIN_COMMANDS`, so the three names are also added to `EXPECTED_AXIOM_COMMANDS`.\n\n## What changed\n- `src/axiom_core/runner/command_registry.py` — 3 new `_register(CommandSpec(...))` entries.\n- `tests/test_command_registry.py` — 3 names added to `EXPECTED_AXIOM_COMMANDS`.\n- `docs/logs/bug-validation-log.md` — BUG-021.\n\n## What did NOT change\n- No CLI command behavior; these commands already existed and ran.\n- No promotion / confidence / readiness / evidence semantics; no runner execution path; no Revit behavior. 2024 baseline unaffected.\n\n## Tests run\n- `pytest tests/test_command_registry.py` → 27 passed (previously 1 failing).\n- `ruff check` on changed files → clean.\n\n## Validation still pending\n- None. Governance-only; not Windows- or Revit-dependent.\n\n## Known risks\n- Low: metadata-only. If a command's evidence output paths later change, the catalog entry would need updating (same as every other entry).\n\n## Factory relevance\nCloses governance drift so the registry is once again the complete, authoritative catalog the runner authorizes against — supports the verification factory's command-governance layer.\n\n## Revit live validation required?\nNo. 2024 baseline unaffected.\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782928040-command-registry-catalog-drift",
+    "status": "merged",
+    "merge_commit_sha": "2f0984ee09cf16ebf474d888b968a7d4bfdfb638",
+    "created_at": "2026-07-01T17:49:24Z",
+    "updated_at": "2026-07-01T19:13:38Z",
+    "merged_at": "2026-07-01T19:13:38Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "7dbf033873cf888f677858f3639104a56c35d58e",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Catalog context-preflight + model-health-evidence commands in command registry (BUG-021)\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-01T17:48:49Z"
+    }
+  ],
+  "files": [
+    {
+      "path": "docs/logs/bug-validation-log.md",
+      "status": "modified",
+      "additions": 15,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 94,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:25:03.856633+00:00"
+  }
+}

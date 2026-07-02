@@ -1,0 +1,74 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 28,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/28",
+    "title": "PR #138 — Execution Step Framework v1",
+    "description": "## Summary\n\nAdds the **execution-step** layer, continuing the autonomous-engineering roadmap one step past the Execution Plan Framework (#137):\n\n`Context = State → Environment = Location → Resource = Requirements → Constraint = Boundaries → Readiness = Can execution proceed? → Plan = What execution would do → **Step = Individual unit of planned execution**`\n\nWhere the plan layer represents *what execution would do*, this layer represents *the individual executable units within a plan*. It is **observational and declarative only** — no execution, orchestration, scheduling, optimization, worker assignment, or autonomous behavior; upstream Plan / Chain / Knowledge-Graph layers are consumed read-only.\n\nMirrors the established deterministic, append-only framework pattern (same as #132–#137). New module `src/axiom_core/execution_step.py`:\n\n- **`ExecutionStep`**: `step_id, plan_id, capability_id, order_index, step_type, status, references, summary, created_at, schema_version, raw_payload`\n  - `ExecutionStepType` ∈ IMPLEMENTATION/VALIDATION/REPAIR/REVIEW/REPORTING/INVESTIGATION/APPROVAL/OTHER\n  - `ExecutionStepStatus` ∈ CREATED/READY/BLOCKED/COMPLETED/FAILED/SKIPPED\n- **`ExecutionStepReference`**: `reference_id, reference_type, reference_value, summary`; `ExecutionStepReferenceType` ∈ CAPABILITY/PLAN/FILE/ARTIFACT/VALIDATION/KNOWLEDGE_NODE/OTHER\n- **`ExecutionStepReport`**: `report_id, step_count, status_counts, step_type_counts, blocked_count, failed_count, skipped_count, duplicate_step_count, created_at`\n- **`ExecutionStepEvidence`** + **`ExecutionStepEngine`** (create/append/get/list/export)\n\nEngine semantics:\n- Validation + normalization (type/status/reference_type uppercased; `order_index` must be a non-bool `int`)\n- Deterministic ordering — step sort key `(plan_id, order_index, capability_id, step_type, status, step_id)`; references sorted `(reference_type, reference_value, reference_id)`\n- Duplicate detection — case-insensitive 4-tuple `(plan_id, capability_id, order_index, step_type)`, keep first, count the rest\n- Aggregation — `status_counts`, `step_type_counts`, `blocked_count`, `failed_count`, `skipped_count`\n- `raw_payload` preservation, schema versioning (`SCHEMA_VERSION = \"1.0\"`), path-safe `report_id` sandboxing\n- Evidence bundle always written under `artifacts/execution_step/<run_id>/`: `execution_step_request.json`, `execution_step_result.json`, `execution_step_summary.md`, `pass_fail.json` (+ `report.json`)\n\nPass/Fail gate (in `pass_fail.json` only):\n```\npassed = step_count > 0 and blocked_count == 0 and failed_count == 0\n```\n\nCLI (mirrors the plan/constraint commands): `axiom execution-step-create [--step-file] [--json-output]`, `execution-steps`, `execution-step-show <id>`, `execution-step-export <id> [--format markdown|json|csv]`.\n\nWiring: registered 4 commands in `command_registry.py` (+ `test_command_registry` EXPECTED set), `test_selection_engine` map (`execution_step.py → test_execution_step.py`), `.gitignore` (`artifacts/execution_step/`).\n\n## Validation\n\n- **New tests:** `tests/test_execution_step.py` (52 tests — models, determinism, step ordering, normalization, validation, duplicate detection, blocked/failed/skipped detection, pass/fail gate, append-only, retrieval/exports, path safety)\n- **Full pytest:** `poetry run pytest -q` → **4742 passed, 1 skipped** (baseline 4686 at #137)\n- **Ruff:** `poetry run ruff check src/ tests/` → 0 errors\n- **CLI smoke (adversarial fixture):** 4 steps, 1 case-insensitive duplicate `(pln-1,cap-1,0,IMPLEMENTATION)`, 1 BLOCKED, 1 FAILED, lowercase types/statuses, out-of-order steps → step_count 3 / duplicate 1 / blocked 1 / failed 1 / skipped 0; ordered by `order_index` 0→1→2; exports markdown/CSV(header+2 steps+1 ref)/JSON valid; error paths show-missing exit 2 / traversal exit 1\n\n## What did not change\n\nRevit 2024 baseline unaffected; no architecture changes, no network calls. Non-goals respected (no execution/orchestration/scheduling/optimization/worker-assignment/autonomous behavior).\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782308091-execution-step-framework",
+    "status": "merged",
+    "merge_commit_sha": "ae041afa4f48c5851660d62a1b83ed6c7d80ef1c",
+    "created_at": "2026-06-24T13:39:08Z",
+    "updated_at": "2026-06-24T17:23:40Z",
+    "merged_at": "2026-06-24T17:23:40Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "8ef3a4522e3b5f3e7f7f17657b51d9ea7dca4d44",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #138 — Execution Step Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-24T13:38:53Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 166,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/execution_step.py",
+      "status": "added",
+      "additions": 721,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 70,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_execution_step.py",
+      "status": "added",
+      "additions": 712,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:42.127233+00:00"
+  }
+}

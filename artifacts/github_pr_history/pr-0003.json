@@ -1,0 +1,74 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 3,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/3",
+    "title": "PR #114 — Recovery Recommendation Framework v1",
+    "description": "## Summary\n\nAdds the **Recovery Recommendation Framework v1**, the next link in the chain (Execution Attempt → Execution Outcome → Failure Classification → **Recovery Recommendation**). Where Failure Classification records *why* an outcome failed, this framework records *what to do about it*: a recommended action type, priority, summary, and rationale per failure classification, with deterministic ordering and an always-written evidence bundle. It follows the exact template of the prior frameworks (dataclasses + Engine + 4-file evidence bundle + create/show/export CLI + command-registry & test-selection registration).\n\nNew module `src/axiom_core/recovery_recommendation.py`:\n\n```python\nclass RecoveryRecommendationType(str, Enum):  # RETRY, REPAIR, ROLLBACK, ESCALATE, IGNORE, INVESTIGATE\nclass RecoveryPriority(str, Enum):            # LOW, NORMAL, HIGH, CRITICAL\n\n@dataclass\nclass RecoveryRecommendation:\n    recommendation_id; classification_id; recommendation_type; priority\n    summary; rationale; created_at\n\n@dataclass\nclass RecoveryRecommendationReport:\n    report_id; recommendation_count\n    low_count; normal_count; high_count; critical_count; created_at\n\n@dataclass\nclass RecoveryRecommendationEvidence:\n    evidence_id; report_id; summary; created_at\n\nclass RecoveryRecommendationEngine:\n    create(recommendations) -> report dict   # validates enums, requires classification_id\n    get_report(report_id); list_reports(); export_report(report_id) -> markdown\n```\n\nBehavior notes (the parts not obvious from the code):\n- **Consumes `FailureClassification`** via a required `classification_id` on every recommendation (empty/missing rejected).\n- **Deterministic ordering** by `(created_at, classification_id, recommendation_id)` — independent of input order.\n- **Pass/fail** is explicit: `passed = critical_count == 0` (an empty report passes).\n- **Evidence bundle** always written under `artifacts/recovery_recommendations/<report_id>/`: `recovery_recommendation_request.json`, `recovery_recommendation_result.json`, `recovery_recommendation_summary.md`, `pass_fail.json` (plus `report.json` for retrieval). Markdown includes Priority Counts, Type Counts, and Recommendations sections.\n- **Path safety** reused from the established template: segment-validated `report_id` (rejects `..`, `/`, `\\`, empty/whitespace), sandbox-resolved paths, symlink-escape rejection.\n\nCLI: `axiom recovery-recommendation-create` / `-show` / `-export`, registered in `runner/command_registry.py` (READ_ONLY / SAFE) and the `test_selection_engine.py` map; command names added to `tests/test_command_registry.py`. `.gitignore` ignores the new artifacts dir.\n\n## What changed\n- New: `src/axiom_core/recovery_recommendation.py`, `tests/test_recovery_recommendation.py` (34 tests).\n- Modified: `src/axiom_cli/main.py` (3 CLI commands + rich renderer), `runner/command_registry.py` (3 CommandSpecs), `test_selection_engine.py` (mapping), `tests/test_command_registry.py` (expected command names), `.gitignore`.\n\n## What did NOT change\nNo changes to existing frameworks, the Revit 2024 baseline, architecture, or dependencies. No network calls, approvals, workflow routing, or merge behavior. Non-goals (automatic repair execution, schedulers, worker orchestration) are out of scope.\n\n## Validation\n- `poetry run pytest -q` → **3622 passed, 1 skipped** (+34 new; PR #113 baseline was 3588 passed, 1 skipped).\n- `poetry run ruff check src/ tests/` → **0 errors**.\n- CLI smoke verified: create → show → export with sample data; error paths (not-found → exit 2, invalid id `../../etc` → exit 1); all 4 evidence files + `report.json` written.\n\n## Risks\nLow. Additive framework following an established, tested pattern; deterministic and self-contained.\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782185745-recovery-recommendation-framework",
+    "status": "merged",
+    "merge_commit_sha": "3071b1a38dae1ca5de1a3bc8819770385a5e2115",
+    "created_at": "2026-06-23T03:39:07Z",
+    "updated_at": "2026-06-23T03:47:38Z",
+    "merged_at": "2026-06-23T03:47:38Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "07473e164bc79fb493da5aefdd26915d0a191ab6",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #114 — Recovery Recommendation Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-23T03:38:53Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 154,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/recovery_recommendation.py",
+      "status": "added",
+      "additions": 396,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 55,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_recovery_recommendation.py",
+      "status": "added",
+      "additions": 420,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:22.263541+00:00"
+  }
+}

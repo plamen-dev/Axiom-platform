@@ -1,0 +1,98 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 47,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/47",
+    "title": "PR #157 — Axiom Context Preflight, System Atlas, PR Purpose Map, and Anti-Duplication Guide v0",
+    "description": "## Summary\n\nContext-enforcement layer that makes Axiom explain its own architecture so future PRs don't rebuild existing concepts under new names. Five deliverables — one live CLI command, one live-generated atlas, three tracked reference docs. A required **old-foundation scan** (final commit) reconciled the original pipe/spine/bridge/job-plan/MCP/agents architecture against the newer execution-chain/evidence/confidence work.\n\n### Deliverable 1 — Context Preflight CLI\n`axiom context-preflight [--repo-root .] [--artifacts-root ./artifacts] [--json-output]` generates a 9-section repo scan: git state, canonical context, integration docs, CLI/command map, evidence topology, runner substrate, known caveats, overlap guardrails, Context Basis template. Outputs JSON + Markdown under gitignored `artifacts/context_preflight/<run_id>/`.\n\n### Deliverable 2 — Live System Atlas\n`_system_atlas(repo_root)` maps **25** hardcoded component families with: name, aliases, primary_files, purpose, workflow_edge, related_prs, status, overlap_risk, notes. File presence checked live against repo root. Outputs `system_atlas.json` + `system_atlas.md`.\n\nThe old-foundation scan added 7 families to the original 18 (pipe/spine/bridge/MCP/agents):\n```\n+ MCP Layer (mock tool boundary)\n+ Automation Bridge / Pipe Client (real named-pipe transport, Python side)\n+ Revit Add-in Bridge (C#: AxiomPipeServer / PromptDispatcher)\n+ Run Spine (audit/evidence backbone)\n+ Automation Planner (event → lane, planning-only)\n+ Persistence / ExecutionTrace store (legacy SQLite record)\n+ Agents Layer (OrchestratorAgent / ExecutionAgent / TelemetryAgent — coordinate-only)\n```\n\n### Deliverable 3 — PR Purpose Map (`docs/architecture/integration/PR_Purpose_Map_v0.md`)\nMaps PRs #143–#156 with M1–M4 status nuance, plus a new **old-foundation (pre-#112) component table** citing files (original PR numbers not invented — marked unknown). M1: implemented runtime. M2: runtime (narrow EVID-001 slice). M3: docs-validation milestone (no runtime proven). M4: runtime 7-stage ID flow (not full autonomous loop).\n\n### Deliverable 4 — Duplicate/Alias Map (`docs/architecture/integration/Duplicate_Alias_Map_v0.md`)\nNow **12 concept clusters**. Old-foundation scan added:\n- **Cluster 10** — Revit Execution Boundary: MCP Layer (mock) vs Automation Bridge / Pipe Client / AxiomPipeServer / PromptDispatcher (real). Status: **adapter seam needed**.\n- **Cluster 11** — Execution Record: Run Spine vs ExecutionTrace (legacy) vs ExecutionReport (new) vs evidence/validation bundles. Status: **duplicate candidate** (ExecutionTrace vs ExecutionReport).\n- **Cluster 12** — Coordinators: Agents layer vs data-model Orchestrator vs ExecutionChainOrchestrator. Status: accepted distinct, high naming-overlap risk.\n\n### Deliverable 5 — Context Pack Index (`docs/architecture/integration/Axiom_Current_Context_Pack.md`)\nLightweight tracked pointer to all context resources.\n\n## Old-foundation scan result\n\nRequired scan before final commit, to prevent reinventing existing autonomy components under new names.\n\n1. **Did older pipe/spine/bridge/job-plan concepts already cover parts of the autonomy loop?** Yes. The named-pipe bridge (`PipeClient` → `AxiomPipeServer` → `PromptDispatcher`) is the **real Revit execution edge**; `AutomationBridge` already wraps it as a non-interactive autonomy driver. `Run Spine` provides run identity/audit/artifacts. `Orchestrator` does Job→Plan→ToolStep→MCP. `WorkItem`/`WorkQueue` model a backlog. These cover transport, run-identity, planning, and backlog edges.\n2. **Which newer concepts overlap?** MCPLayer (mock) ↔ pipe bridge (Cluster 10); ExecutionReport/bundles ↔ legacy ExecutionTrace/QAReport/Run Spine (Clusters 4 & 11); ExecutionChainOrchestrator/agents ↔ legacy Orchestrator (Clusters 2 & 12); WorkItem/WorkQueue ↔ Job/Plan (Cluster 1).\n3. **Active vs legacy/unknown?** Active: Run Spine, PipeClient/AutomationBridge (Windows revalidation pending), AxiomPipeServer/PromptDispatcher (C#), Orchestrator, AutomationPlanner, Persistence/ExecutionTrace, Agents, normalization, Job/Plan/ToolStep/QAReport. Partial: MCPLayer (mock; real impl unproven). Duplicate-candidate: ExecutionTrace vs ExecutionReport. Unknown: original PR numbers for pre-#112 modules (cited by file, not invented).\n4. **What must future PRs check before proposing:**\n   - **task packet consumer** → Cluster 1 (Job/Plan/WorkItem/WorkQueue) — consume existing, don't add a 4th.\n   - **implementation attempt model** → `execution_attempt.py`/`execution_attempt_v2.py` already exist.\n   - **local worker loop** → Clusters 2/10/12 + Local Runner/CommandRegistry; reuse AutomationBridge/PipeClient transport.\n   - **retry executor** → Cluster 7 (FailureClassification + RecoveryRecommendation + RecoveryExecution) — no parallel retry engine.\n   - **validation/evidence bundle changes** → Clusters 4 & 11 (Run Spine + ExecutionTrace + ExecutionReport + bundle conventions).\n5. **What remains unknown?** Whether MCPLayer becomes the real Revit boundary or is superseded by the pipe bridge; exact creating-PR numbers for pre-#112 modules; whether ExecutionTrace is slated for retirement vs co-existing with ExecutionReport.\n\n**Did this change conclusions about future task-packet/worker/retry work?** Yes — it strengthens the anti-duplication position: each would overlap already-existing old-foundation components, so future PRs must start from those via an adapter seam, not a new framework.\n\n## Output framing\n- **Live generated (gitignored):** context_preflight report, system_atlas\n- **Tracked reference (committed):** PR Purpose Map, Duplicate/Alias Map, Context Pack, Design Pass\n- **Canonical (not touched):** docs 10/20/30/40/50/60 — test-asserted NOT mutated\n\n## Validation\n- 34 tests passed (incl. new `test_atlas_includes_old_foundation_components` asserting pipe/spine/bridge/MCP families + files present); ruff clean; CI green\n- Canonical docs not mutated (assertion)\n\n## What changed\n- `src/axiom_core/context_preflight.py`: 25 component families (added 7 old-foundation)\n- `tests/test_context_preflight.py`: +1 old-foundation test\n- `docs/architecture/integration/Duplicate_Alias_Map_v0.md`: +Clusters 10–12 + Old-foundation scan result\n- `docs/architecture/integration/PR_Purpose_Map_v0.md`: +old-foundation component table\n- `docs/logs/behavior-change-ledger.md`: BHV-031 updated\n\n## What did NOT change\n- Canonical docs 10/20/30/40/50/60\n- pipe/spine/bridge/orchestrator/runtime behavior (mapping only)\n- Confidence math, evidence promotion logic, Revit adapter code\n\n## Scope held\nThis is a mapping and context-enforcement correction only. No refactor of old architecture, no task-packet ingestion, no runner/worker/retry behavior, no Revit bridge behavior change.\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782711733-context-preflight",
+    "status": "merged",
+    "merge_commit_sha": "40b21943223a4faffb17d5fdc21db38195956b99",
+    "created_at": "2026-06-29T05:50:56Z",
+    "updated_at": "2026-06-30T20:04:29Z",
+    "merged_at": "2026-06-30T20:04:29Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "62157002c1e6cd7b68a23156959ade89d1d6ccda",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #157 — Axiom Context Preflight and Live System Map v0\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-29T05:49:35Z"
+    },
+    {
+      "commit_sha": "eba0f33ec3e8eb6690ff2c716c2a67cf8656a62a",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Expand PR #157: System Atlas, PR Purpose Map, Duplicate/Alias Map, Context Pack\n\nDeliverable 2: System Atlas (live generated)\n- 18 component families with aliases, status, workflow edges, overlap risk\n- Hardcoded from repo inspection design pass; file presence checked live\n- system_atlas.json + system_atlas.md generated alongside preflight\n\nDeliverable 3: PR Purpose Map (tracked reference doc)\n- PRs #143-#156 with purpose, files, workflow edge, status, overlap risk\n- M1-M4 classified with proper nuance (runtime vs docs vs investigation)\n- Does not duplicate PR-review ledger (different fields/purpose)\n\nDeliverable 4: Duplicate/Alias Map (tracked reference doc)\n- 9 concept clusters with aliases, overlap risk, reconciliation status\n- Does not duplicate canonical impact ledger (different purpose)\n\nDeliverable 5: Current Context Pack (tracked index)\n- Lightweight pointer to all context resources\n\nDesign pass: PR157_Design_Pass.md answers 10 design questions with\nanti-duplication assessment for each deliverable.\n\nTests: 33 passed (24 original + 9 new atlas tests). Ruff clean.\nCanonical documents 10/20/30/40/50/60 NOT mutated.\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-29T06:26:46Z"
+    },
+    {
+      "commit_sha": "7b0c784637252026baea0d4d37f64971dec0851f",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #157: old-foundation scan — add pipe/spine/bridge/MCP/agents families and alias clusters\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-29T06:35:42Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "docs/architecture/integration/Axiom_Current_Context_Pack.md",
+      "status": "added",
+      "additions": 98,
+      "deletions": 0
+    },
+    {
+      "path": "docs/architecture/integration/Duplicate_Alias_Map_v0.md",
+      "status": "added",
+      "additions": 211,
+      "deletions": 0
+    },
+    {
+      "path": "docs/architecture/integration/PR157_Design_Pass.md",
+      "status": "added",
+      "additions": 154,
+      "deletions": 0
+    },
+    {
+      "path": "docs/architecture/integration/PR_Purpose_Map_v0.md",
+      "status": "added",
+      "additions": 250,
+      "deletions": 0
+    },
+    {
+      "path": "docs/logs/behavior-change-ledger.md",
+      "status": "modified",
+      "additions": 17,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 126,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/context_preflight.py",
+      "status": "added",
+      "additions": 1214,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_context_preflight.py",
+      "status": "added",
+      "additions": 515,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:56.974313+00:00"
+  }
+}

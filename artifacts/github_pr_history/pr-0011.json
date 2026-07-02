@@ -1,0 +1,74 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 11,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/11",
+    "title": "PR #122 — Global Capability Registry Framework v1",
+    "description": "## Summary\n\nAdds the **canonical identity layer** for Program 1. GitHub PR numbers are repository-local; the Global Capability ID/number becomes the primary identity so capability history stays continuous across repositories, workers, and future systems. Repository PR numbers become *references*, not identity.\n\nExample mapping the registry encodes:\n```\nplamen-hristov/Axiom-platform PR #111  -> Global Capability #111\nplamen-dev/Axiom-platform     PR #1    -> Global Capability #112\nplamen-dev/Axiom-platform     PR #10   -> Global Capability #121\n```\n\nNew module `src/axiom_core/global_capability_registry.py`:\n- `GlobalCapabilityStatus` — `PROPOSED, OPEN, MERGED, CLOSED, SUPERSEDED`.\n- `GlobalCapabilityRepositoryRef` — owner/name/PR number/PR url/branch/commit_sha/merge_sha (`from_dict`/`to_dict`).\n- `GlobalCapabilityWorkerRef` — `worker_id, worker_type`.\n- `GlobalCapabilityValidationSummary` — `new_tests, total_tests, skipped_tests, ruff_clean, ci_status, notes`.\n- `GlobalCapabilityEntry` — the full record: `global_capability_id/number, capability_name, worker, repository, validation, primary_program, secondary_programs, parent_capability_ids, related_capability_ids, affected_files, status, created_at/updated_at, schema_version, raw_metadata`.\n- `GlobalCapabilityRegistry` — ordered de-duplicated collection.\n- `GlobalCapabilityReport` — `report_id, entry_count, status_counts, program_counts, schema_version, entries`.\n- `GlobalCapabilityEvidence` + `GlobalCapabilityRegistryEngine` (`create / get_report / list_reports / export_report`).\n\n**Authoritative global ordering** (`_sort_key`):\n```python\n(global_capability_number, created_at,\n repository_owner, repository_name,\n repository_pr_number, global_capability_id)\n```\n\n**Duplicate global numbers rejected** at create time (`ValueError`). **Raw metadata preserved** verbatim. **Schema versioning** via `SCHEMA_VERSION = \"1.0\"` (overridable per entry).\n\nCLI (registered in `command_registry.py`, `test_selection_engine.py`, `test_command_registry.py`):\n- `axiom global-capability-create [--registry-file <rf>] [--json-output]`\n- `axiom global-capability-list [--json-output]`\n- `axiom global-capability-show <report_id> [--json-output]`\n- `axiom global-capability-export <report_id> [--format markdown|json|csv]`\n\n**Three export formats**: JSON, Markdown timeline (`#112 Name [MERGED] (owner/repo PR #1)`), and CSV (flattened columns). Evidence bundle under `artifacts/global_capability_registry/<run_id>/`: `global_capability_request.json`, `global_capability_result.json`, `global_capability_summary.md`, `global_capability_timeline.csv`, `pass_fail.json` (+ `report.json`).\n\n## What changed / didn't\n- **Changed behavior**: new additive identity registry + 4 CLI commands. No existing framework modified.\n- **Did not change**: Revit 2024 baseline, architecture/doctrine, dependencies. No GitHub API, no automation, no orchestration, no event timeline.\n- **Strategic fit**: identity/registry layer — capability metadata belongs in registries; this makes capability history continuous and machine-traceable across repos/workers.\n\n## Validation\n- `poetry run pytest -q` → **3928 passed, 1 skipped** (+46 new; PR #121 baseline 3882).\n- `poetry run ruff check src/ tests/` → **0 errors**.\n- CLI create/list/show/export verified incl. all 3 export formats and error paths (not-found → exit 2, path-traversal → exit 1, invalid format → exit 1); deterministic ordering confirmed (112 before 121); duplicate-number rejection verified.\n- Revit live validation: not required (no adapter/baseline changes).\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782228404-global-capability-registry",
+    "status": "merged",
+    "merge_commit_sha": "c71d6b7a5d79200d702245931f76ed435bfa7161",
+    "created_at": "2026-06-23T15:30:04Z",
+    "updated_at": "2026-06-23T16:08:42Z",
+    "merged_at": "2026-06-23T16:08:42Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "5c3ba696321d29cbad553dae910f47c90bc9f2f8",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #122 — Global Capability Registry Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-23T15:29:53Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 161,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/global_capability_registry.py",
+      "status": "added",
+      "additions": 636,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 74,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_global_capability_registry.py",
+      "status": "added",
+      "additions": 503,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:28.492721+00:00"
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 40,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/40",
+    "title": "PR #149 — Devin PR Self-Audit and CLI Testing Skill Update v1",
+    "description": "## Summary\n\nUpdates `.agents/skills/testing-axiom-cli/SKILL.md` with operational patterns proven during the PR #146/#147/#148 integration phase. **No runtime code changes.** This is operational skill guidance, not doctrine.\n\nAdds 5 new sections to the existing skill file:\n\n1. **Recommended Devin Compute Mode** — template + when-to-use-Ultra vs Normal/Fast guidance for future PR task packets.\n2. **Required Pre-Review Self-Audit** — trigger conditions (execution/evidence/state/promotion/registry/doctrine PRs) + 9-point checklist (overclaims, new object families, doctrine-in-code, idempotency, conflict handling, source-of-truth, etc.).\n3. **Purpose-to-Workflow Reconciliation Gate** — 8-question reconciliation for architecture-sensitive PRs (what does it use, what consumes it, what should be deleted/merged/preserved).\n4. **M4/M2 CLI verification checklists** — step-by-step CLI testing procedures for `execution-chain-run` (7 steps: IDs, ID-flow, disk resolution, static-vs-runtime distinction) and `capability-evidence-apply` (12 steps: baseline, pass, fail, duplicate, conflict, invalid, stale, history, show, no-mutation, audit-only).\n5. **Recording/ttyd reliability guidance** — character-dropping workaround, helper-script pattern, clean-tree checks, webp conversion, lessons from PR #146–#148 walkthroughs. Also fixes `--writable` → `-W` for ttyd 1.6.x.\n\nAll new sections are explicitly classified as **operational guidance, not doctrine**.\n\n### Purpose-to-Workflow Reconciliation\n\n1. **What existing PR/component/capability does this use?** `.agents/skills/testing-axiom-cli/SKILL.md`; PR #146/#147/#148 CLI testing patterns; Program 0/6/7 operational guidance.\n2. **What workflow does it participate in?** Devin PR execution and review-readiness workflow.\n3. **What consumes its output?** Devin during future Axiom PR execution; Program 1 task packets indirectly.\n4. **What evidence proves it works?** Skill file update only; no runtime behavior changes; `git diff --stat` shows 1 file, 143 insertions, 6 deletions.\n5. **What is the disposition?** Support-only operational infrastructure.\n6. **What existing structure was checked before adding anything new?** Existing `.agents/skills/` — only one skill file exists (`testing-axiom-cli/SKILL.md`); no competing skill location found.\n7. **What complexity or duplicate-engine risk does this introduce?** None — updates existing skill file only.\n8. **What should be deleted, merged, preserved, or left alone?** Preserved all existing checklist content (framework CLI, runner-commands); merged new sections into the same file; no competing files created.\n\n### Pre-review self-audit\n\n1. **Did this PR change runtime behavior?** No.\n2. **Did this PR create or alter doctrine?** No — all new sections explicitly state \"operational guidance, not doctrine\".\n3. **Did this PR touch canonical files?** No.\n4. **Did this PR create duplicate skill guidance?** No — single file updated, no competing files.\n5. **Did this PR correctly classify compute-mode guidance as operational?** Yes.\n6. **Did this PR correctly classify self-audit and Purpose-to-Workflow as operational guidance?** Yes.\n7. **Did this PR keep CLI recording guidance separate from Axiom-native validation recorder work?** Yes — ttyd/recording guidance is for Devin's current manual walkthrough workflow; the planned CLI Validation Evidence Recorder (PR #150) is a separate Axiom-native implementation.\n8. **Are future PR trigger conditions clear?** Yes — self-audit triggers listed (execution flow, evidence, capability state, etc.); compute-mode template provided for task packets.\n\n### Validation\n\n- `git diff --stat`: 1 file changed (`.agents/skills/testing-axiom-cli/SKILL.md`), 143 insertions, 6 deletions.\n- No runtime source files changed.\n- No tests required (skill/docs-only change per repo testing policy).\n\n### Non-goals confirmed\n\n- No runtime code changes.\n- No product behavior changes.\n- No canonical file migration.\n- No doctrine update.\n- No new execution framework.\n- No Axiom-native validation recorder implementation.\n- No broad refactor.\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782671223-pr149-skill-update",
+    "status": "merged",
+    "merge_commit_sha": "4310fd1b305047c34dbc0db8d49afacaef3682f8",
+    "created_at": "2026-06-28T18:31:46Z",
+    "updated_at": "2026-06-28T18:42:28Z",
+    "merged_at": "2026-06-28T18:42:27Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "db4e3d8dae6c6c928be5560ea00be946dad74309",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #149 — Devin PR Self-Audit and CLI Testing Skill Update v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-28T18:30:34Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".agents/skills/testing-axiom-cli/SKILL.md",
+      "status": "modified",
+      "additions": 143,
+      "deletions": 6
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:51.499106+00:00"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 38,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/38",
+    "title": "Update testing-axiom-cli skill with execution-chain and evidence-promotion checklists",
+    "description": "Updates the testing-axiom-cli skill with verified testing patterns for the execution-chain-run and capability-evidence-apply CLI commands, plus guidance on running long multi-step walkthrough scripts in ttyd.\n\nDevin Session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7",
+    "author": "plamen-dev",
+    "branch_name": "devin/update-skills-1782668981",
+    "status": "merged",
+    "merge_commit_sha": "4c196e279be613908bd609278ded22c632a8fa0f",
+    "created_at": "2026-06-28T17:49:44Z",
+    "updated_at": "2026-06-28T18:47:30Z",
+    "merged_at": "2026-06-28T18:47:30Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "82b35b46b60a76035bcc83d791e8ea8d53b0c340",
+      "author": "devin-ai-integration[bot]",
+      "message": "Update testing-axiom-cli skill with execution-chain and evidence-promotion checklists\n\nCo-authored-by: plamen.hristov@imsdevlab.onmicrosoft.com <plamen.m.hristov@gmail.com>",
+      "timestamp": "2026-06-28T17:49:42Z"
+    },
+    {
+      "commit_sha": "3deb0071d6450d4bb842103797952c77b6260727",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Merge main into branch, resolve SKILL.md conflict (take main's PR #40 version which subsumes PR #38 content)\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-28T18:44:26Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".agents/skills/testing-axiom-cli/SKILL.md",
+      "status": "modified",
+      "additions": 43,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:49.974401+00:00"
+  }
+}

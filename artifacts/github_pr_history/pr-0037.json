@@ -1,0 +1,62 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 37,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/37",
+    "title": "PR #147 — Evidence to Promotion Loop v1",
+    "description": "## Summary\n\nM2 — proves that execution evidence **changes capability state** instead of remaining an inert artifact (closes the EVID-001 orphaning gap from PR #144). A thin `EvidencePromotionLoop` reads the `evidence.json` bundle that `execution-chain-run` already produces, derives a pass/fail outcome, and accumulates it onto the capability's existing confidence/readiness via the existing `CapabilityConfidenceEngine`. **No new promotion framework, no doctrine, no new registry** — the confidence record (keyed by `capability_id`) *is* the durable state.\n\n### Evidence source used\nThe `execution-chain-run` output: `artifacts/execution_chain/<run_id>/evidence.json` (carries `references.capability_id/result_id/artifact_id`) + sibling `trace.json` (carries `status` PASS/FAIL, `report_id`, `created_at`). No orchestrator change was needed.\n\n### Existing structures reused (no gap → nothing new invented)\n| M2 need | Existing structure reused |\n|---|---|\n| capability identity | `capability_id` (chain evidence `references.capability_id`; the key `CapabilityConfidenceEngine` already uses) |\n| evidence + pass/fail | chain `evidence.json` bundle + `trace.json` `status` |\n| confidence / readiness / state | `CapabilityConfidenceEngine` (score 0–1, level very_low…very_high); readiness derived from score |\n| recency | existing `created_at` ISO timestamps (opt-in `--max-age-seconds`) |\n| rejected/quarantined | thin intake audit record (see below) |\n\nThe one thin addition: rejected/quarantined evidence produces **no** confidence report (no state change), so the confidence store cannot record the rejection itself. A small per-application intake record (`artifacts/capability_evidence_intake/<intake_id>/report.json` + `pass_fail.json`, following the repo's standard per-engine evidence convention) captures decision + reason + before/after + links. It is an audit artifact, **not** a new promotion registry.\n\n### Evidence → state mapping (pseudocode)\n```\noutcome  = bundle.passed | bundle.status | trace.status   -> PASS | FAIL | MISSING\nidentity = override | bundle.capability_id | references.capability_id\n\nif not identity:              decision = QUARANTINED   (no state change)\nelif file missing/unreadable: decision = REJECTED (MISSING)\nelif stale(created_at, max_age_seconds): decision = QUARANTINED\nelif outcome == MISSING:      decision = REJECTED      (no state change)\nelse:  # ACCEPTED\n    prior = latest confidence report for capability_id (factors) or zeros\n    execution_count += 1; success_count += (outcome==PASS); failure_count += (outcome==FAIL)\n    report = CapabilityConfidenceEngine.create(capability_id, **cumulative_factors)\n    readiness = ready (score>=0.7) | provisional (>=0.3) | blocked\n```\n\n### Before/after state example (real run)\n`execution-chain-run self-model-build` (PASS) → apply:\n- confidence `very_low (0.0)` → `very_high (1.0)`; readiness `blocked` → `ready`\n- linked to `capability_id`, `result_id`, `artifact_id`, `report_id` of that run\n\n### Accepted vs rejected/quarantined behavior\n- **Accepted**: PASS raises confidence; FAIL accumulates a failure (can drop readiness to `blocked`).\n- **Quarantined**: missing capability identity; stale evidence (older than `--max-age-seconds`). No state change.\n- **Rejected**: missing evidence file or no determinable outcome. No state change.\n\n### CLI\n- `axiom capability-evidence-apply --evidence <path> [--capability-id <id>] [--max-age-seconds <n>] [--artifacts-root <p>] [--json-output]` — shows capability, evidence path/id, outcome, decision (accepted/rejected/quarantined), reason, prior→updated confidence/readiness, and links.\n- `axiom capability-evidence-history [--capability-id <id>]` — queryable state-change log.\n- `axiom capability-evidence-show <intake_id>` — one record.\n\n### Tests and validation numbers\nNew `tests/test_evidence_promotion.py` (passing, failing, missing-outcome, missing-file, no-identity → quarantine, override, repeated/cumulative, stale → quarantine, fresh, determinism, queryable, M3 hook, real-chain integration, 3 CLI). Registry expectations updated.\n- targeted (`test_evidence_promotion` + `test_command_registry` + `test_execution_chain_orchestrator`): **61 passed**\n- full `pytest`: **5045 passed, 1 skipped**\n- `ruff`: clean\n\n### M3 hook (recorded only)\nEach record carries an `m3_hook` listing semantic info that would improve evidence routing (capability purpose, layer, intended use, consumers, dependencies, evidence expectations). Purpose/Layer Index is **not** implemented here.\n\n### Non-goals confirmed\nNo new promotion doctrine/architecture, no new framework family, no M3 index, no M5 work, no Execution Graph Synthesizer, no Organizational State schema, no canonical file migration, no broad refactor, no Revit-runtime validation.\n\n### Unresolved questions (routed, not designed)\n- **Program 6**: promotion doctrine — when does accumulated confidence/readiness justify a `global_capability_registry` status transition (PROPOSED→OPEN→MERGED)? Not decided here.\n- **Program 2**: should evidence weighting account for which upstream capabilities/dependencies were exercised (needs M3 semantics)?\n- **Program 7**: a recency/decay policy beyond binary stale-quarantine (half-life on confidence factors)?\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782664374-evidence-promotion-loop",
+    "status": "merged",
+    "merge_commit_sha": "fbca222e85bcc2d651dad0286c0af257943ddd19",
+    "created_at": "2026-06-28T16:44:49Z",
+    "updated_at": "2026-06-28T17:17:31Z",
+    "merged_at": "2026-06-28T17:17:31Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "2f05819d3e9e0f7a7f82d78fb5cd0b94cce5ac4b",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #147 — Evidence to Promotion Loop v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-28T16:44:11Z"
+    }
+  ],
+  "files": [
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 180,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/evidence_promotion.py",
+      "status": "added",
+      "additions": 497,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 78,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_evidence_promotion.py",
+      "status": "added",
+      "additions": 413,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:49.186607+00:00"
+  }
+}

@@ -13,6 +13,7 @@ Read-only governance surfaces of the axiom CLI: the command registry policy prin
 
 - `axiom runner-commands [--classification <c>] [--name <cmd>] [--json]`
 - `axiom <framework>-create / -show / -export` (frameworks #112–#119 pattern)
+- `axiom github-import-backfill --payload-dir <dir> [--ledger-out <path>] [--json-output]` — batch-import PR metadata payloads (fetched via `python scripts/fetch_github_pr_metadata.py --repo <owner/name> --out <dir>`) and regenerate `docs/logs/pr-sequence-ledger.md`. Re-runnable: duplicates are skipped, not fatal. Canonical numbers come from `PR #<n>` titles; PRs without one are listed as explicit gaps — never invent a number.
 
 ## Registry pointers
 

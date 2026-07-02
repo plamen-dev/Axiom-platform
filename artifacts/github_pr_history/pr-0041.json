@@ -1,0 +1,428 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 41,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/41",
+    "title": "PR #151 — Windows Artifact Path Compatibility Fix v1",
+    "description": "## Summary\n\nThe Program 5 Windows Local Runner Compatibility Probe found that `execution-chain-run` and `capability-evidence-apply` false-fail on Windows with `Error: Resolved path escapes artifacts root: '<uuid>'` (operator's targeted run: 38 failed / 77 passed / 1 skipped). Root cause: a POSIX-only sandbox containment check copy-pasted across the codebase:\n\n```python\n# before — false-fails on Windows because resolved paths use \"\\\"\nif not str(target).startswith(str(sandbox) + \"/\") and target != sandbox:\n    raise ValueError(f\"Resolved path escapes artifacts root: {report_id!r}\")\n```\n\nOn Windows `Path.resolve()` yields `C:\\...\\artifacts\\<uuid>`, which never starts with `str(sandbox) + \"/\"`, so every valid id was rejected. The check was **not** unique to the failing modules — it existed in **124 sites across 63 files** (every `_safe_path` helper plus every `list_*`/scan loop).\n\nThe fix introduces one shared, cross-platform helper and routes all 124 sites through it:\n\n```python\n# src/axiom_core/artifact_paths.py\ndef is_within_sandbox(target: Path, sandbox: Path) -> bool:\n    if target == sandbox:\n        return True\n    try:\n        target.relative_to(sandbox)   # pathlib semantics: separator-aware,\n        return True                    # case-insensitive on Windows, no hard-coded \"/\" or \"\\\"\n    except ValueError:                 # different drive / outside root -> not within\n        return False\n```\n\n```python\n# after (every former site)\nif not is_within_sandbox(target, sandbox):\n    raise ValueError(f\"Resolved path escapes artifacts root: {report_id!r}\")\n```\n\nTraversal protection is preserved on both platforms: `../outside`, `..\\outside`, absolute/drive-root injection, UNC escapes, and separator-bearing ids resolve outside the root and are rejected; the pre-existing `_validate_id_segment` (rejects `..`, `/`, `\\`, empty) is untouched. No hard-coded separators remain in containment logic.\n\n## Scope\n\nReplace POSIX-specific string-prefix containment checks for artifact / report / intake / evidence persistence with a cross-platform check, applied consistently everywhere the pattern existed — not just the failing call sites.\n\n## Key Changes\n\n- **New** `src/axiom_core/artifact_paths.py` — `is_within_sandbox(target, sandbox)` using `Path.relative_to()` (the directive's preferred approach; `commonpath()` was avoided because it raises across Windows drives).\n- **63 modules** in `src/axiom_core/` updated: all 124 occurrences of `str(...).startswith(str(sandbox) + \"/\") and ... != sandbox` (in both `_safe_path` helpers and `list_*` scan loops) now call `is_within_sandbox(...)`. Includes the reported failures `capability_confidence.py`, `evidence_promotion.py`, and the `execution_*` chain modules consumed by `execution_chain_orchestrator.py`.\n- **New** `tests/test_artifact_paths.py` — Windows-simulated (`PureWindowsPath`), POSIX, and concrete-`resolve()` regression coverage.\n- **Ledger** `docs/logs/behavior-change-ledger.md` — BHV-028.\n- **Local Runner untouched**: `tools/local_runner/` was inspected and contains no equivalent unsafe helper, so per the directive it was not modified.\n\n## Validation\n\nRun on Devin's **Ubuntu** environment:\n\n- `poetry run pytest tests/test_artifact_paths.py tests/test_execution_chain_orchestrator.py tests/test_evidence_promotion.py tests/test_local_runner.py tests/test_command_registry.py -q` → **132 passed, 1 skipped**\n- Full suite `poetry run pytest -q` → **5072 passed, 1 skipped**\n- `poetry run ruff check .` → clean\n- `git grep 'startswith(str(sandbox) + \"/\")'` → 0 (only a docstring mention remains in `artifact_paths.py`)\n- `git diff --stat` → 66 files changed, 418 insertions(+), 184 deletions(-)\n\n**Windows execution cannot be exercised in Devin's Ubuntu environment**, so Windows behaviour is proven via `PureWindowsPath` regression tests (the exact `C:\\...\\artifacts\\<uuid>` and `C:\\actions-runner-axiom\\...` shapes, plus cross-drive/UNC/sibling-prefix rejection). **Pending operator (Plamen) Windows re-run**: `execution-chain-run --capability self-model-build --artifacts-root ... --json-output`, `capability-evidence-apply`, Local Runner `git_status`/`ruff`, and the two targeted test files.\n\n## Non-Goals\n\nNo implementation-worker behavior, retry loop, new runner, Local Runner rewrite, canonical knowledge-base seed, or GPR/global PR registry. No confidence-math change, no evidence-promotion semantic change, no execution-chain ID-flow change, no Revit validation, no broad refactor.\n\n## Architectural Significance\n\nCompatibility / validation hardening of the existing execution substrate (Program 5 ownership). It removes a portability defect blocking Windows — the real target environment — without adding any new framework or object family. One canonical containment helper now backs every artifact-persisting engine, eliminating 124 copies of a latent OS-specific bug.\n\n---\n\n### Purpose-to-Workflow Reconciliation\n\n1. **Existing PR/component used:** the artifact-persistence helpers (`_safe_path` / scan loops) introduced across the M1 execution object families, M2 evidence-promotion, capability-confidence, and registries.\n2. **Workflow:** `execution-chain-run` (M4) and `capability-evidence-apply` (M2) artifact/report/intake/evidence persistence, plus the Windows Local Runner validation lane.\n3. **Consumes its output:** the orchestrator and evidence-promotion loop reading/writing under `--artifacts-root`; M4/M2 validation.\n4. **Evidence it works:** full pytest 5072 passed/1 skipped + ruff green on Ubuntu; `PureWindowsPath` regression tests for the Windows failure mode; operator Windows re-run pending.\n5. **Disposition:** compatibility hardening / validation hardening. Not a new runner, not a retry loop, not implementation-worker behavior.\n6. **Existing structure checked first:** repo-wide grep for `_safe_path`, `startswith(str(sandbox) + \"/\")`, and resolved-path containment before adding the single shared helper.\n7. **Risk introduced:** one small shared helper (mild indirection) replacing 124 inline copies; the main risk — weakening containment — is covered by traversal/drive/UNC/sibling regression tests on both platforms.\n8. **Delete/merge/preserve:** preserved id-segment validation and all sandbox semantics; merged 124 duplicate inline checks into one helper; left Local Runner alone (no such helper there).\n\n### Pre-Review Self-Audit\n\n1. **Preserved artifact-root containment?** Yes — equality or `relative_to` under the resolved sandbox.\n2. **Avoided hard-coded separators?** Yes — no `/` or `\\` in containment logic.\n3. **Rejects traversal on POSIX and Windows-style inputs?** Yes — `../`, `..\\`, absolute, drive-root, UNC, sibling-prefix all rejected (tested).\n4. **Updated every relevant helper, not just the first?** Yes — all 124 sites / 63 files.\n5. **Avoided confidence-math change?** Yes.\n6. **Avoided evidence-promotion semantic change?** Yes.\n7. **Avoided execution-chain ID-flow change?** Yes.\n8. **Avoided touching Local Runner unless necessary?** Yes — inspected, no such helper, untouched.\n9. **Avoided retry/worker behavior?** Yes.\n10. **Added regression coverage for the Windows failure mode?** Yes — `tests/test_artifact_paths.py`.\n11. **Honestly stated Ubuntu vs Windows validation?** Yes — Ubuntu full suite + simulated Windows tests here; true Windows re-run is the operator's, listed under Validation.\n\n### Review expectations checklist\n\n- **What changed:** POSIX-only sandbox containment replaced with cross-platform `is_within_sandbox` across 63 modules.\n- **What behavior changed:** valid ids now persist under the artifacts root on Windows; behavior on POSIX is unchanged.\n- **What did not change:** confidence math, evidence-promotion semantics, execution-chain ID-flow, id-segment validation, Local Runner.\n- **Tests run:** targeted (132 passed/1 skipped) + full (5072 passed/1 skipped) + ruff, on Ubuntu.\n- **Validation still pending:** operator Windows re-run of CLI + targeted tests.\n- **Known risks:** containment weakening — mitigated by traversal/drive/UNC/sibling regression tests.\n- **Revit live validation required:** No.\n- **2024 baseline affected:** No.\n- **Factory impact:** strengthens evidence quality / execution substrate portability (Windows target).\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782682986-windows-artifact-path-fix",
+    "status": "merged",
+    "merge_commit_sha": "ab4a9cf10691fd3ee7a0983adb93f9d956576c6e",
+    "created_at": "2026-06-28T21:44:05Z",
+    "updated_at": "2026-06-28T22:04:04Z",
+    "merged_at": "2026-06-28T22:04:04Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "f972774aed030f4cb0e1cb9e54252cd16c8871f9",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #151 — Windows Artifact Path Compatibility Fix v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-28T21:43:10Z"
+    }
+  ],
+  "files": [
+    {
+      "path": "docs/logs/behavior-change-ledger.md",
+      "status": "modified",
+      "additions": 17,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/artifact_paths.py",
+      "status": "added",
+      "additions": 39,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/capability_chain.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/capability_confidence.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/capability_definition.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/capability_event_timeline.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 5
+    },
+    {
+      "path": "src/axiom_core/capability_execution_report.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/capability_failure.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/capability_file_knowledge.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 5
+    },
+    {
+      "path": "src/axiom_core/capability_history.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/capability_impact.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 5
+    },
+    {
+      "path": "src/axiom_core/capability_input.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/capability_knowledge_graph.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 5
+    },
+    {
+      "path": "src/axiom_core/capability_output.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/capability_relationship.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 5
+    },
+    {
+      "path": "src/axiom_core/capability_repair_outcome.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/capability_routing.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/capability_selection.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/capability_skill.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/capability_summary.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 5
+    },
+    {
+      "path": "src/axiom_core/capability_validation_knowledge.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 5
+    },
+    {
+      "path": "src/axiom_core/config_batch_execution.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/config_dependency.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/config_diff.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/config_execution.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/config_explanation.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/config_history.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/config_merge.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/config_policy.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/config_repair.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/config_rollback.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/config_scenario.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/config_validation.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/configuration_registry.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/conflict_registry.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/devin_session_import.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 5
+    },
+    {
+      "path": "src/axiom_core/evidence_promotion.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/execution_artifact.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 5
+    },
+    {
+      "path": "src/axiom_core/execution_attempt.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/execution_attempt_v2.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 5
+    },
+    {
+      "path": "src/axiom_core/execution_constraint.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 5
+    },
+    {
+      "path": "src/axiom_core/execution_context.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 5
+    },
+    {
+      "path": "src/axiom_core/execution_environment.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 5
+    },
+    {
+      "path": "src/axiom_core/execution_outcome.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/execution_plan.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 5
+    },
+    {
+      "path": "src/axiom_core/execution_readiness.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 5
+    },
+    {
+      "path": "src/axiom_core/execution_report.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 5
+    },
+    {
+      "path": "src/axiom_core/execution_resource.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 5
+    },
+    {
+      "path": "src/axiom_core/execution_result.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 5
+    },
+    {
+      "path": "src/axiom_core/execution_step.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 5
+    },
+    {
+      "path": "src/axiom_core/failure_classification_framework.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/github_metadata_import.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 5
+    },
+    {
+      "path": "src/axiom_core/global_capability_registry.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/live_coding_trial.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "src/axiom_core/parser_coding_trial.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "src/axiom_core/recovery_execution.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/recovery_recommendation.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/repair_decision_registry.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "src/axiom_core/session_memory.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/session_state_machine.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/session_task_graph.py",
+      "status": "modified",
+      "additions": 5,
+      "deletions": 3
+    },
+    {
+      "path": "src/axiom_core/skill_composition.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/work_dependency.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/work_prioritization.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "src/axiom_core/work_queue.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "tests/test_artifact_paths.py",
+      "status": "added",
+      "additions": 116,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:52.283832+00:00"
+  }
+}
