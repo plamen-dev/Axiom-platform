@@ -6796,6 +6796,46 @@ _register(
 
 _register(
     CommandSpec(
+        name="simulation-harness-run",
+        command=(
+            "axiom simulation-harness-run [--artifacts-root <p>] "
+            "[--json-output]"
+        ),
+        description=(
+            "Run the full capability suite (CreateLevels, CreateGrids, "
+            "InventoryModel, SetParameterValue preview + apply) against "
+            "Adapter 000 on one shared in-memory model, producing one "
+            "bridge evidence bundle per step and a harness report with "
+            "per-step assertions."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput(
+                "simulation_harness/<harness_id>/report.json", required=True
+            ),
+            EvidenceOutput(
+                "simulation_harness/<harness_id>/pass_fail.json",
+                required=True,
+            ),
+            EvidenceOutput(
+                "validation_runs/<harness_id>-s<n>-<capability>/bridge/"
+                "pass_fail.json",
+                required=True,
+            ),
+        ),
+        timeout_seconds=300,
+        failure_modes=(FM_NONZERO,),
+        notes=(
+            "Simulated evidence only (adapter: simulated-000) — proves "
+            "capability contract behavior, never live-Revit readiness."
+        ),
+    )
+)
+
+_register(
+    CommandSpec(
         name="loop-run",
         command=(
             "axiom loop-run [--cycles <n>] [--repo-root <p>] "

@@ -19663,6 +19663,53 @@ def simulated_adapter_run(
         raise SystemExit(1)
 
 
+@cli.command("simulation-harness-run")
+@click.option(
+    "--artifacts-root",
+    "artifacts_root",
+    type=click.Path(),
+    default=None,
+    help="Artifacts root for harness + bridge evidence (default: ./artifacts).",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def simulation_harness_run(
+    artifacts_root: str | None,
+    json_output: bool,
+) -> None:
+    """Run the full capability suite against Adapter 000 (simulated model).
+
+    CreateLevels, CreateGrids, InventoryModel, then SetParameterValue
+    preview + apply against one shared in-memory model — each step through
+    the automation bridge with its own evidence bundle, plus a harness
+    report linking the step run_ids with per-step assertions.
+    """
+    from axiom_core.simulation_harness import SimulationHarness
+
+    harness = SimulationHarness(artifacts_root=artifacts_root)
+    report = harness.run()
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, sort_keys=True, default=str))
+    else:
+        console.print("\n[bold]Simulation Harness Run (Adapter 000)[/bold]\n")
+        console.print(f"  Harness id: {report['harness_id']}")
+        color = "green" if report["status"] == "passed" else "red"
+        console.print(f"  Status:     [{color}]{report['status']}[/{color}]")
+        for step in report["steps"]:
+            mark = "green]PASS" if step["passed"] else "red]FAIL"
+            console.print(
+                f"  Step {step['step']}: {step['capability']} "
+                f"[{mark}[/] ({step['run_id']})"
+            )
+            for assertion in step["assertions"]:
+                status = "ok" if assertion["passed"] else "FAILED"
+                console.print(
+                    f"      - {assertion['assertion']}: {status}"
+                )
+    if report["status"] != "passed":
+        raise SystemExit(1)
+
+
 @cli.command("loop-run")
 @click.option(
     "--cycles",

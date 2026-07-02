@@ -19,6 +19,8 @@ _(to be populated — build/deploy commands verified on the operator machine)_
 
 `axiom simulated-adapter-run --capability <name> [--args-json <json>] [--output-dir <p>] [--json-output]` runs CreateGrids / CreateLevels / InventoryModel / SetParameterValue against a deterministic in-memory model (`src/axiom_core/simulated_adapter.py`) through the same automation-bridge driver, producing a bridge evidence bundle. Every result is stamped `adapter: simulated-000` — simulated evidence never counts as live-Revit proof. Same safety doctrine as live: InventoryModel is summary-mode only (no parameter dump); SetParameterValue is category-constrained, Text/writable/instance parameters only, hard cap 5 elements, preview by default (`Mode: "apply"` to mutate). Each CLI run starts from a fresh seed model (3 Walls + 2 Doors). Tests: `tests/test_simulated_adapter.py`.
 
+`axiom simulation-harness-run [--artifacts-root <p>] [--json-output]` runs the full suite (CreateLevels → CreateGrids → InventoryModel → SetParameterValue preview → apply) against **one shared** model (`src/axiom_core/simulation_harness.py`): the inventory step must see the created elements, preview must not mutate, apply must. One bridge evidence bundle per step (`validation_runs/<harness_id>-s<n>-<capability>/bridge/`) plus a harness report with per-step assertions under `artifacts/simulation_harness/<harness_id>/`. Non-passed status exits 1. Tests: `tests/test_simulation_harness.py`.
+
 ## Registry pointers
 
 - Current Revit capabilities: CreateGrids, CreateLevels, InventoryModel, SetParameterValue (capability registry is the source of truth).
