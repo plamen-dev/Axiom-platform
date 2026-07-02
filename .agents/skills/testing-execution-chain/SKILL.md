@@ -12,6 +12,7 @@ The execution-chain orchestrator runs one deterministic capability through the f
 ## Commands
 
 - `axiom execution-chain-run --capability <id> [--artifacts-root <p>] [--json-output]`
+- `axiom loop-run [--cycles <n>] [--artifacts-root <p>] [--json-output]` — bounded loop composing the chain: self-model gap analysis → work-queue → execution-chain-run → capability-evidence-apply → re-queue. Max 10 cycles; stops on the first chain failure; loop report at `artifacts/loop_runner/<loop_id>/report.json` links the real ids of every stage of every cycle (queue_report_id, chain_run_id + all 7 chain ids, intake_id, requeue_report_id).
 
 ## Registry pointers
 
@@ -43,7 +44,7 @@ The execution-chain orchestrator runs one deterministic capability through the f
 
 ## Tests
 
-Targeted: `tests/test_execution_chain_orchestrator.py`, `tests/test_evidence_quality.py`. Full pytest only at PR checkpoints (tiering policy).
+Targeted: `tests/test_execution_chain_orchestrator.py`, `tests/test_evidence_quality.py`, `tests/test_loop_runner.py`. Full pytest only at PR checkpoints (tiering policy).
 
 ## Notes / gotchas
 

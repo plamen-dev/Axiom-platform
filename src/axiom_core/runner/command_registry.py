@@ -6755,6 +6755,44 @@ _register(
 
 _register(
     CommandSpec(
+        name="loop-run",
+        command=(
+            "axiom loop-run [--cycles <n>] [--repo-root <p>] "
+            "[--artifacts-root <p>] [--json-output]"
+        ),
+        description=(
+            "Run bounded autonomous loop cycles: self-model gap analysis "
+            "-> work-queue -> execution-chain-run -> "
+            "capability-evidence-apply -> re-queue of follow-up work."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("loop_runner/<loop_id>/report.json", required=True),
+            EvidenceOutput(
+                "loop_runner/<loop_id>/pass_fail.json", required=True
+            ),
+            EvidenceOutput(
+                "execution_chain/<run_id>/evidence.json", required=True
+            ),
+            EvidenceOutput(
+                "capability_evidence_intake/<intake_id>/report.json",
+                required=True,
+            ),
+        ),
+        timeout_seconds=600,
+        failure_modes=(FM_NONZERO,),
+        notes=(
+            "Strictly bounded (max 10 cycles); stops on the first chain "
+            "failure; composes existing read-only engines — no new object "
+            "model, nothing upstream mutated."
+        ),
+    )
+)
+
+_register(
+    CommandSpec(
         name="execution-chain-run",
         command=(
             "axiom execution-chain-run [--capability <id>] "
