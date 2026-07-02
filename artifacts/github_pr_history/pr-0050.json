@@ -1,0 +1,62 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 50,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/50",
+    "title": "PR A — Local Runner: execution_chain_run + capability_evidence_apply loop actions",
+    "description": "## Summary\n\nPhase 1 enabler: teach the **Local Runner** to *perform the loop*, not just run test/build/deploy. Adds two allowlisted actions so the substrate loop (canonical chain → evidence bundle → promotion/confidence) can be driven by the runner and produce a captured evidence bundle — the thing that turns Windows evidence from *attested* into *captured*.\n\nTwo new actions in `tools/local_runner/local_runner.py`:\n- **`execution_chain_run`** → fixed command `poetry run axiom execution-chain-run --json-output`. Drives one deterministic capability through Plan → Step → Attempt(v2) → Result → Artifact → Evidence → Report, writing `artifacts/execution_chain/<run>/evidence.json`.\n- **`capability_evidence_apply`** → applies the newest chain evidence bundle to capability state. The `--evidence` path is **built at run time** by the runner and sandbox-validated, not taken from the task file:\n\n```python\n# _resolve_latest_evidence(workspace):\nchain_dir = Path(workspace).resolve() / \"artifacts\" / \"execution_chain\"\nevidence  = newest(chain_dir.glob(\"*/evidence.json\"))   # by mtime\nassert ws_root == evidence or ws_root in evidence.parents  # no escape\n# -> poetry run axiom capability-evidence-apply --evidence <evidence>\n```\n\nThis preserves the runner's existing security model (named actions only, **no arbitrary args/paths** from `task.json`). If no bundle exists yet, the action is **blocked** with guidance to run `execution_chain_run` first (not a hard error).\n\nAlso gitignores the three generated artifact dirs these actions produce (`artifacts/execution_chain/`, `artifacts/capability_evidence_intake/`, `artifacts/capability_confidence/`) so runs never get committed — satisfies the \"only gitignored artifact folders are produced\" Windows-revalidation rule.\n\n## What did NOT change\n- No change to the execution chain, evidence, or promotion **semantics** — this only *invokes* existing CLI commands. No new framework, no CLI command added, no canonical-path change. Existing runner actions and security checks untouched.\n\n## Tests run (lane 1 / Ubuntu)\n- `poetry run pytest tests/test_local_runner.py -q` → **52 passed, 1 skipped**. New `TestExecutionChainLoopActions` covers registration, static vs run-time command shape, newest-bundle selection, sandbox-escape rejection, and the blocked-without-bundle path.\n- `ruff check` clean on changed files.\n- **End-to-end smoke on Ubuntu:** ran both actions through the runner CLI — `execution_chain_run` produced `artifacts/execution_chain/<uuid>/evidence.json`; `capability_evidence_apply` resolved that exact bundle and wrote the confidence/intake update. Full substrate loop closes off-Windows.\n\n## Validation still pending\n- **Windows (lane 2):** these actions must be exercised in the 8-point post-#151 Windows revalidation on `C:\\Dev\\Axiom\\Code\\Axiom-platform`. Not yet run.\n- **Real Revit (lane 3):** unaffected here — this is the deterministic (non-Revit) chain. Real SetParameterValue-via-pipe remains pending furnace evidence (PR C).\n\n## Factory relevance\nDirectly strengthens the verification factory: makes the loop runnable by the Local Runner and produces a captured evidence bundle + confidence update. No Revit live validation required; 2024 baseline unaffected.\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782877567-runner-loop-actions",
+    "status": "merged",
+    "merge_commit_sha": "1499b2a75c34463eed5d37993fc83491d0159233",
+    "created_at": "2026-07-01T03:46:41Z",
+    "updated_at": "2026-07-01T04:39:40Z",
+    "merged_at": "2026-07-01T04:39:40Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "8ad8acfa1ce86aaea253a688618b00ebedbf1ca4",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Local Runner: add execution_chain_run + capability_evidence_apply loop actions\n\nEnables the runner to drive the canonical execution chain (Plan->...->Evidence->Report) and apply the resulting evidence bundle to capability state (promotion/confidence). capability-evidence-apply resolves the newest chain evidence bundle from a runner-derived, sandbox-validated path (no task-supplied path), preserving the no-arbitrary-args security model. Gitignores the three generated artifact dirs.\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-01T03:46:18Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 7,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_local_runner.py",
+      "status": "modified",
+      "additions": 70,
+      "deletions": 0
+    },
+    {
+      "path": "tools/local_runner/examples/capability_evidence_apply.task.json",
+      "status": "added",
+      "additions": 10,
+      "deletions": 0
+    },
+    {
+      "path": "tools/local_runner/examples/execution_chain_run.task.json",
+      "status": "added",
+      "additions": 10,
+      "deletions": 0
+    },
+    {
+      "path": "tools/local_runner/local_runner.py",
+      "status": "modified",
+      "additions": 99,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:59.216255+00:00"
+  }
+}

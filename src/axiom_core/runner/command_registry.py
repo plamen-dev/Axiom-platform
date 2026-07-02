@@ -6100,6 +6100,35 @@ _register(
 
 _register(
     CommandSpec(
+        name="github-import-backfill",
+        command=(
+            "axiom github-import-backfill --payload-dir <dir> "
+            "[--ledger-out <path>] [--json-output]"
+        ),
+        description=(
+            "Batch-import GitHub PR metadata payloads and render the "
+            "canonical PR sequence ledger."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("github_import_request.json", required=True),
+            EvidenceOutput("github_import_result.json", required=True),
+            EvidenceOutput("github_import_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=300,
+        failure_modes=(FM_NONZERO,),
+        notes=(
+            "Read-only batch ingestion from local payload files; duplicate "
+            "imports are skipped so the backfill is safely re-runnable."
+        ),
+    )
+)
+
+_register(
+    CommandSpec(
         name="github-import-show",
         command="axiom github-import-show <report_id> [--json-output]",
         description="Show a GitHub metadata import.",
@@ -6545,6 +6574,36 @@ _register(
         timeout_seconds=30,
         failure_modes=(FM_NONZERO,),
         notes="Export a capability validation report (md/json/csv).",
+    )
+)
+
+_register(
+    CommandSpec(
+        name="capability-graph-ingest",
+        command=(
+            "axiom capability-graph-ingest "
+            "[--artifacts-root <dir>] [--json-output]"
+        ),
+        description=(
+            "Auto-ingest evidence intake, chain-run, validation-run, and "
+            "GitHub PR import artifacts into a capability graph report."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("capability_graph_request.json", required=True),
+            EvidenceOutput("capability_graph_result.json", required=True),
+            EvidenceOutput("capability_graph_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=120,
+        failure_modes=(FM_NONZERO,),
+        notes=(
+            "Read-only artifact scan; deterministic node/edge ids so "
+            "re-runs over the same artifacts yield the same structure. "
+            "Malformed artifact files are skipped, never fatal."
+        ),
     )
 )
 

@@ -1,0 +1,272 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 64,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/64",
+    "title": "Tests: skip symlink-escape safety tests when Windows symlink privilege is unavailable (WinError 1314)",
+    "description": "## Summary\n\nLane-2 Windows validation hit `tests/test_capability_confidence.py::TestSafety::test_symlink_escape_rejected` failing with `OSError: [WinError 1314] A required privilege is not held by the client` — a test-harness environment limitation (Windows needs a privilege or Developer Mode to create symlinks), not an Axiom runtime failure.\n\nThe identical `link.symlink_to(target)` pattern exists in **42 symlink-escape safety tests** across the suite (frameworks, registries, configs, coding trials), all of which would fail the same way on a Windows full-suite run. Rather than patching one, this adds a shared helper and applies it everywhere:\n\n```python\n# tests/conftest.py\ndef make_symlink_or_skip(link: Path, target) -> None:\n    try:\n        link.symlink_to(target)\n    except OSError as exc:\n        pytest.skip(f\"symlink creation unavailable: {exc}\")\n```\n\nEvery call site becomes `make_symlink_or_skip(link, target)`. Where symlink creation works (Linux/macOS/CI, Windows with the privilege) the escape scenario is constructed and the full safety assertion runs unchanged; where it can't be constructed the test skips with the OS error in the skip reason. **No production path-safety logic is touched** — only test scaffolding.\n\nAlso appends the lane-2-confirmed note to the BHV-037 ledger entry: the one-time `very_high (1.0) → medium (0.5)` published-confidence drop on the first accepted application after #63 is **expected doctrine** (old undamped reports are historical evidence; the new report is computed under the damped rule), not a regression.\n\nTests: full pytest 5175 passed locally (excl. atlas/local-runner suites, unaffected by this change; CI runs everything); ruff clean on tests/.\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782963942-windows-symlink-test-skip",
+    "status": "merged",
+    "merge_commit_sha": "7f6eef9dee46174053b666f5a52ede7045d9dfb9",
+    "created_at": "2026-07-02T03:49:30Z",
+    "updated_at": "2026-07-02T04:30:49Z",
+    "merged_at": "2026-07-02T04:30:49Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "3467bbf1374a2b2aa2d50dbff749b71a5ff82f3e",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Tests: skip symlink-escape safety tests when symlink creation is unavailable\n\nWindows requires a privilege (or Developer Mode) to create symlinks\n(WinError 1314); without it the symlink-escape scenario cannot be\nconstructed, so the safety tests skip instead of failing. Shared\nmake_symlink_or_skip helper in tests/conftest.py applied to all 42\nsymlink-escape call sites; production path-safety logic untouched.\nAlso records the expected one-time first-post-damping confidence\nre-projection in the BHV-037 ledger entry (lane-2 confirmed).\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-02T03:49:15Z"
+    }
+  ],
+  "files": [
+    {
+      "path": "docs/logs/behavior-change-ledger.md",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 1
+    },
+    {
+      "path": "tests/conftest.py",
+      "status": "added",
+      "additions": 22,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_capability_confidence.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_capability_definition.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_capability_failure.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_capability_history.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_capability_input.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_capability_repair_outcome.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_capability_routing.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_capability_selection.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_capability_skill.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_config_batch_execution.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_config_dependency.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_config_diff.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_config_execution.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_config_explanation.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_config_history.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_config_merge.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_config_policy.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_config_repair.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_config_rollback.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_config_scenario.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_config_validation.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_configuration_registry.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "tests/test_conflict_registry.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "tests/test_execution_attempt.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_execution_outcome.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_failure_classification_framework.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_live_coding_trial.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_parser_coding_trial.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_recovery_execution.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_recovery_recommendation.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_repair_decision_registry.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_session_memory.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_session_state_machine.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "tests/test_session_task_graph.py",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "path": "tests/test_skill_composition.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_work_dependency.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_work_prioritization.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_work_queue.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:25:10.246707+00:00"
+  }
+}

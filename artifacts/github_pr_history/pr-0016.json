@@ -1,0 +1,74 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 16,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/16",
+    "title": "PR #127 — Capability Relationship Framework v1",
+    "description": "## Summary\n\nAdds the **Capability Relationship Framework** — the first formal *relationship* layer, on top of the Global Capability Registry (#122, identity) and Capability Summary (#125, understanding). It moves beyond linear previous/next capability chains and models capability evolution as a **graph-ready, deterministic, append-only edge list** of typed, directed relationships (`source -> target`).\n\nThis is *structure only* per the spec non-goals: **no graph engine, no graph queries, no visualization, no dashboard, no Organizational Twin, no automatic relationship discovery, no network calls.** The registry/summary are consumed read-only via an optional `known_capability_ids` set used solely to detect orphans; nothing is mutated.\n\n### What landed\n- `src/axiom_core/capability_relationship.py`:\n  - Models: `CapabilityRelationship` (relationship_id, source/target_capability_id, relationship_type, confidence, summary, created_at, schema_version, raw_payload), `CapabilityRelationshipType` (`BUILDS_ON`/`ENABLES`/`RELATED_TO`/`DEPENDS_ON`/`SUPERSEDES`/`DERIVED_FROM`/`AFFECTS`/`VALIDATES`/`REPAIRS`), `CapabilityRelationshipReference` (graph-ready edge projection), `CapabilityRelationshipReport`, `CapabilityRelationshipEvidence` + `CapabilityRelationshipEngine`.\n  - **Deterministic ordering** by `(source, target, relationship_type, relationship_id)` — input order is irrelevant.\n  - **Relationship-type validation**: types are normalized case-insensitively to the canonical UPPERCASE set; unknown types are rejected. Missing source/target/type rejected; non-numeric `confidence` rejected; `confidence` clamped to `[0,1]`.\n  - **Duplicate detection**: edges are deduplicated on `(source, target, type)`; the first occurrence in deterministic order is kept and the rest counted in `duplicate_relationship_count`.\n  - **Orphan detection**: `orphan_capability_ids` = known capabilities that appear in no edge.\n\n    ```\n    edge = (source_capability_id, target_capability_id, relationship_type)\n    # keep first in sorted order, count the rest as duplicates\n    relationship_type_counts = sorted tally over deduped edges\n    references            = [edge projection per deduped relationship]\n    orphan_capability_ids = sorted(known_capability_ids) - {c in any edge}\n    passed = relationship_count > 0 and duplicate_relationship_count == 0\n    ```\n- CLI `capability-relationship-create` / `capability-relationships` (list) / `capability-relationship-show` / `capability-relationship-export` (JSON/Markdown/CSV), registered in `command_registry.py`, `test_selection_engine.py`, `test_command_registry.py`.\n- Evidence bundle under `artifacts/capability_relationships/<run_id>/`: `capability_relationship_request.json`, `capability_relationship_result.json`, `capability_relationship_summary.md`, `pass_fail.json` (gitignored). Append-only `append()` preserves existing edges verbatim and merges `known_capability_ids`.\n\n### What did not change\nNo architecture/dependency changes, no graph engine/queries/visualization, no orchestration, no network calls. No mutation of existing registry entries, timeline events, or summaries. Revit 2024 baseline unaffected.\n\n### Validation\n- `poetry run pytest -q` → **4168 passed, 1 skipped** (+44; baseline 4124 at #126)\n- `poetry run ruff check src/ tests/` → **0 errors**\n- CLI smoke verified with an adversarial fixture: deterministic reorder, case-insensitive duplicate edge deduped (`enables` == `ENABLES`) → `duplicate_relationship_count=1`/`passed:false`, orphan `cap-199` detected, all 3 export formats, `show missing`→exit 2, traversal→exit 1, invalid type→exit 1.\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782250523-capability-relationship",
+    "status": "merged",
+    "merge_commit_sha": "52c2f433cd7c74ffeb3e1626b16583d404149727",
+    "created_at": "2026-06-23T21:40:13Z",
+    "updated_at": "2026-06-23T22:08:05Z",
+    "merged_at": "2026-06-23T22:08:05Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "5ea077b21718611af132b68914c43fec70d2482c",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #127 — Capability Relationship Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-23T21:39:57Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 171,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/capability_relationship.py",
+      "status": "added",
+      "additions": 622,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 79,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_capability_relationship.py",
+      "status": "added",
+      "additions": 502,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:32.458518+00:00"
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 46,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/46",
+    "title": "PR #156 — Model Health Evidence Consumer v1",
+    "description": "## Summary\n\nThe Model Health producer (`axiom_core.model_health.execute_health_run`) writes `axiom_capability_readiness.json` but has only **read-only** consumers (`server_tools.axiom_capability_readiness_get` / `axiom_model_health_get_latest`). It is therefore *orphaned* — the open Model Health slice of EVID-001. This PR adds the missing **state/evidence consumer**: a thin `ModelHealthReadinessConsumer` adapter (+ `model-health-evidence-apply` / `model-health-evidence-history` CLI) that ingests, validates, de-duplicates, quarantines, and durably records readiness evidence with preserved provenance.\n\n**Key design decision (the consequential one):** readiness is a *precondition assessment*, not an execution outcome. `EvidencePromotionLoop.apply()` / `CapabilityConfidenceEngine.create()` accumulate execution pass/fail onto `execution_count`/`success_count` → confidence score. Mapping `READY → pass` would **fabricate execution history and corrupt confidence math** — exactly the readiness-doctrine-by-implementation this task forbids. So readiness is **not** routed into confidence. Instead the consumer *reuses the existing evidence-intake conventions* (fingerprint dedup, quarantine/reject policy, `is_within_sandbox` path safety from PR #151, `report.json`+`pass_fail.json` per-engine intake layout) to record durable readiness state keyed by `capability`. `confidence_mutated` is always `False`.\n\n```\napply(readiness_path, max_age_seconds=None):\n  load+validate artifact ({generated_at_utc, capabilities:[{capability, readiness in READY|WARNING|BLOCKED|UNKNOWN, ...}]})\n  unreadable / non-object / no `capabilities`        -> REJECTED (whole artifact)\n  per capability entry:\n    missing/empty capability | missing/invalid readiness -> REJECTED (entry only; valid siblings unaffected)\n    same capability has >1 distinct label in artifact    -> QUARANTINED (no silent resolution)\n    stale (opt-in via generated_at_utc + max_age_seconds)-> QUARANTINED\n    fingerprint(capability+readiness+generated_at) seen   -> DUPLICATE (not re-recorded)\n    else                                                  -> ACCEPTED (durable intake + provenance)\n```\n\n**EVID-001 is closed only for the Model Health readiness evidence slice implemented here; broader EVID-001 remains open.**\n\n## Required Preflight (12 questions)\n\n1. **Where readiness evidence is produced:** `src/axiom_core/model_health.py::execute_health_run` (writes the artifact into the run-spine folder).\n2. **Exact schema of `axiom_capability_readiness.json`:** `{ \"generated_at_utc\": str, \"capabilities\": [ { \"capability\": str, \"capability_version\": str, \"readiness\": \"READY|WARNING|BLOCKED|UNKNOWN\", \"risk_level\": str, \"dry_run_available\": bool, \"execute_available\": bool, \"blocking_conditions\": [str], \"warnings\": [str], \"required_user_decisions\": [str], \"recommended_next_actions\": [str] } ] }`.\n3. **Where it is written:** the ModelHealth run-spine artifact folder (`runs/<run_id>/axiom_capability_readiness.json`), alongside `axiom_model_health.json` and `axiom_environment_report.json`.\n4. **Read-only consumers today:** `server_tools.axiom_capability_readiness_get` and `axiom_model_health_get_latest` — they read & return JSON, mutate no durable state.\n5. **Why they don't close EVID-001:** they are read-only server helpers; per the directive these do not count as state consumers. No durable state is created or changed when the artifact is read.\n6. **Safest state-mutating target:** the existing evidence-intake convention (durable `report.json`+`pass_fail.json` records under a sandboxed artifacts subdir), reusing `EvidencePromotionLoop`'s intake/dedup/quarantine *patterns* and the shared `is_within_sandbox` helper — rather than `CapabilityConfidenceEngine` (see Q7).\n7. **`EvidencePromotionLoop` vs `CapabilityConfidenceEngine`:** neither's confidence-accumulation entrypoint is semantically appropriate for readiness (both would conflate \"ready to run\" with \"ran successfully\" and mutate confidence math). The consumer reuses their *intake/provenance/dedup conventions* without routing readiness into confidence factors. Confidence math is untouched.\n8. **Capability identity fields:** `capability` (e.g. `GridCreation`); `capability_version` retained for provenance. No cross-system identity remap is invented.\n9. **Duplicate detection:** stable `sha256` fingerprint over `(capability, readiness, generated_at_utc)`; an already-`accepted` fingerprint for that capability → `duplicate`, not re-recorded (mirrors PR #148 dedup).\n10. **Conflicting readiness:** two distinct readiness labels for the same capability within one artifact → both `quarantined` (no silent resolution), mirroring the loop's conflict policy.\n11. **Stale evidence:** explicit and **opt-in** via `--max-age-seconds` against `generated_at_utc`; over-age → `quarantined`. Without the flag, age is ignored (accepted).\n12. **What remains open after this PR:** (a) whether/how readiness should influence confidence/promotion — an open **Program 6 readiness-doctrine** question, intentionally not decided here; (b) broader EVID-001 for other producers (e.g. CLI Validation Recorder consumer, partially-consumed lifecycle producers) per PR #154 inventory; (c) automatic discovery of the \"latest\" readiness artifact (this PR takes an explicit `--readiness` path, like `capability-evidence-apply`).\n\n## Purpose-to-Workflow Reconciliation\n\n1. **Existing PR/component used:** `model_health` producer (PR #32), evidence-intake conventions from `EvidencePromotionLoop` (PR #147/#148), `artifact_paths.is_within_sandbox` (PR #151); target identified by the PR #154 inventory.\n2. **Workflow:** Verification-factory evidence flow — producer → artifact → **consumer (this PR)** → durable, queryable readiness state.\n3. **Consumes its output:** `model-health-evidence-history` / `current_readiness()`; future readiness-aware reporting. Provides the state hook a future Program 6 doctrine could build on.\n4. **Evidence it works:** `tests/test_model_health_evidence.py` (19 tests) + CLI smoke (accept + duplicate recorded); targeted regression suites green (below).\n5. **Disposition:** **integrated** (new consumer closes the named orphan slice), not support-only/temporary.\n6. **Structure checked before adding:** `EvidencePromotionLoop`, `CapabilityConfidenceEngine`, `server_tools`, `CapabilityStateRegistry`, existing CLI evidence commands — reused conventions; no new framework/registry.\n7. **Risk introduced:** a new artifacts subdir (`model_health_readiness_intake/`) following the standard per-engine convention; mitigated by reusing the shared path-safety + id-validation helpers. No confidence/promotion/ID-flow risk (those paths untouched).\n8. **Delete/merge/preserve:** preserve read-only helpers (still valid); nothing deleted. Future work may merge readiness into a confidence/promotion view once Program 6 decides doctrine.\n\n## Pre-Review Self-Audit (17)\n\n1. Inspected the actual producer before building? **Yes** — `model_health.py::execute_health_run`.\n2. Confirmed the exact artifact schema? **Yes** (Q2).\n3. Connected to an existing consumer path/convention rather than a new framework? **Yes** — reused intake/dedup/path-safety conventions.\n4. Avoided a new evidence framework? **Yes.**\n5. Avoided a new registry? **Yes** — a standard per-engine artifact subdir, not a registry abstraction.\n6. Avoided new confidence math? **Yes** — `CapabilityConfidenceEngine` untouched; `confidence_mutated=False` (test-asserted).\n7. Avoided new readiness/promotion doctrine? **Yes** — readiness→confidence left open, routed to Program 6.\n8. Malformed evidence never mutates state? **Yes** — rejected, no durable readiness state written (only an audit record of the rejection).\n9. Conflicting evidence not silently resolved? **Yes** — quarantined.\n10. Duplicate evidence not applied repeatedly? **Yes** — fingerprint dedup.\n11. Stale handling explicit? **Yes** — opt-in `--max-age-seconds`.\n12. Read-only helpers left read-only? **Yes** — untouched; test asserts no intake side effects.\n13. CLI validation bundles not treated as state-changing here? **Yes** — out of scope.\n14. No implementation-worker behavior? **Yes.**\n15. No retry behavior? **Yes.**\n16. No GPR/global-registry behavior? **Yes.**\n17. No canonical-doc edits / no Revit-live validation? **Yes** — only `docs/logs/behavior-change-ledger.md` (BHV-030, the sanctioned evidence log), no canonical KB edits, no Revit.\n\n## Validation (Ubuntu)\n\n- `tests/test_model_health_evidence.py` — **19 passed**.\n- `tests/test_evidence_promotion.py` + `tests/test_execution_chain_orchestrator.py` + `tests/test_model_health.py` + `tests/test_capability_confidence.py` — **129 passed** (existing execution-chain evidence promotion tests still pass).\n- `ruff check .` — clean.\n- `git diff --stat`: `src/axiom_core/model_health_evidence.py` (new, 547), `src/axiom_cli/main.py` (+118), `tests/test_model_health_evidence.py` (new, 398), `docs/logs/behavior-change-ledger.md` (BHV-030).\n- CLI smoke: `model-health-evidence-apply` recorded `accepted` for two capabilities, then `duplicate` on re-apply.\n\n## Before / After — Model Health orphan status\n\n- **Before:** `axiom_capability_readiness.json` had only read-only consumers; readiness evidence produced no durable state (orphaned; Model Health slice of EVID-001 open).\n- **After:** `model-health-evidence-apply` ingests the artifact into durable, queryable, provenance-bearing intake records with explicit accept/duplicate/quarantine/reject decisions — the Model Health readiness slice of EVID-001 is closed. Broader EVID-001 remains open; readiness→confidence doctrine remains an open Program 6 question.\n\n## Non-Goals (honored)\n\nNo global EVID-001 closure claim; no new evidence framework/registry/doctrine; no confidence-math rewrite; no evidence-promotion-semantic or execution-chain ID-flow change; no implementation-worker / retry / GPR behavior; no canonical-doc rewrite; no Revit-live validation; no Windows/Local Runner changes.\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782691589-model-health-evidence-consumer",
+    "status": "merged",
+    "merge_commit_sha": "6c8ba50ea228593f12e59fc37c3d25038a09e4bd",
+    "created_at": "2026-06-29T00:17:50Z",
+    "updated_at": "2026-06-29T05:37:33Z",
+    "merged_at": "2026-06-29T05:37:32Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "8c6c4b73d18e487052afd146a063b8679abd1b7a",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #156 — Model Health Evidence Consumer v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-29T00:16:09Z"
+    },
+    {
+      "commit_sha": "c4de844f0a83ef5cd0f7ddd281ba092da1bb7791",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #156 — add behavior-change-ledger BHV-030\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-29T00:16:51Z"
+    }
+  ],
+  "files": [
+    {
+      "path": "docs/logs/behavior-change-ledger.md",
+      "status": "modified",
+      "additions": 17,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 118,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/model_health_evidence.py",
+      "status": "added",
+      "additions": 547,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_model_health_evidence.py",
+      "status": "added",
+      "additions": 398,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:56.179853+00:00"
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 39,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/39",
+    "title": "PR #148 — Evidence Promotion Safety Hardening v1",
+    "description": "## Summary\n\nSafety-hardening of the merged M2 `EvidencePromotionLoop` (PR #147). Fixes 4 issues surfaced in the post-merge review **without** new frameworks, doctrine, registries, or object families. Confidence math in `CapabilityConfidenceEngine` is untouched — this only changes *which* evidence is allowed to mutate it.\n\n**1. Duplicate evidence no longer silently inflates confidence.** `apply()` now computes a stable per-record fingerprint and skips a second mutation if it was already accepted:\n\n```python\nfingerprint = self._fingerprint(bundle, evidence_path)   # evidence_id, else sha256(content)\nduplicate_of = self._already_accepted(capability_id, fingerprint)  # prior ACCEPTED intake only\nif duplicate_of is not None:\n    return self._record(..., EvidenceDecision.DUPLICATE, prior=prior, updated=prior,  # state_changed=False\n                        fingerprint=fingerprint, duplicate_of=duplicate_of)\n```\nDistinct evidence from distinct runs has a distinct `evidence_id` → distinct fingerprint → still accumulates. Only *accepted* prior applications block re-application (a prior quarantine/reject never mutated state, so it must not permanently block).\n\n**2. Conflicting outcome signals are quarantined, not resolved by priority.** `_outcome()` previously picked `bundle.passed` → `bundle.status` → `trace.status` by priority. It now collects **all** recognised signals and reconciles them:\n\n```python\nsignals = self._collect_signals(bundle)        # [{source, value, outcome}, ...]\ndistinct = {s[\"outcome\"] for s in signals}\nif len(distinct) > 1:\n    return EvidenceOutcome.CONFLICT, \"conflicting outcome signals (...)\", signals\n```\n`CONFLICT` → `apply()` quarantines with `state_changed: false`, and the intake record preserves `outcome_signals`, the conflict `reason`, and the decision.\n\n**3. Readiness threshold classification (option B — keep local).** `_readiness_from_score()` stays in `evidence_promotion.py` but its docstring (and the module docstring) now explicitly classify it as **implementation-local readiness labelling — NOT promotion doctrine**: a deterministic projection of the confidence score, gating no registry transition, with the canonical-ownership/threshold question routed to **Program 6**.\n\n**4. EVID-001 scope corrected.** Module docstring + M2 validation packet now state PR #147 closed only the **narrow M2 execution-chain slice** (chain `evidence.json` → confidence/readiness). The broader EVID-001 finding (`axiom_core.model_health` producer has no consumer) **remains open**.\n\nIntake records gain `evidence_fingerprint`, `outcome_signals`, and `duplicate_of` fields; the `capability-evidence-apply` renderer shows the detected signals and colours the new `duplicate` decision. The intake record stays an audit artifact only (no new registry/doctrine/durable state). A `BHV-027` behavior-change-ledger entry documents the before/after.\n\n## Pre-review self-audit\n\n1. **Change confidence math?** No. `CapabilityConfidenceEngine` is untouched.\n2. **Introduce/move readiness thresholds?** No. Same `0.7/0.3` thresholds; only added classification docs.\n3. **Readiness classification?** Implementation-local labelling (option B); explicitly not doctrine; doctrine routed to Program 6.\n4. **Can duplicate evidence mutate confidence/readiness?** No — decision `duplicate`, `state_changed: false`, no confidence write.\n5. **Can conflicting evidence mutate confidence/readiness?** No — decision `quarantined`, `state_changed: false`.\n6. **Are rejected/quarantined/duplicate/conflicting records queryable without a new registry?** Yes — same per-intake `report.json`/`pass_fail.json` audit artifacts via `capability-evidence-history`/`-show`.\n7. **Overclaim EVID-001 closure?** No — narrowed to the M2 slice; `model_health` gap noted open.\n8. **Introduce promotion doctrine?** No.\n9. **Introduce a new object family/registry/source of truth?** No.\n10. **Unresolved doctrine routed to Program 6?** Yes (readiness ownership/thresholds), in code + packet.\n\n## Tests / validation\n\n- New tests in `tests/test_evidence_promotion.py`: duplicate no-inflation, duplicate visible in history, distinct-run accumulation, previously-quarantined-can-reapply, conflict quarantined, conflict no-mutation, agreeing-signals accepted, CLI duplicate+conflict, readiness deterministic/local docstring, EVID-001 scope language. Existing PASS/FAIL/missing/no-identity/stale cases preserved.\n- `tests/test_evidence_promotion.py`: **27 passed**.\n- `tests/test_command_registry.py` + `tests/test_execution_chain_orchestrator.py`: **44 passed**.\n- Full `pytest`: **5055 passed / 1 skipped**.\n- `ruff check`: clean.\n- CLI smoke: real chain run → apply (accepted, `very_low→very_high`) → re-apply (`duplicate`, `state_changed: false`) → conflicting bundle (`quarantined`, outcome `conflict`, `state_changed: false`).\n\n## Non-goals confirmed\n\nNo new promotion doctrine/framework/registry, no M3 Purpose/Layer Index, no `model_health` consumer, no full EVID-001 closure, no Execution Graph Synthesizer, no Organizational State schema, no canonical file migration, no broad refactor.\n\n## Unresolved questions\n\n- **Program 6:** canonical ownership and official thresholds for \"readiness\" (currently an implementation-local label derived from the confidence score).\n- **EVID-001 (gap analysis):** remains open until `model_health` (and any other orphaned producer) gains a consumer edge and gap analysis re-confirms it.\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782669505-evidence-promotion-safety-hardening",
+    "status": "merged",
+    "merge_commit_sha": "cda0f7e2de396350b32e795bd8d7ffbcc19ce93d",
+    "created_at": "2026-06-28T18:10:47Z",
+    "updated_at": "2026-06-28T18:25:48Z",
+    "merged_at": "2026-06-28T18:25:48Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "577486896ddd6be63a687a2e142c7d42df958c2e",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #148 — Evidence Promotion Safety Hardening v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-28T18:09:55Z"
+    }
+  ],
+  "files": [
+    {
+      "path": "docs/architecture/integration/M2_Evidence_Promotion_Validation_Packet.md",
+      "status": "modified",
+      "additions": 13,
+      "deletions": 1
+    },
+    {
+      "path": "docs/logs/behavior-change-ledger.md",
+      "status": "modified",
+      "additions": 17,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 13,
+      "deletions": 3
+    },
+    {
+      "path": "src/axiom_core/evidence_promotion.py",
+      "status": "modified",
+      "additions": 188,
+      "deletions": 39
+    },
+    {
+      "path": "tests/test_evidence_promotion.py",
+      "status": "modified",
+      "additions": 216,
+      "deletions": 3
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:50.743133+00:00"
+  }
+}

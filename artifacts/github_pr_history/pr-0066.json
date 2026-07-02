@@ -1,0 +1,122 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 66,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/66",
+    "title": "Revit 2025 + 2026 build targets (net8.0-windows) + deploy scripts — lane-3A operator target is 2025",
+    "description": "## Summary\n\nDe-risks Lane-3A Gate 2: the operator no longer improvises MSBuild overrides — Gate 2 is now `.\\scripts\\deploy-revit-2025.ps1 -BuildOnly` then deploy. **Revit 2025 is the lane-3A operator target** (machine has 2024/2025/2027 installed; 2026 not yet). The 2026 target is included and kept build-ready for when 2026 is installed.\n\n- New per-version build targets mirroring the 2027 SDK-style pattern but on **net8.0-windows** (Revit 2025/2026 add-ins run .NET 8): `Axiom.Revit.2025.sln` / `Axiom.Revit.2026.sln`, `Axiom.Core.<ver>` + `Axiom.RevitAddin.<ver>` projects compiling the shared `Axiom.Core` / `Axiom.RevitAddin` sources via `Compile Include` links with `REVIT_2025` / `REVIT_2026` symbols and Revit API HintPaths under `$(ProgramW6432)\\Autodesk\\Revit <ver>\\`. No capability logic duplicated.\n- `RevitElementIdCompat`: `.Value` now gated on `#if REVIT_2025 || REVIT_2026 || REVIT_2027` (2024 baseline byte-identical — no `REVIT_2025/2026` symbol in the net48 solution).\n- `scripts/deploy-revit-2025.ps1` / `deploy-revit-2026.ps1` (`-BuildOnly` supported; .NET SDK ≥ 8 check; deploys manifest + `Axiom.RevitAddin.dll` + `Axiom.Core.dll` + `Newtonsoft.Json.dll` to `C:\\ProgramData\\Autodesk\\Revit\\Addins\\<ver>\\` — the 2024 all-users pattern; Program Files remains the 2027 deviation, untouched).\n- Lane-3A runbook: operator target section rewritten to Revit 2025 (2026 when installed); Gate 2, prerequisites, operator fields and evidence-to-return now reference the 2025 script/paths. Multi-version runbook + `revit-adapter` SKILL updated in the same PR.\n\n**Caveat:** both targets are **not build-verified** — no Revit 2025/2026 DLLs on this box. The first `dotnet build` happens on the operator machine as lane-3A Gate 2 itself; the runbook says record any deviations as findings, and a build failure is a lane-3A finding, not a silent fallback to another version.\n\n## Tests\n\nXML/sln well-formedness verified locally; no Python changes → no pytest (tier 3: C# build validation happens on the operator machine).\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782967131-revit-2026-build-target",
+    "status": "open",
+    "merge_commit_sha": "7ec7c04f4a4a31f370c44d666308526c9cb28000",
+    "created_at": "2026-07-02T04:41:44Z",
+    "updated_at": "2026-07-02T04:59:48Z",
+    "merged_at": ""
+  },
+  "commits": [
+    {
+      "commit_sha": "322ab22cc2d8b41c2a2f50585df23dd9208a4840",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Add Revit 2026 build target (net8.0-windows) + deploy script for lane-3A\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-02T04:41:26Z"
+    },
+    {
+      "commit_sha": "3af66d7e15b269fe805c20ed0982c9edb4343ec9",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Add Revit 2025 build target; lane-3A operator target 2025 (2026 kept build-ready)\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-02T04:59:29Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".agents/skills/revit-adapter/SKILL.md",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "docs/runbooks/lane3a-revit-readonly-validation-runbook.md",
+      "status": "modified",
+      "additions": 36,
+      "deletions": 31
+    },
+    {
+      "path": "docs/runbooks/revit-multi-version-runbook.md",
+      "status": "modified",
+      "additions": 21,
+      "deletions": 0
+    },
+    {
+      "path": "scripts/deploy-revit-2025.ps1",
+      "status": "added",
+      "additions": 171,
+      "deletions": 0
+    },
+    {
+      "path": "scripts/deploy-revit-2026.ps1",
+      "status": "added",
+      "additions": 171,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_revit/Axiom.Core.2025/Axiom.Core.2025.csproj",
+      "status": "added",
+      "additions": 44,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_revit/Axiom.Core.2026/Axiom.Core.2026.csproj",
+      "status": "added",
+      "additions": 44,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_revit/Axiom.Core/Compat/RevitElementIdCompat.cs",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 3
+    },
+    {
+      "path": "src/axiom_revit/Axiom.Revit.2025.sln",
+      "status": "added",
+      "additions": 31,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_revit/Axiom.Revit.2026.sln",
+      "status": "added",
+      "additions": 31,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_revit/Axiom.RevitAddin.2025.addin",
+      "status": "added",
+      "additions": 11,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_revit/Axiom.RevitAddin.2025/Axiom.RevitAddin.2025.csproj",
+      "status": "added",
+      "additions": 53,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_revit/Axiom.RevitAddin.2026.addin",
+      "status": "added",
+      "additions": 11,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_revit/Axiom.RevitAddin.2026/Axiom.RevitAddin.2026.csproj",
+      "status": "added",
+      "additions": 53,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:25:11.734156+00:00"
+  }
+}

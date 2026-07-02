@@ -1,0 +1,74 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 32,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/32",
+    "title": "PR #142 — Execution Report Framework v1",
+    "description": "## Summary\n\nAdds the **execution-report** layer on top of the Execution Artifact Framework (#141), completing the deterministic execution roadmap: `… → Artifact → Report`. Where prior layers track discrete execution facts, this layer produces *structured, human- and machine-readable reports that summarize execution outcomes, artifacts, failures, and evidence*. Clean **v1** — no prior `execution_report` module/CLI exists.\n\nNew twist vs prior layers: reports carry **ordered sections** (sub-records) in addition to typed references, and the engine's container is an `ExecutionReportSummary` (aggregating many `ExecutionReport`s) rather than `…Report`.\n\nObservational/declarative only: consumes ExecutionResult + ExecutionArtifact + ExecutionAttempt v2 + CapabilityKnowledgeGraph **read-only**. Per non-goals it does **not** execute, orchestrate, schedule, publish reports, build dashboards, assign workers, or make network calls. Revit 2024 baseline unaffected.\n\nNew module `src/axiom_core/execution_report.py` (`ExecutionReport` / `ExecutionReportSection` / `ExecutionReportReference` / `ExecutionReportSummary` / `ExecutionReportEvidence` / `ExecutionReportEngine`):\n\n- **Report**: `report_id, capability_id, attempt_id, result_id, report_type, status, sections, references, summary, created_at, schema_version, raw_payload`\n- **Report types**: `EXECUTION_SUMMARY / VALIDATION_SUMMARY / FAILURE_SUMMARY / ARTIFACT_SUMMARY / REVIEW_SUMMARY / FINAL_SUMMARY / OTHER`\n- **Statuses**: `CREATED / COMPLETE / PARTIAL / FAILED / UNKNOWN`\n- **Section**: `section_id, section_type, title, content, order_index`; section types `OVERVIEW / RESULT / ARTIFACTS / FAILURES / VALIDATION / RISKS / NEXT_STEPS / OTHER`\n- **Reference types**: `RESULT / ARTIFACT / ATTEMPT / CAPABILITY / FILE / VALIDATION / KNOWLEDGE_NODE / OTHER`\n- **Summary**: `report_count, section_count, status_counts, report_type_counts, failed_count, partial_count, complete_count, duplicate_report_count`\n\nDeterministic ordering, dedup, section ordering, and pass/fail gate:\n\n```\nreport sort key  = (capability_id, attempt_id, result_id, report_type, status, report_id)\nsection sort key = (order_index, section_type, title, section_id)\ndedup key        = (capability_id, attempt_id, result_id, report_type)  # keep first in sorted order, count surplus\npassed           = report_count > 0 and failed_count == 0   # empty summary -> fail\n```\n\nCLI (4 commands, JSON/Markdown/CSV exports), registered in `command_registry.py`:\n\n```\naxiom execution-report-create [--report-file <rf>] [--json-output]\naxiom execution-reports [--json-output]\naxiom execution-report-show <summary_id> [--json-output]\naxiom execution-report-export <summary_id> [--format markdown|json|csv]\n```\n\nEvidence bundle always written under `artifacts/execution_report/<run_id>/` (5 files: `execution_report_request.json`, `execution_report_result.json`, `execution_report_summary.md`, `pass_fail.json`, `report.json`); directory git-ignored.\n\n## Validation\n\n- **New tests:** +61 (`tests/test_execution_report.py`) + `test_command_registry.py`/`test_selection_engine` updates\n- **Full pytest:** `poetry run pytest -q` → **4978 passed, 1 skipped** (baseline 4917 at #141)\n- **Ruff:** `poetry run ruff check src/ tests/` → 0 errors\n- **CLI smoke (shell-authoritative):** adversarial fixture (5 reports → 1 case-insensitive duplicate `(cap-1,att-1,res-1,EXECUTION_SUMMARY)`, 1 FAILED, 1 PARTIAL, lowercase types/statuses, out-of-order sections) → report_count 4 / section_count 4 / failed 1 / partial 1 / complete 2 / duplicate 1; status `{COMPLETE:2,FAILED:1,PARTIAL:1}`; deterministic report order; sections ordered by order_index 0→1→2; show round-trips identically; markdown/CSV(header+4 reports+4 sections+2 refs=11 rows)/JSON exports valid; error paths show-missing exit 2, traversal exit 1, invalid report_type exit 1; pass_fail `false` adversarial, `true` clean, `false` empty\n\n## What did NOT change\n\n- No modification to ExecutionArtifact (#141) or any prior layer\n- No execution / orchestration / scheduling / report publishing / dashboard / worker assignment / network calls / architecture changes\n- Revit 2024 baseline unaffected\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782343321-execution-report-framework",
+    "status": "merged",
+    "merge_commit_sha": "dc99c7018c7cf36907d595a532e738aa132e3630",
+    "created_at": "2026-06-24T23:25:48Z",
+    "updated_at": "2026-06-28T05:28:11Z",
+    "merged_at": "2026-06-28T05:28:11Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "a92eab9d5b2c8b366ce25c54bc144e73f254e47b",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #142 — Execution Report Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-24T23:25:36Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 178,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/execution_report.py",
+      "status": "added",
+      "additions": 849,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 71,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_execution_report.py",
+      "status": "added",
+      "additions": 987,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:45.257373+00:00"
+  }
+}

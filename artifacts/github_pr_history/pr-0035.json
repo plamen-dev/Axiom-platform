@@ -1,0 +1,56 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 35,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/35",
+    "title": "Integration PR #145 — M4/M2/M3 Validation Packets v1",
+    "description": "## Summary\n\nPlanning deliverable (no framework, no implementation). Converts PR #144's **negative discovery** into three concise, implementation-ready **validation packets** so the next executable PR (#146+) can begin without redoing discovery. Adds `docs/architecture/integration/` (index + 3 packets); touches no source.\n\nPR #144 answered *\"what is disconnected/unwired?\"*; PR #145 answers *\"how do we validate the implementation that fixes the highest-value disconnected behavior?\"*\n\n**Evidence grounding** — PR #144's gap analyzer re-run against current `main` (which now includes PR #142 `execution_report.py`, `dc99c70`): 158 modules / 275 edges / 9 isolated / 16 gaps. All **5 execution-chain transitions** flagged `declared_but_unwired_chains` — *\"no import edge in either direction\"* → the chain is **nominal, not executable**. EVID-001 (`model_health`) → M2; PURP-001 (all 158 modules) → M3.\n\n### Packets\n\n| Packet | Milestone (INV) | Next PR (proposed) | Role |\n|---|---|---|---|\n| M4 — Execution Chain Validation | INV-03 | Integration PR #146 — Execution Chain Orchestrator v1 | **next executable target** |\n| M2 — Evidence→Promotion | INV-04 | Evidence-to-State Loop v1 | hooks + test matrix |\n| M3 — Purpose & Layer | INV-05 | Purpose & Layer Index v1 | hooks + test matrix |\n\n### M4 highlights (the prize)\n\n- Preserves *\"docstring read-only consumption is NOT sufficient\"* — defines pass/fail as **real id equality**: `downstream.ref(reference_type==UpstreamType).reference_value == upstream.<id>`, plus a gap-analysis diff showing `declared_but_unwired_chains` drop 5→0 as wiring lands.\n- Wiring, not new objects: each stage already has a `*Reference`/`*ReferenceType` hook naming its upstream (Step→`PLAN`, Attempt→`STEP`, Result→`ATTEMPT`, Artifact→`RESULT`, Report→`RESULT`/`ARTIFACT`). `ExecutionReport` confirmed on `main` → terminal stage (PR #144's \"module not present\" flag was a branch-timing artifact, resolved).\n- Candidate decision table compares an **internal deterministic capability (recommended slice subject)** vs **`SetParameterValue`** (deferred — hard Revit-runtime dep, not CI-deterministic) vs **`InventoryModel`** (rejected — broad + guarded), justified from repo evidence.\n\n### Discipline / bounds honored\n\n- M4 stays the next executable target; M2/M3 are hooks + matrices, not reasons to delay M4.\n- M2 defines tests on existing `global_capability_registry` / `capability_confidence` (no promotion doctrine). M3 keeps **structural vs semantic vs executable** relationships distinct (no new semantic framework).\n- Re-architecture (Execution Graph Synthesizer, Org State schema, promotion doctrine, semantic schema) routed to INV-01/02/05/07 and Programs 0/2/6/7 as unresolved — **not designed here**.\n- Canonical docs cross-referenced by **stable filenames**; uploaded version-suffixed copies + the fact that canonical docs are not yet committed are flagged as source-structure observations. **No canonical filename migration** in this PR (reference rule only).\n\n## What did not change\n\nNo source code, no tests, no behavior. Docs-only. 2024 Revit baseline unaffected; no live Revit path touched.\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782646247-m4-m2-m3-validation-packets",
+    "status": "merged",
+    "merge_commit_sha": "df1b269c161114128d16ea2dbd3ac85468d6f74e",
+    "created_at": "2026-06-28T14:19:43Z",
+    "updated_at": "2026-06-28T14:33:30Z",
+    "merged_at": "2026-06-28T14:33:30Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "5cb4885b7295b62286fa1484768aaa6d97e79d67",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Integration PR #145 — M4/M2/M3 Validation Packets v1\n\nConvert PR #144 gap-analysis findings into narrow, implementation-ready\nvalidation targets for the next executable PRs. Planning deliverable only\n(no framework, no implementation).\n\n- M4 (next executable target): execution-chain id-flow validation, candidate\n  decision table, exact pass/fail, re-arch routed to INV-01/Program 2.\n- M2 (hooks + matrix): evidence->state/confidence/promotion using existing\n  global_capability_registry / capability_confidence; refs EVID-001.\n- M3 (hooks + matrix): purpose/layer via capability_summary; structural vs\n  semantic vs executable kept distinct; refs PURP-001.\n- Index + canonical source-status note (stable filenames; no migration).\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-28T14:19:15Z"
+    }
+  ],
+  "files": [
+    {
+      "path": "docs/architecture/integration/M2_Evidence_Promotion_Validation_Packet.md",
+      "status": "added",
+      "additions": 81,
+      "deletions": 0
+    },
+    {
+      "path": "docs/architecture/integration/M3_Purpose_Layer_Validation_Packet.md",
+      "status": "added",
+      "additions": 83,
+      "deletions": 0
+    },
+    {
+      "path": "docs/architecture/integration/M4_Execution_Chain_Validation_Packet.md",
+      "status": "added",
+      "additions": 154,
+      "deletions": 0
+    },
+    {
+      "path": "docs/architecture/integration/README.md",
+      "status": "added",
+      "additions": 85,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:47.529477+00:00"
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 42,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/42",
+    "title": "PR #152 — Canonical Knowledge Base Repo Seed v1",
+    "description": "## Summary\n\nSeeds Axiom's Canonical Knowledge Base as stable, repo-resident source-of-truth documents under a new repo-native location, `docs/canonical_knowledge_base/`. This establishes the repository (not chat threads or the ChatGPT Library) as the durable authoritative location for current canonical Axiom knowledge.\n\nDocs-only / canonical-source seed: **no runtime, CLI, Local Runner, GPR, or automation changes; no doctrine rewrite.** Content is drawn only from existing repo evidence and the provided Axiom knowledge base; where exact canonical content is not repo-resident it is left as a clearly marked **\"Current Status / Source Needed\"** placeholder and routed as a follow-up rather than invented.\n\nFiles (stable names, no `_v#`; version/status/date live in each file's header):\n\n```\ndocs/canonical_knowledge_base/\n  00_Readme.md                       # index + source-of-truth/update/mirror rules\n  10_Current_Strategic_Context.md    # Program 0 anchor (self-improving BIM factory; Revit = Adapter 001)\n  20_Current_Organizational_State.md # program roster + boundaries + validated milestone + recent PRs\n  30_Architectural_Principles.md     # POINTS TO docs/architecture/axiom-doctrine.md (no duplication)\n  40_Open_Investigations.md          # OI-001..003 + routed follow-ups RF-001..004\n  50_Organizational_Communications.md# structure + rules only; intentionally empty (Source Needed)\n  60_Reasoning_Quality_Assurance.md  # self-audit + Purpose-to-Workflow + tiered testing gates\n```\n\nKey non-duplication decision: an architectural doctrine file already exists at `docs/architecture/axiom-doctrine.md`. `30_Architectural_Principles.md` **references and summarizes** it rather than forking it, to avoid creating duplicate/competing doctrine.\n\n## Scope\n\nCreate the repo-resident Canonical Knowledge Base in the smallest appropriate repo-native location, with `00_Readme.md` plus the six primary canonical files, consistent headers, documented source-of-truth / mirror / update rules, and explicit routing of missing content.\n\n## Key Changes\n\n- **New folder** `docs/canonical_knowledge_base/` (7 markdown files, 484 insertions). Chosen because no existing canonical/governance/knowledge-base *organizational-state* location exists; `docs/architecture/` holds per-component design specs, not org/strategy state. Not placed under `src/`, `artifacts/`, or `.agents/skills/`.\n- `00_Readme.md` defines: authoritative repo-resident source of truth; ChatGPT Library / chat copies are mirrors/references only; stable-filename rule (no `_v#`); version/status in headers; updates via PR; Canonical Impact Flags may be batched; traceability (`docs/logs/`) kept separate from clean canonical source; an index table (file → purpose → owner program → update trigger); and a 4-level update/review policy.\n- Each file carries the required header (Title, Status, Owner/Responsible Program, Last Updated, Source/Provenance, Purpose, Update/Review notes).\n- Program-ownership boundaries honored: Program 6 owns doctrine/canonical custody; **Program 1 does not own the canonical knowledge base** (owns PR execution + task-packet production only).\n- Missing canonical content routed (not invented): RF-001 Program 0 strategy narrative, RF-002 live program staffing, RF-003 durable org communications, RF-004 whether prior Program 5 investigation reports should be canonicalized.\n\n## Validation\n\n- `git diff --stat` → **7 files changed, 484 insertions(+)**, all under `docs/canonical_knowledge_base/`.\n- No files under `src/` changed (verified).\n- No `.agents/skills/testing-axiom-cli/SKILL.md` change (verified).\n- No generated artifacts, recordings, screenshots, or session dumps committed (verified clean working tree).\n- Per the repo tiered-testing policy, **tests not run — docs/canonical-source only** (no runtime/CLI/test code touched). Relative links verified (e.g. `../architecture/axiom-doctrine.md`).\n- Based on latest `main` containing PR #151 (`ab4a9cf`).\n\n## Non-Goals\n\nNo runtime/CLI/Local Runner changes; no implementation-worker, retry-loop, or validation-delegation work; no GPR/global PR registry; no automation; no canonical doctrine rewrite; no large artifact or Devin-session migration; no screenshot/video storage; no Revit validation; no broad repo reorganization.\n\n## Architectural Significance\n\nRepo governance seed. It gives Programs 0–7 a single durable, versioned-in-git location for current canonical knowledge, reducing reliance on expirable external chat context — without adding doctrine, runtime surface, or new object families. It deliberately points at existing doctrine instead of duplicating it, and makes gaps explicit/routed instead of fabricated.\n\n---\n\n### Purpose-to-Workflow Reconciliation\n\n1. **Existing component used:** existing repo docs — `docs/architecture/axiom-doctrine.md`, `README.md`, `docs/logs/`, `docs/architecture/integration/` — and the Axiom knowledge base notes provided as source context.\n2. **Workflow:** organizational knowledge governance — canonical reference for program planning, PR judgement, and doctrine review.\n3. **Consumes its output:** Programs 0–7, Program 1 task-packet production, Program 6 canonical review, and future organizational-state/navigation systems.\n4. **Evidence it works:** docs render with consistent headers/links; `git diff --stat` confined to the new folder; boundary rules and routed follow-ups are explicit.\n5. **Disposition:** canonical-source / repo governance seed. Not runtime behavior.\n6. **Existing structure checked first:** searched for canonical/governance/doctrine locations (`find -iname`), inspected `docs/` tree and `docs/architecture/` (including `axiom-doctrine.md`) before adding a new folder.\n7. **Risk introduced:** duplicate/stale-source risk — mitigated by pointing `30_Architectural_Principles.md` at the existing doctrine, documenting mirror-vs-source precedence, and forbidding filename versioning.\n8. **Delete/merge/preserve:** preserved existing doctrine and traceability ledgers untouched; merged nothing (additive seed); left `src/`, CLI, Local Runner, and skills alone.\n\n### Required Pre-Review Self-Audit\n\n1. **Create new vs seed intended source of truth?** Seeded the intended source of truth.\n2. **Accidentally created duplicate doctrine?** No — references `axiom-doctrine.md` instead of restating it.\n3. **Invented unsupported canonical content?** No — only repo/knowledge-supported content; gaps marked \"Source Needed\" and routed.\n4. **Distinguished repo source from ChatGPT Library mirrors?** Yes — explicit in `00_Readme.md` (repo wins).\n5. **Stable filenames without `_v#`?** Yes.\n6. **Version/status in headers?** Yes.\n7. **Traceability kept separate from clean canonical content?** Yes — `docs/logs/` referenced, not merged in.\n8. **Avoided runtime code changes?** Yes.\n9. **Avoided CLI behavior changes?** Yes.\n10. **Avoided GPR/global PR registry?** Yes.\n11. **Avoided Local Runner / implementation-worker / retry behavior?** Yes.\n12. **Routed missing material as follow-up instead of silently filling gaps?** Yes — RF-001..004.\n13. **Preserved Program ownership boundaries?** Yes — doctrine/canonical custody = Program 6; Program 1 ≠ canonical owner.\n\n### Review expectations checklist\n\n- **What changed:** added a repo-resident Canonical Knowledge Base (7 docs).\n- **What behavior changed:** none (docs-only).\n- **What did not change:** runtime, CLI, Local Runner, skills, doctrine source, tests.\n- **Tests run:** none — docs/canonical-source only (per tiered testing policy).\n- **Validation pending:** Programs 0/6/7 to supply RF-001..004 content via PR.\n- **Known risks:** stale/duplicate source — mitigated by doctrine pointer + mirror precedence + no filename versioning.\n- **Revit live validation required:** No.\n- **2024 baseline affected:** No.\n- **Factory impact:** indirect — strengthens governance/knowledge durability, not the runtime factory.\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782684392-canonical-kb-seed",
+    "status": "merged",
+    "merge_commit_sha": "48a120e692e6ed63e97a85c7cfe05fa53180e5c9",
+    "created_at": "2026-06-28T22:09:38Z",
+    "updated_at": "2026-06-28T22:27:49Z",
+    "merged_at": "2026-06-28T22:27:48Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "84f46d9796ce83ef149e4e90b77445019d40bf87",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #152 — Canonical Knowledge Base Repo Seed v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-28T22:08:55Z"
+    },
+    {
+      "commit_sha": "8ea71a6584d8f0b32bdb2e9b6806e7aa0d82c76c",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #152 — route README capability-list lag (SetParameterValue) as RF-005\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-28T22:25:22Z"
+    }
+  ],
+  "files": [
+    {
+      "path": "docs/canonical_knowledge_base/00_Readme.md",
+      "status": "added",
+      "additions": 99,
+      "deletions": 0
+    },
+    {
+      "path": "docs/canonical_knowledge_base/10_Current_Strategic_Context.md",
+      "status": "added",
+      "additions": 77,
+      "deletions": 0
+    },
+    {
+      "path": "docs/canonical_knowledge_base/20_Current_Organizational_State.md",
+      "status": "added",
+      "additions": 78,
+      "deletions": 0
+    },
+    {
+      "path": "docs/canonical_knowledge_base/30_Architectural_Principles.md",
+      "status": "added",
+      "additions": 67,
+      "deletions": 0
+    },
+    {
+      "path": "docs/canonical_knowledge_base/40_Open_Investigations.md",
+      "status": "added",
+      "additions": 61,
+      "deletions": 0
+    },
+    {
+      "path": "docs/canonical_knowledge_base/50_Organizational_Communications.md",
+      "status": "added",
+      "additions": 40,
+      "deletions": 0
+    },
+    {
+      "path": "docs/canonical_knowledge_base/60_Reasoning_Quality_Assurance.md",
+      "status": "added",
+      "additions": 68,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:53.121668+00:00"
+  }
+}

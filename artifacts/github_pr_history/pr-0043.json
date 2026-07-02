@@ -1,0 +1,92 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 43,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/43",
+    "title": "PR #153 — CLI Validation Evidence Recorder v1",
+    "description": "## Summary\n\nAdds an Axiom-native way to run an **explicit validation plan** (an ordered list of allowlisted CLI commands) and write a **durable evidence bundle** — so validation proof is repo/artifact-addressable instead of living in manual terminal copy/paste, Devin session context, or screenshots. Validation-evidence infrastructure only: it **reuses** existing command-registry governance and `is_within_sandbox` path safety; it is **not** a new runner, retry loop, implementation worker, or promotion change.\n\n`EvidenceRunner` (PR #25) only covers three fixed in-process validations; this recorder is complementary — it runs an arbitrary plan of safe CLI commands as subprocesses and captures per-command evidence.\n\n## Scope\n\n- New module `src/axiom_core/validation/cli_validation_recorder.py`: plan format, governance gate, executor, and bundle writer.\n- New CLI command `axiom cli-validation-record` in `src/axiom_cli/main.py` + a registry entry in `command_registry.py`.\n- Example plans + docs under `docs/validation_plans/` (M4 execution-chain, M2 evidence-promotion).\n- Tests, behavior-change ledger entry (BHV-029), and a small skill-checklist reference.\n\n## Key Changes\n\nCLI surface:\n\n```\naxiom cli-validation-record --plan <path> \\\n  [--artifacts-root <p>] [--name <run-name>] [--set KEY=VALUE] [--dry-run] [--json-output]\n```\n\nGovernance — every plan command is authorized against the Runner Command Registry; only cataloged, `SafetyLevel.SAFE`, non-Revit commands run (no shell, explicit `argv`):\n\n```python\ndef authorize_command(name) -> GovernanceDecision:\n    spec = command_registry.get_command(name)\n    if spec is None:                      return denied(\"not in registry\")\n    if spec.requires_revit:               return denied(\"requires live Revit\")\n    if spec.safety_level is not SAFE:     return denied(f\"classified '{...}'\")\n    return allowed()\n```\n\nRun policy — failures are first-class. A failed/blocked command (assertion fail, unexpected exit, timeout) with `continue_on_failure=false` stops the run and marks the rest `skipped`; run status is `passed` only if every command passed. Process exit code is `0` pass / `1` otherwise.\n\nPath safety — bundle dir and `expect_artifact_exists` checks route through `artifact_paths.is_within_sandbox` (POSIX + Windows safe; traversal rejected), reusing the PR #151 fix rather than re-implementing containment.\n\nBundle layout (under git-ignored `artifacts/validation_evidence/<run_id>/`):\n\n```\nvalidation_run.json   commands.json   environment.json\nartifact_manifest.json (sha256/file)  assertion_results.json\nplan_snapshot.json    report.md\ncommands/NN_<id>.stdout.txt  commands/NN_<id>.stderr.txt\n```\n\nPlan format is a small explicit JSON list (deliberately **not** a workflow DSL): `plan_id`, `title`, `purpose`, and `commands[]` with `id`, `command`, `args` (supporting `${artifacts_root}` / `${run_dir}` / `${repo_root}` / `--set` substitution), `timeout_seconds`, `expected_exit_code`, `expect_stdout_contains`, `expect_stderr_contains`, `expect_artifact_exists`, `continue_on_failure`.\n\nThe default `SubprocessCommandExecutor` runs `poetry run axiom <name> <args>`; an injectable `CommandExecutor` protocol keeps tests subprocess-free.\n\n## Validation\n\nUbuntu (Devin):\n- `tests/test_cli_validation_recorder.py` — 26 tests (plan parsing, governance, success/failure/timeout/blocked/skip, variable substitution, dry-run, path-safety) — pass.\n- Directive-required targeted tests: `test_execution_chain_orchestrator.py`, `test_evidence_promotion.py`, `test_local_runner.py`, `test_command_registry.py` (+ recorder) — **141 passed / 1 skipped**.\n- Full suite — **5098 passed / 1 skipped**; `poetry run ruff check .` — clean.\n- CLI smoke test produced real bundles: M4 plan → `Status: PASSED 1/1`; M2 plan (with `--set evidence=<chain evidence.json>`) → `Status: PASSED 2/2`. `git status` confirms generated bundles stay under git-ignored `artifacts/validation_evidence/`.\n\nPending operator (Windows) — cannot run in Devin's Ubuntu env: re-run M4 + M2 plans via `axiom cli-validation-record` on Windows to confirm subprocess/path behavior on the real target.\n\n## Non-Goals\n\nNo new runner framework. No retry loop. No implementation-worker behavior. No Local Runner rewrite. No GPR/global PR registry. No canonical doctrine. No confidence-math / evidence-promotion-semantic / execution-chain ID-flow changes. No Revit-live validation. No browser/terminal recording or Devin session ingestion. No broad refactor.\n\n## Architectural Significance\n\nStrengthens the verification factory's **evidence quality**: validation proof becomes durable, structured, and addressable, with governance and path-safety reused from existing systems rather than duplicated. Complementary to `EvidenceRunner`, not a replacement.\n\n---\n\n### Purpose-to-Workflow Reconciliation\n\n1. **Existing PR/component/capability used:** Runner Command Registry (PR #22) for governance; `artifact_paths.is_within_sandbox` (PR #151) for path safety; the Local Runner subprocess/env-capture pattern; `execution-chain-run` (PR #146) and `capability-evidence-apply` (PR #147/#148) as the commands the example plans drive.\n2. **Workflow it participates in:** the validation/evidence lane of the verification factory — runs governed CLI sequences and persists proof.\n3. **What consumes its output:** humans/operators reviewing `report.md`; downstream tooling reading `validation_run.json` / `commands.json` / `artifact_manifest.json`; the Windows Local Runner validation lane.\n4. **Evidence it works:** 26 recorder tests + 141 targeted + 5098 full-suite pass; ruff clean; real M4/M2 bundles produced via CLI smoke test.\n5. **Disposition:** validation artifact / support infrastructure (compatibility-friendly), not a new engine.\n6. **Existing structure checked before adding:** `EvidenceRunner` (3 fixed in-process validations — cannot run an arbitrary plan), Local Runner (named allowlisted actions only), command registry (governance, executes nothing). New code is the minimal plan-driven recorder layer over these.\n7. **Risks introduced:** subprocess latency (bounded by per-command timeout); a thin new module — mitigated by reuse of governance + path safety and an injectable executor. No duplicate-engine: complementary to `EvidenceRunner`.\n8. **Delete/merge/preserve/leave alone:** preserve `EvidenceRunner` and Local Runner; leave confidence/promotion/execution-chain semantics alone; add only the recorder + plans + tests.\n\n### Pre-Review Self-Audit\n\n1. Plan format is small/explicit, not a workflow DSL — yes.\n2. Every command authorized via the command registry before execution — yes (`authorize_command`).\n3. Only `SAFE`, non-Revit, cataloged commands run by default; everything else `blocked` — yes.\n4. No arbitrary shell strings; explicit `argv`, no `shell=True` — yes.\n5. Per-command id/args/cwd/timing/exit/timed-out/stdout/stderr/env captured — yes.\n6. Durable bundle with both machine-readable + human-readable outputs — yes.\n7. M4 + M2 example plans provided and parse/run — yes.\n8. Failures first-class (recorded, outputs preserved, run failed, later commands skipped per policy) — yes.\n9. No retry implemented — yes.\n10. Path safety reuses `is_within_sandbox`; no hard-coded `/` or `\\`; traversal rejected — yes.\n11. Windows + POSIX path handling preserved (pathlib + reused helper) — yes.\n12. Generated bundles kept out of git (`artifacts/validation_evidence/` ignored) — yes.\n13. No confidence-math / evidence-promotion-semantic / execution-chain ID-flow changes — yes.\n14. No new canonical doctrine, no GPR, no Devin/screenshot/video ingestion — yes.\n15. SKILL.md touched only with a small justified reference (new command checklist) — yes.\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782685707-cli-validation-recorder",
+    "status": "merged",
+    "merge_commit_sha": "4f615ff4b7f09252059db079c217ae48214136df",
+    "created_at": "2026-06-28T22:43:56Z",
+    "updated_at": "2026-06-28T23:11:55Z",
+    "merged_at": "2026-06-28T23:11:55Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "062a644465d972e305fd318500ee2eae97b30bfa",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #153 — CLI Validation Evidence Recorder v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-28T22:40:49Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".agents/skills/testing-axiom-cli/SKILL.md",
+      "status": "modified",
+      "additions": 11,
+      "deletions": 0
+    },
+    {
+      "path": "docs/logs/behavior-change-ledger.md",
+      "status": "modified",
+      "additions": 17,
+      "deletions": 0
+    },
+    {
+      "path": "docs/validation_plans/README.md",
+      "status": "added",
+      "additions": 88,
+      "deletions": 0
+    },
+    {
+      "path": "docs/validation_plans/m2_evidence_promotion.json",
+      "status": "added",
+      "additions": 29,
+      "deletions": 0
+    },
+    {
+      "path": "docs/validation_plans/m4_execution_chain.json",
+      "status": "added",
+      "additions": 20,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 120,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 40,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/validation/cli_validation_recorder.py",
+      "status": "added",
+      "additions": 846,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_cli_validation_recorder.py",
+      "status": "added",
+      "additions": 376,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:53.922095+00:00"
+  }
+}

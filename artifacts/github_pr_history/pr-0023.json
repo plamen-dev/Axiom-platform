@@ -1,0 +1,74 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 23,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/23",
+    "title": "PR #133 — Execution Environment Framework v1",
+    "description": "## Summary\n\nContinues the execution roadmap (`Capability Chain → Execution Context → Execution Environment`): where Execution Context (#132) captures the *state in which execution occurs*, this layer captures the *environment where execution is expected to happen*. New read-only, structure-only `axiom_core/execution_environment.py` + 4 CLI commands, mirroring the established deterministic framework pattern.\n\n**What it does** — per report, builds a deterministic, append-only set of typed execution environments aggregated with type counts, status counts, unavailable/degraded detection, and duplicate detection:\n\n```\nExecutionEnvironment(environment_id, context_id, capability_id,\n    environment_type ∈ {LOCAL, DEVIN, GITHUB_ACTIONS, WINDOWS_REVIT,\n                        LOCAL_RUNNER, AXIOM_WORKER, OTHER},\n    status ∈ {AVAILABLE, UNAVAILABLE, DEGRADED, UNKNOWN},\n    references[], summary, created_at, schema_version, raw_payload)\nExecutionEnvironmentReference(reference_id,\n    reference_type ∈ {CONTEXT, CAPABILITY, WORKER, REPOSITORY, BRANCH,\n                      COMMIT, ARTIFACT, CONFIGURATION, OTHER},\n    reference_value, summary)\nExecutionEnvironmentReport(report_id, environment_count,\n    environment_type_counts, status_counts,\n    unavailable_count, degraded_count, created_at)\n```\n\n**Key deterministic behaviors** (identical contract style to #132):\n- Environments sorted by `(context_id, capability_id, environment_type, status, environment_id)`; references sorted by `(reference_type, reference_value, reference_id)` — input order ≠ output order.\n- Types/statuses/reference-types normalized to uppercase; invalid values rejected (`ValueError`).\n- Duplicate detection by `(context_id, capability_id, environment_type)` — deduped + counted, does **not** gate pass/fail.\n- `unavailable_count`/`degraded_count` derived from status aggregation.\n\n**Pass/Fail semantics:**\n```\npassed = environment_count > 0 and unavailable_count == 0 and degraded_count == 0\n# empty environment reports fail\n```\n\n**CLI** (`src/axiom_cli/main.py`): `execution-environment-create` / `execution-environments` / `execution-environment-show` / `execution-environment-export` (JSON/Markdown/CSV). CSV uses a `record_kind` discriminator (`environment` / `reference`). `show` missing → exit 2; export/create errors → exit 1 (incl. path-traversal guard on `report_id`).\n\n**Evidence bundle** — always written under `artifacts/execution_environment/<run_id>/`: `execution_environment_request.json`, `execution_environment_result.json`, `execution_environment_summary.md`, `pass_fail.json` (+ `report.json`).\n\n**Registration:** 4 `CommandSpec` entries in `runner/command_registry.py`; added to `EXPECTED_AXIOM_COMMANDS` (`tests/test_command_registry.py`), `test_selection_engine.py` source→test map, and `.gitignore`.\n\n## What changed / didn't\n- **Changed:** new environment knowledge layer; +51 tests.\n- **Did NOT change:** no behavior change to any prior framework (#112–#132); upstream ExecutionContext + CapabilityKnowledgeGraph consumed read-only, nothing mutated. Per non-goals: no execution engine, no environment provisioning, no worker orchestration, no scheduling, no Docker/VM management, no network calls, no graph query language, no dashboard, no architecture changes. Revit 2024 baseline unaffected.\n\n## Validation\n- `poetry run pytest -q` → **4477 passed, 1 skipped** (+51; baseline 4426 at #132)\n- `poetry run ruff check src/ tests/` → **0 errors**\n- CLI smoke (adversarial fixture: 4 envs, 1 case-insensitive duplicate `(ctx-1,cap-1,DEVIN)`, 1 UNAVAILABLE, 1 DEGRADED, lowercase types/statuses, out-of-order refs): environment_count 3 / duplicate 1 / unavailable 1 / degraded 1; sorted status + type counts; references ordered `[BRANCH, CONTEXT]`.\n\nImproves the verification factory: deterministic, evidence-producing environment representation feeding the capability knowledge layers. Left open and merge-ready per the baton model (not merged).\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782269227-execution-environment",
+    "status": "merged",
+    "merge_commit_sha": "9d505e81acc44521de63582a8c0ee3697aa89828",
+    "created_at": "2026-06-24T02:51:08Z",
+    "updated_at": "2026-06-24T04:03:04Z",
+    "merged_at": "2026-06-24T04:03:04Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "071a2a377938139ef0b5d9d8dab1cd0f0f353378",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #133 — Execution Environment Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-24T02:50:53Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 174,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/execution_environment.py",
+      "status": "added",
+      "additions": 711,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 79,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_execution_environment.py",
+      "status": "added",
+      "additions": 657,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:38.119398+00:00"
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 7,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/7",
+    "title": "PR #118 — Capability Routing Framework v1",
+    "description": "## Summary\n\nAdds the **Capability Routing Framework v1**, the next link in the chain (Skill Composition → **Capability Routing**). Where prior frameworks compose reusable skill sequences, capability routing represents *selecting which capability should handle a particular work item*: static routes, weighted matching rules, and the resulting routing decisions — with an always-written evidence bundle. Follows the established framework template (dataclasses + Engine + 4-file evidence bundle + create/show/export CLI + command-registry & test-selection registration).\n\nNew module `src/axiom_core/capability_routing.py`:\n\n```python\n@dataclass\nclass CapabilityRoute:          # route_id, capability_id, work_type, priority, created_at\n@dataclass\nclass CapabilityRoutingRule:    # rule_id, work_pattern, capability_id, weight, created_at\n@dataclass\nclass CapabilityRoutingDecision:\n    # decision_id, work_id, selected_capability_id, candidate_count,\n    # routing_score, rationale, created_at\n@dataclass\nclass CapabilityRoutingReport:\n    report_id; decision_count\n    capability_counts: dict[str, int]   # sorted-key, deterministic\n    created_at; routes; rules; decisions\n@dataclass\nclass CapabilityRoutingEvidence:  # evidence_id, report_id, summary, created_at\n\nclass CapabilityRoutingEngine:\n    create(routes, rules, decisions) -> report dict\n    get_report(report_id); list_reports(); export_report(report_id) -> markdown\n```\n\nBehavior notes (the parts not obvious from the code):\n- **Consumes `CapabilityDefinition` / `SkillComposition` / `WorkItem`** generically via id references: routes/rules require a `capability_id`, rules require a non-empty `work_pattern`, decisions require a `work_id` (the work item reference). Source references are preserved through persistence and export.\n- **`capability_counts`** is a map (open-ended capability ids) counting routed decisions per `selected_capability_id`, built with **sorted keys** for reproducible output; unrouted decisions (empty `selected_capability_id`) are excluded from counts.\n- **Deterministic ordering** independent of input order: routes by `(created_at, capability_id, route_id)`, rules by `(created_at, work_pattern, rule_id)`, decisions by `(created_at, work_id, decision_id)`.\n- **Pass/fail** is explicit: `passed = (unrouted_count == 0)` — every decision must select a capability (an empty report passes; a decision with no `selected_capability_id` fails).\n- **Evidence bundle** always written under `artifacts/capability_routing/<report_id>/`: `capability_routing_request.json`, `capability_routing_result.json`, `capability_routing_summary.md`, `pass_fail.json` (plus `report.json` for retrieval). Markdown includes Routing Summary, Capability Counts, Routes, Rules and Decisions sections.\n- **Path safety** reused from the established template: segment-validated `report_id` (rejects `..`, `/`, `\\`, empty/whitespace), sandbox-resolved paths, symlink-escape rejection.\n\nCLI: `axiom capability-routing-create` / `-show` / `-export`, registered in `runner/command_registry.py` (READ_ONLY / SAFE) and the `test_selection_engine.py` map; command names added to `tests/test_command_registry.py`. `.gitignore` ignores the new artifacts dir.\n\nNote: the show renderer escapes user-supplied strings via `rich.markup.escape` before printing bracketed tokens like `[work_type]`, so arbitrary work patterns (e.g. `create *grid*`) don't get parsed as Rich markup.\n\n## What changed\n- New: `src/axiom_core/capability_routing.py`, `tests/test_capability_routing.py` (44 tests).\n- Modified: `src/axiom_cli/main.py` (3 CLI commands + rich renderer + `rich.markup.escape` import), `runner/command_registry.py` (3 CommandSpecs), `test_selection_engine.py` (mapping), `tests/test_command_registry.py` (expected command names), `.gitignore`.\n\n## What behavior changed\nNew, additive routing surface only. No existing behavior changed.\n\n## What did NOT change\nNo changes to existing frameworks, the Revit 2024 baseline, architecture, or dependencies. No network calls, approvals, workflow routing, or merge behavior. Non-goals (dynamic scheduling, autonomous worker assignment, multi-agent orchestration) are out of scope — this framework only records routing decisions deterministically.\n\n## Tests run\n- `poetry run pytest -q` → **3776 passed, 1 skipped** (+44; PR #117 baseline was 3732 passed, 1 skipped).\n- `poetry run ruff check src/ tests/` → **0 errors**.\n- CLI smoke verified: create → show → export; deterministic ordering applied; bracketed work patterns render correctly; error paths (not-found → exit 2, invalid id `../../etc` → exit 1); all 4 evidence files + `report.json` written.\n\n## Validation still pending\nNone. No Revit live validation required (Python-only, deterministic, self-contained).\n\n## Known risks\nLow. Additive framework following an established, tested pattern; deterministic and self-contained.\n\n## Revit / baseline\nRevit 2024 baseline unaffected. Strengthens evidence quality and the trusted-pattern direction by representing capability routing decisions deterministically with evidence bundles.\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782221326-capability-routing-framework",
+    "status": "merged",
+    "merge_commit_sha": "7a5a683f7876a630133314114383fa7aed5c716e",
+    "created_at": "2026-06-23T13:35:56Z",
+    "updated_at": "2026-06-23T13:57:00Z",
+    "merged_at": "2026-06-23T13:56:59Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "3808781952120ec3bb318dbfaef5f6edab0b3b5a",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #118 — Capability Routing Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-23T13:35:29Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 183,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/capability_routing.py",
+      "status": "added",
+      "additions": 480,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 55,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_capability_routing.py",
+      "status": "added",
+      "additions": 512,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:25.373947+00:00"
+  }
+}

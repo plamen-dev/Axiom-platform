@@ -1,0 +1,44 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 20,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/20",
+    "title": "Fix Devin session CSV export dropping skill proposal summary",
+    "description": "## Summary\n\nDevin Review on PR #126 (now merged) flagged a real data-loss bug in `devin_session_import._generate_export_csv`: the `skill_proposal` rows put `skill_name` into the `summary` column and never emitted `proposal_summary` at all, so the summary was silently dropped from CSV exports and `skill_name` was mislabeled under the `summary` header.\n\nFix matches the representation already used for skill-proposal timeline events (`devin_session_import.py:842`):\n\n```diff\n- p.get(\"skill_name\", \"\"),          # column = \"summary\" header → wrong field, summary lost\n+ f\"{p.get('skill_name', '')}: {p.get('proposal_summary', '')}\",\n```\n\nThis keeps `skill_name` visible while ensuring the `summary` column actually carries `proposal_summary`, with zero CSV schema changes (action/artifact rows untouched). Extended `test_export_csv_rows` to assert the skill_proposal `summary` column contains both the proposal summary and skill name.\n\n## Validation\n- `poetry run pytest tests/test_devin_session_import.py -q` → 63 passed\n- `poetry run pytest -q` → 4264 passed, 1 skipped\n- `poetry run ruff check src/ tests/` → 0 errors\n\n## What did not change\nCSV header/columns, action & artifact rows, JSON/Markdown exports, and all other behavior. Revit 2024 baseline unaffected.\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782256596-fix-devin-session-csv-summary",
+    "status": "merged",
+    "merge_commit_sha": "df836875ae778f956629d0020819809f638d4d96",
+    "created_at": "2026-06-23T23:18:18Z",
+    "updated_at": "2026-06-23T23:37:04Z",
+    "merged_at": "2026-06-23T23:37:04Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "1b5983633b13aabf585d2dda42aa4421a54691af",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Fix Devin session CSV export dropping skill proposal summary\n\nDevin Review (PR #126) found that the skill_proposal rows in\n_generate_export_csv placed skill_name into the 'summary' column and\nomitted proposal_summary entirely, silently losing it from CSV exports.\nUse the same '{skill_name}: {proposal_summary}' representation already\nused for timeline events so the summary column carries the actual\nsummary without losing skill_name.\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-23T23:18:04Z"
+    }
+  ],
+  "files": [
+    {
+      "path": "src/axiom_core/devin_session_import.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_devin_session_import.py",
+      "status": "modified",
+      "additions": 8,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:35.814019+00:00"
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 34,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/34",
+    "title": "Integration PR #144 — Self-Model Gap Analysis v1",
+    "description": "## Summary\n\nBuilds the next integration milestone on top of the self-model populated in PR #143 (#33). Where PR #143 made Axiom answer *positive* structural questions (\"what depends on X?\"), this PR adds executable **negative discovery**: Axiom reads its own populated self-model and emits a ranked, structured **integration backlog** of what is missing, disconnected, unused, or unexplained.\n\nThis is an **analyzer/adapter only** — no new framework, object model, graph, registry, or evidence system, and no broad refactor. It reuses the existing `capability_knowledge_graph` report as input and existing `code-inventory` / `command_registry` / `capability_summary` data as supporting evidence, returning plain `dict` findings (mirrors the `self_model.py` adapter from PR #143).\n\n### What it does\n\n`SelfModelGapAnalyzer(report, *, module_classes=None, documented_modules=None, chain_stages=None).analyze()` classifies all 9 required gap categories from the graph's nodes/edges/`orphan_node_ids`:\n\n```\nisolated_modules · unconsumed_modules · no_outgoing_dependency_modules\ncommand_modules_with_low_connectivity · declared_but_unwired_chains\nartifact_or_evidence_producers_without_consumers\nmissing_purpose_or_layer_candidates · disconnected_framework_families\nrecommended_integration_candidates   (ranked roll-up)\n```\n\nEach gap carries the full required backlog shape: `gap_id, gap_type, affected_modules, evidence, why_it_matters, existing_capabilities_to_reuse, proposed_smallest_fix, expected_new_behavior, validation_strategy, priority`. Output is deterministic (sorted module lists, stable `TYPE-NNN` ids, fixed `(-score, gap_type, gap_id)` ordering). Ranking weights reflect the directive's criteria — chain blockers and evidence→promotion gaps score highest.\n\n**Declared-but-unwired chain detection** walks `ExecutionPlan → ExecutionStep → ExecutionAttempt → ExecutionResult → ExecutionArtifact → ExecutionReport` and flags any stage pair with no supporting import edge in either direction — using repository evidence, not hard-coded conclusions. Each stage resolves to whichever candidate module node is actually present; a stage whose module is absent is flagged distinctly.\n\n### New CLI command (read-only, registered in `command_registry`)\n\n```\naxiom self-model-gap-analysis --graph <report_id> [--repo-root <p>] \\\n    [--artifacts-root <p>] [--export <path>] [--json-output]\n```\n\n`--export foo.md` writes the Markdown backlog to `foo.md` and the JSON backlog to the sibling `foo.json`.\n\n### Negative discovery, executed against the real self-model\n\nBuilding the self-model (158 modules / 275 edges / 9 isolated) and running the analyzer produced **16 gaps**, e.g. all 5 execution-chain transitions flagged unwired — and `ExecutionArtifact → ExecutionReport` correctly flagged because `execution_report.py` is not on `main` (PR #142 unmerged), proving the findings are generated from real repository evidence rather than restated from the prior Self-Discovery report.\n\n## Validation\n\n- Targeted `tests/test_self_model_gap_analysis.py` → **21 passed** (fixtures for isolated/connected/command-only/producer modules, wired vs unwired chains, JSON + Markdown output, deterministic ordering, required-fields, >1 failure class).\n- `tests/test_command_registry.py` + `tests/test_self_model.py` + targeted → **60 passed**.\n- Full `poetry run pytest -q` → **4950 passed, 1 skipped** (preexisting skip).\n- `ruff check src/ tests/` → clean.\n- CLI smoke: `self-model-build` → `self-model-gap-analysis` (console + `--json-output` valid JSON + `--export` writing `.md` + `.json`).\n\n## What did not change\n\nNo execution/graph/relationship engines were modified; no Revit live path touched; 2024 baseline unaffected. Introspection-only. Does not implement M2/M3/M4/M5 — it produces the ranked candidates used to *choose* the next integration PR.\n\n## Strategic fit\n\nStrengthens the verification factory's self-understanding: turns failure discovery into executable platform behavior and surfaces exactly where evidence is not feeding trust/promotion and where the execution chain is not yet wired end-to-end.\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782395154-self-model-gap-analysis",
+    "status": "merged",
+    "merge_commit_sha": "024b2b8b815bd25a373f45906893aa57493dd471",
+    "created_at": "2026-06-25T13:57:37Z",
+    "updated_at": "2026-06-28T14:31:21Z",
+    "merged_at": "2026-06-28T14:31:21Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "564602ccd2fe47bd0c945cb927f31c435ec6ccd3",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Integration PR #144 — Self-Model Gap Analysis v1\n\nAdd executable negative-discovery on top of the populated self-model:\na SelfModelGapAnalyzer that reads the existing capability-knowledge-graph\nreport (plus existing command-registry / capability-summary metadata) and\nemits a ranked, structured integration backlog classifying 9 gap categories,\nincluding declared-but-unwired execution-chain detection. Adds one read-only\nCLI command (self-model-gap-analysis) and registers it. No new framework.\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-25T13:57:00Z"
+    }
+  ],
+  "files": [
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 159,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 30,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/self_model_gap_analysis.py",
+      "status": "added",
+      "additions": 828,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_self_model_gap_analysis.py",
+      "status": "added",
+      "additions": 306,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:46.766121+00:00"
+  }
+}

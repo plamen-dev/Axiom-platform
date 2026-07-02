@@ -1,0 +1,74 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 6,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/6",
+    "title": "PR #117 — Skill Composition Framework v1",
+    "description": "## Summary\n\nAdds the **Skill Composition Framework v1**, the next link in the chain (Session Memory → **Skill Composition**). It preserves reusable, ordered combinations of skills representing higher-order experience — compositions whose elements reference capability skills — with an always-written evidence bundle. It follows the established framework template (dataclasses + Engine + 4-file evidence bundle + create/show/export CLI + command-registry & test-selection registration).\n\nNew module `src/axiom_core/skill_composition.py`:\n\n```python\nclass SkillCompositionType(str, Enum):\n    # EXECUTION_SEQUENCE, FAILURE_RECOVERY_SEQUENCE, VALIDATION_SEQUENCE,\n    # REVIEW_SEQUENCE, CUSTOM_SEQUENCE\n\n@dataclass\nclass SkillCompositionElement:\n    element_id; skill_id; order_index; created_at\n\n@dataclass\nclass SkillComposition:\n    composition_id; name; composition_type; elements; created_at\n\n@dataclass\nclass SkillCompositionReport:\n    report_id; composition_count\n    composition_type_counts: dict[str, int]   # sorted-key, deterministic\n    created_at; compositions\n\n@dataclass\nclass SkillCompositionEvidence:\n    evidence_id; report_id; summary; created_at\n\nclass SkillCompositionEngine:\n    create(compositions) -> report dict   # validates composition_type, requires name + element skill_id\n    get_report(report_id); list_reports(); export_report(report_id) -> markdown\n```\n\nBehavior notes (the parts not obvious from the code):\n- **Consumes `CapabilitySkill` and `SessionMemory`** generically: each element references a skill via a required `skill_id` (empty/missing rejected); each composition requires a non-empty `name`. Source references are preserved through persistence and export.\n- **`composition_type_counts`** is a map rather than fixed count fields (composition types are open-ended categories); it is built with **sorted keys** so JSON/markdown output is reproducible.\n- **Deterministic ordering** at two levels: elements within a composition by `(order_index, skill_id, element_id)`, and compositions by `(created_at, name, composition_id)` — both independent of input order.\n- **Pass/fail** is explicit: `passed = (empty_count == 0)`, where `empty_count` is the number of compositions with no elements (an empty report passes; a composition with zero elements fails).\n- **Evidence bundle** always written under `artifacts/skill_compositions/<report_id>/`: `skill_composition_request.json`, `skill_composition_result.json`, `skill_composition_summary.md`, `pass_fail.json` (plus `report.json` for retrieval). Markdown includes Composition Summary, Type Counts, and Compositions (with ordered elements) sections.\n- **Path safety** reused from the established template: segment-validated `report_id` (rejects `..`, `/`, `\\`, empty/whitespace), sandbox-resolved paths, symlink-escape rejection.\n\nCLI: `axiom skill-composition-create` / `-show` / `-export`, registered in `runner/command_registry.py` (READ_ONLY / SAFE) and the `test_selection_engine.py` map; command names added to `tests/test_command_registry.py`. `.gitignore` ignores the new artifacts dir.\n\n## What changed\n- New: `src/axiom_core/skill_composition.py`, `tests/test_skill_composition.py` (37 tests).\n- Modified: `src/axiom_cli/main.py` (3 CLI commands + rich renderer), `runner/command_registry.py` (3 CommandSpecs), `test_selection_engine.py` (mapping), `tests/test_command_registry.py` (expected command names), `.gitignore`.\n\n## What did NOT change\nNo changes to existing frameworks, the Revit 2024 baseline, architecture, or dependencies. No network calls, approvals, workflow routing, or merge behavior. Non-goals (autonomous learning, schedulers, worker orchestration) are out of scope — this framework only records reusable skill compositions.\n\n## Tests run\n- `poetry run pytest -q` → **3732 passed, 1 skipped** (+39; PR #116 baseline was 3693 passed, 1 skipped). New test file: 37 tests; remainder are registry-coverage tests that iterate over command names.\n- `poetry run ruff check src/ tests/` → **0 errors**.\n- CLI smoke verified: create → show → export with sample data; element ordering applied; error paths (not-found → exit 2, invalid id `../../etc` → exit 1); all 4 evidence files + `report.json` written.\n\n## Validation still pending\nNone. No Revit live validation required (Python-only, deterministic, self-contained).\n\n## Known risks\nLow. Additive framework following an established, tested pattern; deterministic and self-contained.\n\n## Revit / baseline\nRevit 2024 baseline unaffected. This PR strengthens evidence quality and the trusted-pattern direction by representing reusable skill compositions deterministically with evidence bundles.\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782219962-skill-composition-framework",
+    "status": "merged",
+    "merge_commit_sha": "b5d7d827df0d42f254f9b15cad2fa537456323e9",
+    "created_at": "2026-06-23T13:09:35Z",
+    "updated_at": "2026-06-23T13:26:33Z",
+    "merged_at": "2026-06-23T13:26:33Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "ced1cf51ea15e384fccc88fd1929b6727f6535ea",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #117 — Skill Composition Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-23T13:08:47Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 154,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 55,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/skill_composition.py",
+      "status": "added",
+      "additions": 402,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_skill_composition.py",
+      "status": "added",
+      "additions": 471,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:24.621518+00:00"
+  }
+}

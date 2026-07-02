@@ -1,0 +1,62 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 36,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/36",
+    "title": "PR #146 — Execution Chain Orchestrator v1",
+    "description": "## Summary\n\nM4 vertical slice: proves one deterministic capability (`self-model-build`) moves through the **existing** execution stack as a real producer/consumer chain with **runtime ID flow**, not adjacent framework objects nominally wired by docstrings.\n\nA thin `ExecutionChainOrchestrator` calls the existing engines in order and threads each stage's **real upstream id** forward as a typed reference. It introduces **no new execution object family** — `ExecutionChainTrace` is a view-only inspection container, not an engine-produced object.\n\n```\nself-model-build\n  → ExecutionPlanEngine.create()      plan_id\n  → ExecutionStepEngine.create()      step.ref(PLAN)     == plan_id\n  → ExecutionAttemptEngine.create()   attempt.ref(STEP)  == step_id\n  → ExecutionResultEngine.create()    result.ref(ATTEMPT)== attempt_id\n  → ExecutionArtifactEngine.create()  artifact.ref(RESULT)== result_id\n  → evidence.json                     refs {result_id, artifact_id, capability_id}\n  → ExecutionReportEngine.create()    report.ref(RESULT)==result_id, ref(ARTIFACT)==artifact_id, ref(FILE)==evidence_id\n```\n\nEvery stage's record is **persisted to disk** by its engine (`report.json` + evidence per stage). `resolve_persisted(trace)` re-reads those files and walks `report → artifact/result → attempt → step → plan`, so the proof is against real persisted records — **not fabricated only inside the orchestrator response**.\n\n### Selected capability and why\n`self-model-build` / `code-inventory` (M1 family): CI-safe, deterministic, no Revit runtime, already emits structured output + evidence. `SetParameterValue` deferred (hard Revit-runtime dep, non-deterministic); `InventoryModel` rejected (broad + guarded) — per the merged M4 packet.\n\n### Existing engines reused\n`execution_plan`, `execution_step`, `execution_attempt_v2`, `execution_result`, `execution_artifact`, `execution_report`, `self_model` (code-inventory path), existing evidence/pass_fail behavior, existing CLI conventions. Only a thin orchestration adapter was added.\n\n### Execution chain stages implemented\nPlan → Step → Attempt → Result → Artifact → Evidence → Report (all 7).\n\n### ID-flow proof summary\n- 7 transitions each assert `downstream.reference_value == upstream.id` (non-placeholder; ids distinct).\n- End-to-end in-memory trace resolves `report → artifact → result → attempt → step → plan`.\n- From-disk resolution resolves the same chain from each engine's persisted `report.json`.\n\n### Static vs runtime relationship (honest accounting)\n- **Static import relationship:** `declared_but_unwired_chains` stays **5** on the real self-model. The gap analyzer only credits **direct adjacent `execution_* → execution_*` import edges**; I deliberately did **not** add those just to score 5→0. The orchestrator does add **8 real edges** into the execution stack (`orchestrator → each engine`, `cli → orchestrator`).\n- **Runtime executable relationship:** **PASS** — orchestrator-mediated real ID flow with persisted/resolvable records, which is the accepted M4 proof.\n\n### Tests and validation numbers\n- `tests/test_execution_chain_orchestrator.py`: **17 passed** (full chain + PASS status; id-equality per transition; per-edge transition record; evidence refs; report refs; in-memory e2e trace; **from-disk persisted resolution**; missing-upstream empty-container & missing-id; unsupported capability; broken id-flow rejected; determinism; `code-inventory` alias; M2/M3 hooks; gap metric responds to real wiring; CLI json + console).\n- `tests/test_command_registry.py`: **27 passed** (added `execution-chain-run` to catalog + expected set).\n- Full `poetry run pytest -q`: **5027 passed, 1 skipped** (the 1 prior failure was the command-registry catalog assertion for the new command, now fixed).\n- `ruff check` on changed files: clean.\n- CLI smoke: `axiom execution-chain-run --capability self-model-build --json-output` → status **PASS**, all 7 ids emitted, all 7 transitions `ok=true`.\n\n### CLI walkthrough summary\n`axiom execution-chain-run [--capability <id>] [--repo-root <p>] [--artifacts-root <p>] [--json-output]`. Output includes plan/step/attempt/result/artifact/evidence/report ids + final PASS/FAIL and per-transition OK marks. Artifacts written under `{artifacts_root}/execution_chain/{run_id}/` (`self_model.json`, `evidence.json`, `trace.json`).\n\n### M2 hook summary\nRecords evidence produced (metrics + references) and the fields it *could* affect (`capability_state`, `readiness`, `confidence`, `promotion_status`) via existing `global_capability_registry` / `capability_confidence`. **Full Evidence-to-Promotion not implemented.**\n\n### M3 hook summary\nRecords purpose (`Build deterministic repository self-model`), layer (`self_model`), consumer (`code-inventory`), intended use required to execute the capability. **Full Purpose/Layer Index not implemented.**\n\n### Non-goals confirmed\nNo new execution framework/object family; no full Execution Graph Synthesizer; no Organizational State schema; no full Evidence-to-Promotion; no full Purpose/Layer Index; no M5 work; no Revit-runtime validation; no broad refactor; no canonical file migration; not docs-only.\n\n### Unresolved questions\n- Whether the gap analyzer should additionally credit orchestrator-mediated runtime flow (not just direct adjacent import edges) when reporting `declared_but_unwired_chains` — routed as an observation to Program 2, not changed here.\n\n### Baseline impact\n2024 Revit baseline unaffected; no Revit live validation required (capability is CI-safe and deterministic).\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782657667-execution-chain-orchestrator",
+    "status": "merged",
+    "merge_commit_sha": "4cbe9f0e679f303cf948414d4876d17438987ace",
+    "created_at": "2026-06-28T14:54:11Z",
+    "updated_at": "2026-06-28T16:30:52Z",
+    "merged_at": "2026-06-28T16:30:52Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "53af6dc63c8a3b073ce38ea5d00714a4bced09c6",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #146 — Execution Chain Orchestrator v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-28T14:53:36Z"
+    }
+  ],
+  "files": [
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 79,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/execution_chain_orchestrator.py",
+      "status": "added",
+      "additions": 826,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 36,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_execution_chain_orchestrator.py",
+      "status": "added",
+      "additions": 341,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:48.378015+00:00"
+  }
+}

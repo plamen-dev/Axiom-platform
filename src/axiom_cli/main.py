@@ -18212,6 +18212,59 @@ def github_import(
         raise SystemExit(1) from exc
 
 
+@cli.command("github-import-backfill")
+@click.option(
+    "--payload-dir",
+    type=click.Path(exists=True, file_okay=False),
+    required=True,
+    help="Directory of GitHub PR metadata JSON payloads.",
+)
+@click.option(
+    "--ledger-out",
+    type=click.Path(dir_okay=False),
+    default=None,
+    help="Write the canonical PR sequence ledger (markdown) to this path.",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def github_import_backfill(
+    payload_dir: str, ledger_out: str | None, json_output: bool
+) -> None:
+    """Batch-import GitHub PR metadata payloads and render the PR ledger."""
+    from axiom_core.github_metadata_import import GitHubMetadataImportEngine
+
+    try:
+        engine = GitHubMetadataImportEngine()
+        summary = engine.backfill(payload_dir)
+        if ledger_out:
+            ledger = engine.generate_sequence_ledger()
+            Path(ledger_out).parent.mkdir(parents=True, exist_ok=True)
+            Path(ledger_out).write_text(ledger, encoding="utf-8")
+            summary["ledger_path"] = str(ledger_out)
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if json_output:
+        click.echo(json.dumps(summary, indent=2, default=str))
+    else:
+        console.print("\n[bold]GitHub PR Metadata Backfill[/bold]\n")
+        console.print(f"  Payload dir:        {summary['payload_dir']}")
+        console.print(f"  Imported:           {summary['imported_count']}")
+        console.print(
+            f"  Skipped duplicates: {summary['skipped_duplicate_count']}"
+        )
+        console.print(f"  Failed:             {summary['failed_count']}")
+        console.print(
+            f"  Canonical gaps:     {summary['canonical_gap_count']}"
+        )
+        if summary.get("ledger_path"):
+            console.print(f"  Ledger:             {summary['ledger_path']}")
+        for failure in summary["failed"]:
+            console.print(
+                f"  [red]FAILED[/red] {failure['file']}: {failure['error']}"
+            )
+
+
 @cli.command("github-import-show")
 @click.argument("report_id")
 @click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
@@ -19150,6 +19203,45 @@ def _render_capability_validation_report_rich(report: dict) -> None:
             summary = f.get("summary", "")
             console.print(
                 _rich_escape(f"    [{severity}] [{resolved}] {summary}")
+            )
+
+
+@cli.command("capability-graph-ingest")
+@click.option(
+    "--artifacts-root",
+    type=click.Path(exists=True, file_okay=False),
+    default=None,
+    help="Artifacts root to scan (defaults to ./artifacts).",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_graph_ingest(
+    artifacts_root: str | None, json_output: bool
+) -> None:
+    """Auto-ingest evidence artifacts into a capability graph report."""
+    from axiom_core.graph_auto_ingest import GraphAutoIngestEngine
+
+    try:
+        engine = GraphAutoIngestEngine(artifacts_root=artifacts_root)
+        summary = engine.ingest()
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if json_output:
+        click.echo(json.dumps(summary, indent=2, default=str))
+    else:
+        console.print("\n[bold]Capability Graph Auto-Ingest[/bold]\n")
+        console.print(f"  Report:          {summary['report_id']}")
+        console.print(f"  Artifacts root:  {summary['artifacts_root']}")
+        for source, count in summary["source_counts"].items():
+            console.print(f"  {source + ':':<17}{count}")
+        console.print(f"  Nodes:           {summary['node_count']}")
+        console.print(f"  Edges:           {summary['edge_count']}")
+        console.print(f"  Orphan nodes:    {summary['orphan_node_count']}")
+        console.print(f"  Skipped files:   {summary['skipped_count']}")
+        for item in summary["skipped"]:
+            console.print(
+                f"  [yellow]SKIPPED[/yellow] {item['file']}: {item['error']}"
             )
 
 

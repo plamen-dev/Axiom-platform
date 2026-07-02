@@ -1,0 +1,74 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 2,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/2",
+    "title": "PR #113 — Failure Classification Framework v1",
+    "description": "## Summary\n\nAdds the **Failure Classification Framework v1**, the next link in the chain `… → Execution Attempt → Execution Outcome → Failure Classification`. Where an `ExecutionOutcome` records *what resulted* from an attempt, this records *why* a failed outcome failed, organizing failures into reusable `failure_type` / `category` / `severity`, with deterministic ordering, severity counts, category summaries, and immutable evidence bundles. Pure governance/representation — no repair engine, schedulers, workers, autonomous execution, approvals, workflow routing, or merge behavior.\n\nFollows the established framework pattern (dataclasses + `Engine(artifacts_root)` + 4-file evidence bundle + create/show/export CLI + command-registry registration + test-selection mapping), so it reads like `execution_outcome.py`.\n\n### Naming note (avoids a collision)\nThe repo already has an **unrelated** `src/axiom_core/runner/failure_classification.py` (PR #29 \"Retry & Failure Classification Engine\") and its `tests/test_failure_classification.py`. To avoid two identically-named modules with overlapping class names, this new framework lives at distinct paths:\n- module: `src/axiom_core/failure_classification_framework.py`\n- tests: `tests/test_failure_classification_framework.py`\n\nThe task-specified class names (`FailureClassification`, `FailureType`, …) and CLI names (`failure-classification-*`) are kept exactly. The pre-existing PR #29 module and its tests are **untouched**.\n\n### New module: `src/axiom_core/failure_classification_framework.py`\n\n```python\nclass FailureType(str, Enum):     # validation/test/review/execution/configuration/unknown _failure\nclass FailureCategory(str, Enum): # input, output, logic, environment, data, unknown\nclass FailureSeverity(str, Enum): # info, warning, error, critical\n\n@dataclass\nclass FailureClassification:        # classification_id, outcome_id, failure_type, category, severity, summary, created_at\n@dataclass\nclass FailureClassificationReport:  # report_id, classification_count, info/warning/error/critical_count, created_at, classifications\n@dataclass\nclass FailureClassificationEvidence: # evidence_id, report_id, summary, created_at\n\nclass FailureClassificationEngine:\n    create(classifications) -> dict   # validates, sorts, counts, persists, writes evidence\n    get_report(report_id); list_reports(); export_report(report_id) -> md\n```\n\n- **Consumes `ExecutionOutcome`** via the required `outcome_id` on every classification (empty `outcome_id` → `ValueError`).\n- **Severity counts** drive the report (`info`/`warning`/`error`/`critical`); the markdown export also emits a **category-count** section.\n- **Deterministic ordering**: sort key `(created_at, outcome_id, classification_id)` — order-independent of input.\n- **Explicit pass/fail**: report `passed` iff `error_count == 0 and critical_count == 0`.\n- **Path safety**: `report_id` segment-validated (rejects empty/whitespace/`..`/`/`/`\\`) and resolved inside an artifacts sandbox (rejects symlink escape).\n\n### Evidence output\n`artifacts/failure_classifications/<report_id>/`: `failure_classification_request.json`, `failure_classification_result.json`, `failure_classification_summary.md`, `pass_fail.json` (plus `report.json` for retrieval). Dir added to `.gitignore`.\n\n### CLI\n`axiom failure-classification-create [--classifications-file <f>] [--json-output]`, `failure-classification-show <report_id>`, `failure-classification-export <report_id>` — registered in `runner/command_registry.py` (READ_ONLY/SAFE) and `tests/test_command_registry.py`'s expected set. `show`/`export` exit `2` on not-found, `1` on invalid id.\n\n## Behavior changed / not changed\n- **Changed**: new module, 3 new CLI commands, 3 new registry entries, 1 new test-selection mapping.\n- **Not changed**: existing PR #29 failure-classification module + tests untouched; no capability/agent/adapter/service touched; Revit 2024 baseline untouched; no new dependencies; no network calls.\n\n## Non-Goals\nNo repair engine, schedulers, worker orchestration, autonomous execution, architecture changes, or broad refactoring.\n\n## Validation\n- `poetry run pytest -q` → **3588 passed, 1 skipped** (+37 new tests; baseline after #112 merge was 3551 passed, 1 skipped).\n- `poetry run ruff check src/ tests/` → **0 errors**.\n- Manual CLI smoke (create → show → export, severity+category output, error paths, evidence files written) verified.\n\n## Risks\nLow. Self-contained, deterministic, read-only governance module following an established, tested pattern. No Revit live validation required; 2024 baseline unaffected.\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782179563-failure-classification-framework",
+    "status": "merged",
+    "merge_commit_sha": "a0d4b233d8ca9c3520ab0f7dd02be91882568db8",
+    "created_at": "2026-06-23T01:57:58Z",
+    "updated_at": "2026-06-23T03:35:17Z",
+    "merged_at": "2026-06-23T03:35:17Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "4abbc7ed6da4b7c8578bc6e227e96ee4f66a57bd",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #113 — Failure Classification Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-23T01:57:44Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 161,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/failure_classification_framework.py",
+      "status": "added",
+      "additions": 412,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 55,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_failure_classification_framework.py",
+      "status": "added",
+      "additions": 433,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:21.501602+00:00"
+  }
+}

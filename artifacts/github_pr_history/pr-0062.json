@@ -1,0 +1,68 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 62,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/62",
+    "title": "Promotion: single-step confidence ladder — one accepted run can no longer buy full trust (option B, BHV-036)",
+    "description": "## Summary\n\nCloses the accumulation gap flagged during Finding 2: a single accepted evidence application could jump a capability `very_low → very_high` / `blocked → ready` because the confidence score is the raw success ratio (1/1 = 1.0). This PR rate-limits **upward** published-level transitions to one ladder rung per accepted application (design option B — promotion-side; the scoring formula is untouched, option A evidence-mass damping is staged as a separate follow-up PR).\n\nIn `EvidencePromotionEngine.apply()` (accept path):\n\n```\nraw_level  = _level_from_score(_compute_score(new factors))\neffective, clamped = _clamp_level(prior.confidence_level, raw_level)\n    # very_low → low → medium → high → very_high; up: max +1 rung; down: never clamped\nreport = confidence.create(..., level_override=effective)   # score stays the pure ratio\nreadiness = _readiness_from_level(effective)                # so blocked→ready can't happen in one hop\nintake_record[\"promotion\"] = {raw_level, effective_level, clamped}\n```\n\nKey mechanics:\n- `CapabilityConfidenceEngine.create()` gains an optional validated `level_override` so the clamped level persists in the durable confidence store (no scoring redesign — `score` remains the unmodified ratio).\n- `_readiness_from_level` (new, same implementation-local/Program-6 status as `_readiness_from_score`, identical threshold mapping) is used in `apply` and `_current_state`, so the clamped level round-trips instead of being recomputed away from the raw score.\n- Asymmetric by design: 4 distinct accepted PASSes climb `low → medium → high → very_high`; one FAIL from very_high (4/5 = 0.8) drops to `high` immediately, `clamped: false`.\n- Quarantined/rejected/duplicate applications never advance the ladder (unchanged behavior); the clamp is fully auditable via the intake record's new `promotion` field and the reason string.\n\nBehavior change is logged as **BHV-036** in `docs/logs/behavior-change-ledger.md`; the `testing-evidence-promotion` skill checklist is updated in the same PR (steps 2 and new 13).\n\nWhat did NOT change: score formula/doctrine, readiness thresholds, chain semantics, quality gate, quarantine/duplicate/conflict/stale handling, Revit behavior (2024 baseline unaffected; no live validation required).\n\nTests (tier 2 — targeted, per testing policy): `tests/test_evidence_promotion.py` (incl. 5 new ladder regressions), `tests/test_capability_confidence.py` (level_override persist + invalid-raises), `tests/test_evidence_summary.py`, plus `tests/test_atlas.py` / `tests/test_local_runner.py` / `tests/test_evidence_quality.py` / `tests/test_execution_chain_orchestrator.py` — 199 passed, 1 skipped; ruff clean. Full pytest intentionally skipped (runs in CI).\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782961613-single-step-promotion-ladder",
+    "status": "merged",
+    "merge_commit_sha": "6fad7ebd7849bc9e5e2472dcd9e3f61b2b7791d1",
+    "created_at": "2026-07-02T03:07:29Z",
+    "updated_at": "2026-07-02T03:23:01Z",
+    "merged_at": "2026-07-02T03:23:01Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "d2e5ccd8a05691b6518254b496b86435c5e058ea",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Promotion: single-step confidence ladder (rate-limit upward level transitions)\n\nOne accepted evidence application can no longer jump a capability\nvery_low -> very_high / blocked -> ready. The published confidence level\nrises at most one ladder rung per accepted application; drops are never\nclamped. Raw vs effective level + clamped flag are recorded on the\nintake record's promotion field. Score doctrine unchanged (still the\npure success ratio). BHV-036.\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-02T03:06:53Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".agents/skills/testing-evidence-promotion/SKILL.md",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 1
+    },
+    {
+      "path": "docs/logs/behavior-change-ledger.md",
+      "status": "modified",
+      "additions": 19,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/capability_confidence.py",
+      "status": "modified",
+      "additions": 17,
+      "deletions": 1
+    },
+    {
+      "path": "src/axiom_core/evidence_promotion.py",
+      "status": "modified",
+      "additions": 78,
+      "deletions": 6
+    },
+    {
+      "path": "tests/test_capability_confidence.py",
+      "status": "modified",
+      "additions": 26,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_evidence_promotion.py",
+      "status": "modified",
+      "additions": 120,
+      "deletions": 10
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:25:08.586576+00:00"
+  }
+}

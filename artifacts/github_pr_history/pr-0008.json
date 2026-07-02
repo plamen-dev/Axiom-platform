@@ -1,0 +1,74 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 8,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/8",
+    "title": "PR #119 — Capability Selection Framework v1",
+    "description": "## Summary\n\nAdds a deterministic **Capability Selection Framework** on top of capability routing (PR #118). Where routing maps work to candidate capabilities, selection chooses the *best* capability per work item from scored candidates, with explicit, persisted reasons and stable tie-breaking. Same established pattern as #112–#118: dataclasses + Engine + 4-file evidence bundle + 3 CLI commands + registry/test-selection registration.\n\nNew module `src/axiom_core/capability_selection.py`:\n- `CapabilitySelectionCandidate` — `candidate_id, capability_id, work_id, routing_score, confidence_score, priority_score, final_score, created_at` (`final_score` derived as the sum of the three sub-scores when not supplied).\n- `CapabilitySelectionReason` — `reason_id, reason_type, summary, created_at`. Types: `ROUTING_MATCH, HIGHEST_SCORE, HIGHEST_CONFIDENCE, HIGHEST_PRIORITY, TIE_BREAKER, NO_CANDIDATE`.\n- `CapabilitySelectionDecision` — `decision_id, work_id, selected_capability_id, selected_candidate_id, candidate_count, final_score, reasons, created_at`.\n- `CapabilitySelectionReport` — `report_id, decision_count, selected_count, no_candidate_count, capability_counts, created_at` (+ `candidates`, `decisions`).\n- `CapabilitySelectionEvidence` — `evidence_id, report_id, summary, created_at`.\n- `CapabilitySelectionEngine` — `create / get_report / list_reports / export_report` with path-sandbox safety.\n\n**The engine performs the selection itself** — it does not record a caller-supplied winner. For each work item it ranks candidates and selects deterministically:\n\n```\nkey = (-final_score, -confidence_score, -priority_score, -routing_score,\n       capability_id, candidate_id)   # stable tie-break\nwinner = sorted(group, key=key)[0]\n```\n\nReasons are generated in canonical order (ROUTING_MATCH → HIGHEST_SCORE → HIGHEST_CONFIDENCE → HIGHEST_PRIORITY → TIE_BREAKER). A `TIE_BREAKER` reason is added when ≥2 candidates share the top `final_score`. Work items with no candidates produce a `NO_CANDIDATE` decision (empty `selected_capability_id`).\n\nWork items to decide on = distinct candidate `work_id`s ∪ any `work_id`s declared in the optional `decisions` input (the latter lets no-candidate cases be represented).\n\n**Determinism**: candidates sorted by `(created_at, work_id, capability_id, candidate_id)`; decisions sorted by `(work_id, decision_id)`; `capability_counts` built with sorted keys (excluding no-candidate decisions).\n\n**Pass/fail**: `passed = (no_candidate_count == 0)` — every work item must resolve to a selected capability.\n\nCLI (registered in `command_registry.py`, `test_selection_engine.py`, `test_command_registry.py`):\n- `axiom capability-selection-create [--selection-file <sf>] [--json-output]`\n- `axiom capability-selection-show <report_id> [--json-output]`\n- `axiom capability-selection-export <report_id> [--json-output]`\n\nEvidence bundle under `artifacts/capability_selection/<run_id>/` (gitignored): `capability_selection_request.json`, `capability_selection_result.json`, `capability_selection_summary.md`, `pass_fail.json` (+ `report.json` for retrieval). Rich CLI rendering escapes bracketed tokens via the existing `_rich_escape` helper.\n\n## What changed / didn't\n- **Changed behavior**: new additive selection capability + 3 CLI commands. No existing framework modified.\n- **Did not change**: Revit 2024 baseline, architecture/doctrine, dependencies. No network calls, approvals, workflow routing, or merge behavior.\n- **Strategic fit**: extends the deterministic chain Skill Composition → Capability Routing → Capability Selection; strengthens evidence quality and failure/selection classification.\n\n## Validation\n- `poetry run pytest -q` → **3834 passed, 1 skipped** (+58 new; PR #118 baseline 3776).\n- `poetry run ruff check src/ tests/` → **0 errors**.\n- CLI smoke incl. error paths verified (not-found → exit 2, invalid id → exit 1; all 4 evidence files + report.json written).\n- Revit live validation: not required (no adapter/baseline changes).\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782223150-capability-selection-framework",
+    "status": "merged",
+    "merge_commit_sha": "e7457371cca7648283626fdc0d23971b83cc855e",
+    "created_at": "2026-06-23T14:04:27Z",
+    "updated_at": "2026-06-23T14:33:51Z",
+    "merged_at": "2026-06-23T14:33:50Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "1a45b93e7e0d5cd5e7d7ca711430eb5a2959f0c0",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #119 — Capability Selection Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-23T14:04:06Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 178,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/capability_selection.py",
+      "status": "added",
+      "additions": 602,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 55,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_capability_selection.py",
+      "status": "added",
+      "additions": 678,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:26.140127+00:00"
+  }
+}

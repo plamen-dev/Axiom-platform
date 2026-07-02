@@ -1,0 +1,74 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 21,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/21",
+    "title": "PR #131 — Capability Knowledge Graph Framework v1",
+    "description": "## Summary\n\nFirst graph-ready capability knowledge layer. Unifies the prior seven knowledge layers (registry/timeline/summary/relationship/impact/file/validation) into a single deterministic, append-only set of typed graph **nodes** and **edges**. Structure only — no graph DB, query language, visualization, dashboard, auto-discovery, reasoning, or network calls (per non-goals). Upstream layers are consumed read-only; nothing is mutated.\n\nA node references an originating knowledge object by `(node_type, source_id)`; an edge connects two nodes by `node_id`. The engine validates + normalizes types, dedups, orders deterministically, and detects orphans:\n\n```python\n# node identity → dedupe; edge identity → dedupe\nnode_key = (node_type, source_id)                      # keep first, count rest\nedge_key = (source_node_id, target_node_id, edge_type) # keep first, count rest\n\n# deterministic ordering\nnodes.sort(key=(node_type, source_id, label, node_id))\nedges.sort(key=(source_node_id, target_node_id, edge_type, edge_id))\n\n# orphan = node not referenced by any surviving edge endpoint\norphan_node_ids = sorted(n.node_id for n in nodes\n                         if n.node_id not in {e.source/e.target for e in edges})\n\n# pass gate\npassed = node_count > 0 and duplicate_node_count == 0\n         and duplicate_edge_count == 0 and orphan_node_count == 0\n```\n\nNode types: `CAPABILITY, EVENT, SUMMARY, RELATIONSHIP, IMPACT, FILE, VALIDATION, ARTIFACT, WORKER, UNKNOWN`.\nEdge types: `BUILDS_ON, ENABLES, RELATES_TO, AFFECTS, VALIDATES, TOUCHES_FILE, PRODUCED_EVENT, HAS_SUMMARY, HAS_IMPACT, HAS_ARTIFACT, CREATED_BY, UNKNOWN`.\n\nThe report embeds a `CapabilityKnowledgeGraph` (`graph_id`, nodes, edges, `raw_payload`) as the single source of truth and exposes `node_count/edge_count/node_type_counts/edge_type_counts/duplicate_node_count/duplicate_edge_count/orphan_node_count/orphan_node_ids`. Invalid types raise `ValueError`; type values are uppercased; `raw_payload`/`raw_metadata` and `schema_version` are preserved; reports are append-only.\n\nNew module `src/axiom_core/capability_knowledge_graph.py` (`CapabilityGraphNode`, `CapabilityGraphEdge`, `CapabilityGraphNodeType`, `CapabilityGraphEdgeType`, `CapabilityKnowledgeGraph`, `CapabilityKnowledgeGraphReport`, `CapabilityKnowledgeGraphEvidence`, `CapabilityKnowledgeGraphEngine`). CLI: `capability-graph-create / capability-graphs / capability-graph-show / capability-graph-export` (JSON/Markdown/CSV). Evidence bundle always written under `artifacts/capability_knowledge_graph/<run_id>/`: `capability_graph_request.json`, `capability_graph_result.json`, `capability_graph_summary.md`, `pass_fail.json`. Registered in the command catalog (+ `test_command_registry` coverage set), the test-selection module map, and `.gitignore`.\n\n## Validation\n\n- `poetry run pytest -q` → **4374 passed, 1 skipped** (+55; baseline 4319 at #130)\n- `poetry run ruff check src/ tests/` → **0 errors**\n- CLI smoke (adversarial fixture: 5 nodes incl. one case-insensitive duplicate `(CAPABILITY, cap-131)`, one orphan `EVENT`, edges incl. case-insensitive duplicate `validates`==`VALIDATES`): node_count 4 / dup node 1; edge_count 2 / dup edge 1; orphan_node_count 1 (`[\"n-9\"]`); deterministic node + edge ordering; all 3 export formats; `show missing`→exit 2, `export ../../etc`→exit 1, invalid edge_type→exit 1\n\n## Notes\n- What did **not** change: no behavior change to any prior framework; this layer only reads their concepts as `(node_type, source_id)` references.\n- 2024 Revit baseline unaffected (Python-only, CLI/registry).\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782258034-capability-knowledge-graph",
+    "status": "merged",
+    "merge_commit_sha": "a44e4d528f2588b9df3f48821af3a4666cc8df71",
+    "created_at": "2026-06-23T23:44:46Z",
+    "updated_at": "2026-06-24T00:52:12Z",
+    "merged_at": "2026-06-24T00:52:12Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "2933a3d5880e55d8d7ebe70258558d249602e856",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #131 — Capability Knowledge Graph Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-23T23:44:17Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 182,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/capability_knowledge_graph.py",
+      "status": "added",
+      "additions": 794,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 71,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_capability_knowledge_graph.py",
+      "status": "added",
+      "additions": 672,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:36.618241+00:00"
+  }
+}

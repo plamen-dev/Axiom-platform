@@ -1,0 +1,74 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 22,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/22",
+    "title": "PR #132 — Execution Context Framework v1",
+    "description": "## Summary\n\nResumes the execution roadmap on top of the Capability Chain Framework and the Capability Knowledge Graph. Where the registry/timeline/graph layers capture identity, memory, and structure, this layer captures the **state in which execution occurs**: for a given work item / capability / chain, what kind of execution context it is and what state it is in. Structure only — no execution engine, scheduling, worker orchestration, autonomous execution, graph query language, dashboard, or network calls (per non-goals). Upstream chain / work-item / graph layers are consumed read-only; nothing is mutated.\n\nA context references upstream objects by typed `ExecutionContextReference`s. The engine validates + normalizes types, dedups, orders deterministically, and aggregates:\n\n```python\n# context identity → dedupe (keep first, count rest)\ncontext_key = (work_id, capability_id, chain_id, context_type)\n\n# deterministic ordering\ncontexts.sort(key=(work_id, capability_id, chain_id, context_type, state, context_id))\nreferences.sort(key=(reference_type, reference_value, reference_id))\n\n# aggregation\nstate_counts, context_type_counts = <sorted count maps>\nblocked_count = state_counts.get(\"BLOCKED\", 0)\nfailed_count  = state_counts.get(\"FAILED\", 0)\n\n# pass gate (per spec): blocked- and failed-free, non-empty\npassed = context_count > 0 and blocked_count == 0 and failed_count == 0\n```\n\nContext types: `IMPLEMENTATION, VALIDATION, REPAIR, REVIEW, REPORTING, INVESTIGATION, OTHER`.\nStates: `READY, BLOCKED, RUNNING, COMPLETED, FAILED, UNKNOWN`.\nReference types: `CAPABILITY, WORK_ITEM, CHAIN, FILE, VALIDATION, GRAPH_NODE, GRAPH_EDGE, ARTIFACT, OTHER`.\n\nType values are uppercased; invalid types raise `ValueError`; `work_id`/`capability_id`/`context_type`/`state` and `reference_value` are required; `raw_payload`/`raw_metadata` and `schema_version` are preserved; reports are append-only. `duplicate_context_count` is reported as informational and does **not** gate pass/fail (the spec defines pass = no blocked + no failed).\n\nNew module `src/axiom_core/execution_context.py` (`ExecutionContext`, `ExecutionContextType`, `ExecutionContextState`, `ExecutionContextReference`, `ExecutionContextReferenceType`, `ExecutionContextReport`, `ExecutionContextEvidence`, `ExecutionContextEngine`). CLI: `execution-context-create / execution-contexts / execution-context-show / execution-context-export` (JSON/Markdown/CSV). Evidence bundle always written under `artifacts/execution_context/<run_id>/`: `execution_context_request.json`, `execution_context_result.json`, `execution_context_summary.md`, `pass_fail.json`. Registered in the command catalog (+ `test_command_registry` coverage set), the test-selection module map, and `.gitignore`.\n\n## Final Validation Outcome\n\n- **New tests:** +52 (`tests/test_execution_context.py` — models/round-trip, create/determinism, normalization, validation, duplicate detection, blocked/failed detection, pass/fail gates, append-only, retrieval/exports, path safety)\n- **Full pytest:** `poetry run pytest -q` → **4426 passed, 1 skipped** (baseline 4374 at #131)\n- **Ruff:** `poetry run ruff check src/ tests/` → **0 errors**\n- **CLI testing:** recorded ttyd walkthrough, **6/6 passed** (create dedup 4→3 / normalize / order / blocked 1 / failed 1; JSON valid exact counts; show round-trip; markdown+csv+json exports; error exits 2/1/1; evidence bundle 5 files with adversarial+empty→`passed:false`, clean→`passed:true`) — see the [test-results comment](https://github.com/plamen-dev/Axiom-platform/pull/22#issuecomment-4785210281)\n- **CI:** ✅ green (1 check passed); PR open (non-draft), mergeable (clean)\n- **Devin Review:** intro comment only — no findings (same as #112–#131)\n- **Findings fixed:** none required (no findings)\n- **Final chain:** Registry=Identity → Timeline=Memory → Summary=Understanding → Relationship=Context → Impact=Meaning → File Knowledge=Location → Validation Knowledge=Trust → Knowledge Graph=Structure → **Capability Chain → Execution Context = State**\n\n## Adversarial CLI walkthrough (recording)\n\n![walkthrough](https://app.devin.ai/api/presigned_proxy?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJvcmdfaWQiOiJvcmctNDhmYzk4ZWJkZTMzNDU0ZTliZTFiMzNiOTc0MjlkZmYiLCJ1c2VyX2lkIjpudWxsLCJidWNrZXRfbmFtZSI6ImRldmluYXR0YWNobWVudHMiLCJidWNrZXRfa2V5IjoiYXR0YWNobWVudHNfcHJpdmF0ZS9vcmctNDhmYzk4ZWJkZTMzNDU0ZTliZTFiMzNiOTc0MjlkZmYvZjcyMDU3OGUtMWFjYS00OTI2LTlhMDUtZTQ2OGYxYmMyZmQ3IiwiaWF0IjoxNzgyMjY5MDYxLCJleHAiOjE3ODI4NzM4NjEsImZpbGVuYW1lIjoiZXhlY19jdHhfd2Fsa3Rocm91Z2gud2VicCJ9.20p5Cs-f_ffWfHqW7XB_UmYzAGFMxZ9ivgy-TXb_SNM)\n\n## Notes\n- What did **not** change: no behavior change to any prior framework; this layer only reads chain / work-item / graph concepts as typed references.\n- 2024 Revit baseline unaffected (Python-only, CLI/registry).\n- Improves the verification factory: makes execution state a first-class, deterministic, evidence-backed object ahead of any future execution loop.\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782262349-execution-context",
+    "status": "merged",
+    "merge_commit_sha": "a67e3477705d83344ebc96fbcc9646ff8333ab6a",
+    "created_at": "2026-06-24T00:56:36Z",
+    "updated_at": "2026-06-24T02:46:30Z",
+    "merged_at": "2026-06-24T02:46:30Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "0c2cb8097690488a55dca5246472f6e2aae9d06e",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #132 — Execution Context Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-24T00:56:18Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 165,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/execution_context.py",
+      "status": "added",
+      "additions": 711,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 71,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_execution_context.py",
+      "status": "added",
+      "additions": 670,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:37.366282+00:00"
+  }
+}

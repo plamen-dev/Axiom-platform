@@ -1,0 +1,80 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 58,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/58",
+    "title": "Local Runner: emit_evidence_summary — tracked evidence-return path (PR B, variant A)",
+    "description": "## Summary\n\nAdds a new **read-only** Local Runner action, `emit_evidence_summary`, that turns the loop's gitignored scratch into a durable, **committable** proof object — moving a run's evidence from *attested* (present locally) to *captured* (committed/reviewable), and seeding the Phase-2 navigable graph. This is **PR B / variant A** (a dedicated action, not folded into `capability_evidence_apply`, because emission is a proof-capture step distinct from apply's state mutation).\n\n**What changed:** a new allowlisted action + a small summarizer module. The action runs **in-process (no subprocess)** — so no WDAC exe-shim exposure on Windows — and, like `capability_evidence_apply`, resolves the newest bundle itself instead of accepting a task-supplied path:\n\n```python\n# local_runner action def\n\"emit_evidence_summary\": {\"commands\": [], \"emit_summary\": True, \"description\": ...}\n\n# execute_task branch (after resolve_evidence, before subprocess loop)\nif action_def.get(\"emit_summary\"):\n    evidence_path, err = _resolve_latest_evidence(result.workspace)  # runner-derived, sandbox-validated\n    if err: -> status=\"blocked\" (guidance: run execution_chain_run first)\n    summary = build_evidence_summary(workspace, evidence_path)   # read-only\n    json_rel, md_rel = write_evidence_summary(workspace, summary) # artifacts/validation_runs/<summary_id>/\n    -> status=\"success\"; stdout only names the written files (no dumps)\n```\n\n`build_evidence_summary` reads only artifacts the loop already wrote — the bundle's `quality` + `references`, the run's `trace.json` (id-flow `status`), and the newest intake `report.json` matched by `links.chain_run_id`/`evidence_id`. It emits `evidence_summary.json` + `.md` containing: `run_id`, `capability_id`, chain id-flow `status`, `quality_verdict`, promotion `decision` (or `not_applied` when emit runs before apply), current confidence/readiness, before→after where available, **relative** source-artifact paths, git commit, and a UTC timestamp.\n\n**Boundaries (all enforced by tests):** never mutates confidence/readiness/trust/promotion/capability state; no task-supplied paths (allowlist stays the security boundary); relative paths only via `Path.relative_to(...).as_posix()` — no absolute/machine-specific paths, no raw stdout, no secrets; no new evidence framework (only summarizes existing artifacts). `artifacts/validation_runs/<summary_id>/` is **not** gitignored (only `vrun_*/` is), so the operator commits the summary as captured proof.\n\n## What behavior changed\nNew `emit_evidence_summary` action produces tracked `evidence_summary.{json,md}`. Nothing else changes.\n\n## What did NOT change\nExecution-chain semantics, evidence-quality semantics, and promotion scoring are untouched. `capability_evidence_apply` is unchanged (variant A keeps emission separate). No Revit behavior; 2024 baseline unaffected.\n\n## Tests run\n- `tests/test_evidence_summary.py` (new): substantive summary; EMPTY→quarantined with **no** very_low→very_high / blocked→ready jump; not-applied bundle; no absolute paths; no stdout leak; allowlist boundary + ignored task-supplied paths; blocked-with-guidance when no bundle; in-process `execute_task` artifacts.\n- Ran targeted: `test_evidence_summary.py` + `test_local_runner.py` → all pass; `ruff check .` clean.\n- Tiered testing (governance/tooling change): did not run full pytest.\n\n## Validation still pending\nWindows lane-2 re-run by operator (not blocking this PR). Note: `tests/test_command_registry.py::test_all_builtin_axiom_commands_cataloged` fails on `main` today — that is the preexisting catalog-drift bug fixed by the separate PR #56, unrelated to this change, and not in this PR's CI set.\n\n## Known risks\nLow: additive, read-only action; no state mutation; allowlist unchanged.\n\n## Factory relevance\nEvidence-artifact improvement — captures a durable, diffable proof object (quality verdict + promotion decision + before→after) that seeds the Phase-2 navigable graph.\n\nLogged as BHV-034.\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782931857-pr-b-evidence-return",
+    "status": "merged",
+    "merge_commit_sha": "e92393390677c6d5e1040577ec1d5e6b2870dfc0",
+    "created_at": "2026-07-01T18:59:21Z",
+    "updated_at": "2026-07-01T20:18:47Z",
+    "merged_at": "2026-07-01T20:18:47Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "7b77db074d95715706cd6abbfec5c2aaf831a1c8",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Local Runner: add emit_evidence_summary action (evidence-return path, PR B/variant A)\n\nNew allowlisted, read-only, in-process action that summarizes the newest\nexecution-chain evidence bundle + its promotion outcome into a tracked,\ncommittable proof object under artifacts/validation_runs/<summary_id>/\n(evidence_summary.json/.md). Runner-derived path only (no task-supplied\npaths); no confidence/readiness/promotion/capability mutation; relative\npaths only, no stdout/secrets/absolute paths. Turns loop evidence from\nattested to captured (BHV-034).\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-01T18:58:46Z"
+    },
+    {
+      "commit_sha": "b2569a5a7d43cd88840e0bc33007fcec135099e9",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Merge origin/main into PR B branch; keep both new test files in CI list\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-01T19:15:38Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".github/workflows/python-ci.yml",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "docs/logs/behavior-change-ledger.md",
+      "status": "modified",
+      "additions": 19,
+      "deletions": 0
+    },
+    {
+      "path": "docs/runbooks/local-runner-runbook.md",
+      "status": "modified",
+      "additions": 27,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_evidence_summary.py",
+      "status": "added",
+      "additions": 348,
+      "deletions": 0
+    },
+    {
+      "path": "tools/local_runner/evidence_summary.py",
+      "status": "added",
+      "additions": 245,
+      "deletions": 0
+    },
+    {
+      "path": "tools/local_runner/examples/emit_evidence_summary.task.json",
+      "status": "added",
+      "additions": 10,
+      "deletions": 0
+    },
+    {
+      "path": "tools/local_runner/local_runner.py",
+      "status": "modified",
+      "additions": 82,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:25:05.416835+00:00"
+  }
+}

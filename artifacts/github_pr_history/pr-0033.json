@@ -1,0 +1,68 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 33,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/33",
+    "title": "Integration PR #143 — Self-Model Population v1",
+    "description": "## Summary\n\nFirst integration milestone (M1): wire Axiom's existing structural producer (`code-inventory`) into its existing semantic consumers (`capability_knowledge_graph`, `capability_relationship`) so Axiom can answer real repository dependency questions **from its own populated graph** instead of from an ad-hoc script or manual source parsing.\n\n**This is not a new framework.** No new object family, registry, engine, or evidence system — only a deterministic import-edge extractor on the producer plus a thin adapter that hands plain `dict` payloads to the existing engines' `create()` APIs.\n\n### What became executable\nBefore: the capability graph held only the 4 sample/Revit-primitive nodes and could not answer \"what depends on module X\". After: it holds the real **157 modules / 274 import edges / 9 isolated modules**, queryable via the CLI.\n\n```\naxiom self-model-build            # scan repo -> populate existing graph + relationship engines\naxiom self-model-query --graph <id>                 # what modules exist / what imports what / which are isolated\naxiom self-model-query --graph <id> --module <name> # what <name> depends on  +  what depends on <name>\n```\n\n### How it maps onto existing models (no new types)\n- module → `CAPABILITY` graph node (`node_id == source_id == module name`, so edges resolve by name)\n- import edge → `BUILDS_ON` graph edge\n- import edge → `DEPENDS_ON` capability relationship\n\n```python\n# producer (codebase_inventory.py): deterministic, AST-based, src-internal only\ndef extract_import_edges(self) -> list[tuple[str, str]]: ...   # sorted, deduped, no self-edges\n\n# adapter (self_model.py): thin coordinator, no persistent state\nSelfModelBuilder(repo).populate_graph()          # -> CapabilityKnowledgeGraphEngine.create(nodes, edges)\nSelfModelBuilder(repo).populate_relationships()  # -> CapabilityRelationshipEngine.create(relationships, known_ids)\ngraph_dependents(report, module)                 # answers read off the persisted report\n```\n\nOrphan/island detection is preserved by reusing the engines' built-in logic (`orphan_node_ids` / `orphan_capability_ids`); the adapter adds none of its own.\n\n## What changed\n- `src/axiom_core/codebase_inventory.py`: add `extract_import_edges()` + `_resolve_import_targets()` (read-only, deterministic).\n- `src/axiom_core/self_model.py` (new): `SelfModelBuilder` + query helpers (`graph_modules/imports/isolated/dependencies/dependents`).\n- `src/axiom_cli/main.py`: add `self-model-build`, `self-model-query`.\n- `src/axiom_core/runner/command_registry.py`: catalog the two new READ_ONLY/SAFE commands.\n- `tests/test_self_model.py` (new): fixed-subgraph fixture (4 modules / 2 edges / 1 island) proving node/edge/orphan/relationship counts, mapping, determinism, query answers, and before/after.\n\n## What behavior changed\nA new autonomous behavior: Axiom answers \"what depends on a module?\" from its own graph. No existing behavior changed; the producer and consumer engines are unmodified except for the additive extractor.\n\n## What did NOT change\nNo new framework/object-model/registry/evidence system; no broad refactor; no shared-base extraction; no M2/M3/M4 work; the 2024 Revit baseline is untouched.\n\n## Validation\n- Targeted: `pytest tests/test_self_model.py` → **12 passed**; `pytest -k \"inventory or codebase\"` → 219 passed.\n- Full suite: `poetry run pytest -q` → **4929 passed, 1 skipped** (preexisting skip).\n- Lint: `poetry run ruff check src/ tests/` → **exit 0**.\n- CLI smoke (real repo) answers all four required questions:\n  - what modules exist → **157**\n  - what imports what → **274 edges**\n  - which modules are isolated → **9** (e.g. `axiom_core.discovery.harness`, `axiom_core.inventory`)\n  - what depends on `axiom_core.codebase_inventory` → `axiom_cli.main`, `axiom_core.patch_impact_analyzer`, `axiom_core.self_model`\n\nGraph and relationship engines agree: 274 edges / 9 orphans on both sides.\n\n## Known risks / pending\n- Edge semantics are module-level import edges (not symbol-level call graphs) — sufficient for M1's dependency questions.\n- No Revit live validation required (introspection-only; 2024 baseline unaffected).\n\n## Strategic fit\nCloses broken transition BT-1 (structural self-model → semantic self-model). Strengthens evidence/knowledge integration by routing a structural discovery artifact into the capability registries rather than leaving it an isolated run output.\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782368114-self-model-population",
+    "status": "merged",
+    "merge_commit_sha": "a00e4465fa28f4932e5493df921a38df74c4ca35",
+    "created_at": "2026-06-25T06:23:22Z",
+    "updated_at": "2026-06-25T13:10:41Z",
+    "merged_at": "2026-06-25T13:10:41Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "17778f2f14450f77d136c5d48f32e2cd05cfb70a",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Integration PR #143 — Self-Model Population v1\n\nAdd an adapter that pipes code-inventory's real import graph into the existing\ncapability_knowledge_graph and capability_relationship engines so Axiom can\nanswer dependency questions from its own populated graph.\n\n- code-inventory: add deterministic extract_import_edges() (AST, src-internal)\n- self_model.py: thin adapter mapping modules->CAPABILITY nodes,\n  imports->BUILDS_ON edges / DEPENDS_ON relationships; query helpers\n- CLI: self-model-build, self-model-query (no new framework/registry)\n- tests: fixed-subgraph fixture proving node/edge/orphan/relationship counts\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-25T06:22:47Z"
+    }
+  ],
+  "files": [
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 175,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/codebase_inventory.py",
+      "status": "modified",
+      "additions": 65,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 45,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/self_model.py",
+      "status": "added",
+      "additions": 218,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_self_model.py",
+      "status": "added",
+      "additions": 210,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:45.986796+00:00"
+  }
+}

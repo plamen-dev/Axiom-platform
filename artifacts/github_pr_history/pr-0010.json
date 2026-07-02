@@ -1,0 +1,74 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 10,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/10",
+    "title": "PR #121 — Capability Chain Framework v1",
+    "description": "## Summary\n\nAdds a deterministic **Capability Chain Framework** on top of capability selection (PR #119). Where selection picks the best capability for a single work item, chains represent complete ordered pipelines of capabilities for a work item — deterministic multi-step execution plans. Same established pattern as #112–#119: dataclasses + Engine + 4-file evidence bundle + 3 CLI commands + registry/test-selection registration.\n\nNew module `src/axiom_core/capability_chain.py`:\n- `CapabilityChainStep` — `step_id, order_index, capability_id, selection_id, description`. Steps sorted deterministically by `(order_index, capability_id, step_id)`.\n- `CapabilityChainType` — `LINEAR, VALIDATION_CHAIN, REPAIR_CHAIN, REVIEW_CHAIN, CUSTOM_CHAIN`.\n- `CapabilityChain` — `chain_id, work_id, chain_type, steps, created_at`.\n- `CapabilityChainReport` — `report_id, chain_count, step_count, chain_type_counts, empty_step_count, created_at` (+ `chains` list).\n- `CapabilityChainEvidence` — `evidence_id, report_id, summary, created_at`.\n- `CapabilityChainEngine` — `create / get_report / list_reports / export_report` with path-sandbox safety.\n\n**Determinism**: chains sorted by `(created_at, work_id, chain_id)`; steps within each chain by `(order_index, capability_id, step_id)`; `chain_type_counts` built with sorted keys. Input order is irrelevant — identical output regardless of input permutation.\n\n**Pass/fail**: `passed = (empty_step_count == 0)` — every chain must have at least one step. Empty chains are explicitly tracked and cause failure.\n\nCLI (registered in `command_registry.py`, `test_selection_engine.py`, `test_command_registry.py`):\n- `axiom capability-chain-create [--chain-file <cf>] [--json-output]`\n- `axiom capability-chain-show <report_id> [--json-output]`\n- `axiom capability-chain-export <report_id> [--json-output]`\n\nEvidence bundle under `artifacts/capability_chains/<run_id>/` (gitignored): `capability_chain_request.json`, `capability_chain_result.json`, `capability_chain_summary.md`, `pass_fail.json` (+ `report.json` for retrieval). Export markdown renders bracketed work-ids (`[w-alpha]`) and step descriptions; empty chains display `(empty)`.\n\n## What changed / didn't\n- **Changed behavior**: new additive chain capability + 3 CLI commands. No existing framework modified.\n- **Did not change**: Revit 2024 baseline, architecture/doctrine, dependencies. No network calls, approvals, workflow routing, or merge behavior.\n- **Strategic fit**: extends the deterministic chain Capability Selection → Capability Chain; represents complete capability pipelines for work items.\n\n## Validation\n- `poetry run pytest -q` → **3882 passed, 1 skipped** (+48 new; PR #119 baseline 3834).\n- `poetry run ruff check src/ tests/` → **0 errors**.\n- CLI smoke incl. error paths verified (not-found → exit 2, invalid id → exit 1; all 4 evidence files + report.json written).\n- Revit live validation: not required (no adapter/baseline changes).\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782225553-capability-chain-framework",
+    "status": "merged",
+    "merge_commit_sha": "f3c617e82fde5435672d8dcf06f82f5c7b7c6476",
+    "created_at": "2026-06-23T14:46:57Z",
+    "updated_at": "2026-06-23T14:49:58Z",
+    "merged_at": "2026-06-23T14:49:58Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "f54f9b3e8d22b3ce87df20d3b90a2d1798f74b4e",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #121 — Capability Chain Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-23T14:46:21Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 122,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/capability_chain.py",
+      "status": "added",
+      "additions": 421,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 56,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_capability_chain.py",
+      "status": "added",
+      "additions": 574,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:27.722103+00:00"
+  }
+}

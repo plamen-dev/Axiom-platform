@@ -1,0 +1,62 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 45,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/45",
+    "title": "PR #155 — Canonical Impact Ledger and Program Inventory Reconciliation v1",
+    "description": "## Summary\n\nDocs-only reconciliation of 114 Canonical Impact Flags from Programs 0, 2, 5, 6, and 7 into a working ledger (16 CIL clusters) and detailed reconciliation packet. Creates the first repo-resident impact ledger under `docs/canonical_knowledge_base/impact_ledger/` so Program 6 can classify final canonical impacts in batches rather than one PR per flag.\n\nPR #152 seeded canonical structure but did not fully backfill all flags. PR #155 creates a traceability/reconciliation layer, not final canonical classification. Program 3 and Program 4 are out of scope for this reconciliation cycle — not pending, not missing.\n\n## Scope\n\nThree file changes (853 insertions, all under `docs/canonical_knowledge_base/`):\n- **New:** `impact_ledger/Canonical_Impact_Ledger.md` — concise operational ledger with 16 reconciled clusters\n- **New:** `impact_ledger/Program_Inventory_Reconciliation_PR155.md` — detailed reconciliation with 16 sections\n- **Modified:** `00_Readme.md` — 1-line pointer to `impact_ledger/` in the index table\n\nNo runtime code, CLI, tests, confidence math, evidence-promotion, execution-chain, or Local Runner changes.\n\n## Key Changes\n\nReconciled 114 source IDs (P0-CIF-001..022, P2-CIF-001..025, P5-CIF-001..020, P6-CIF-001..030, P7-CIF-001..017) into **16 CIL clusters**:\n\n1. **CIL-001** Canonical source-of-truth / Library mirror — Light Update / Communication Record\n2. **CIL-002** Canonical Impact Ledger / batching — this PR implements it\n3. **CIL-003** M4 execution-chain proof / Integration Phase — Targeted Review / Strategic Update\n4. **CIL-004** M2 evidence-to-state / evidence-safety — Open Investigation / Reasoning QA\n5. **CIL-005** EVID-001 partial closure / evidence producer gaps — Open Investigation / Targeted Review\n6. **CIL-006** CLI validation evidence recorder — Traceability / Open Investigation\n7. **CIL-007** Runtime relationships vs static imports — Doctrine Candidate / Open Investigation\n8. **CIL-008** Local Runner / worker / retry boundary — Open Investigation / Program Owner Review (21 source IDs — largest cluster)\n9. **CIL-009** Windows / cloud / local evidence lanes — Traceability / Open Investigation\n10. **CIL-010** Devin operational QA — Reasoning QA Candidate / Communication Record (16 source IDs)\n11. **CIL-011** GPR / global work identifier — Open Investigation / Traceability (**NOT implemented**)\n12. **CIL-012** README / SetParameterValue drift — Traceability / Reasoning QA\n13. **CIL-013** M3 / M5 / milestone sequencing — Strategic Review / Open Investigation\n14. **CIL-014** Primary/mirror repo state mismatch — Open Investigation / Traceability\n15. **CIL-015** Axiom / Capital boundary — Already Captured / monitor for violations\n16. **CIL-016** Learning Events candidate — Open Investigation / deferred\n\n**Excluded:** P6-CIF-022 (Program 3/4 coverage gaps) — superseded by operator clarification.\n\n## Validation\n\n- `git diff --stat`: 3 files changed, 853 insertions(+), all under `docs/canonical_knowledge_base/`\n- All files docs-only — no runtime source files changed\n- No CLI behavior changed\n- No generated artifacts committed\n- No screenshots/recordings/attachments committed\n- No broad edits to documents 10–60 (only 1-line index pointer in 00_Readme.md)\n- All 114 Program 0/2/5/6/7 source IDs preserved in cluster cross-reference fields\n- Program 3 and Program 4 out of scope — no coverage gap created; P6-CIF-022 excluded\n- All 16 CIL clusters present per specification\n- Tests not run — docs/canonical-source only per tiered testing policy\n\n## Non-Goals\n\n- No runtime behavior, CLI changes, evidence-promotion changes, Local Runner changes\n- No implementation-worker behavior, retry loop, GPR/global registry implementation\n- No canonical doctrine rewrite or broad edits to documents 10–60\n- Program 3 and Program 4 out of scope for this reconciliation cycle\n- No final Program 6 classification (reconciliation provides inputs; Program 6 classifies)\n- No Program 0 strategic decision (reconciliation surfaces questions; Program 0 decides)\n- No one-PR-per-flag maintenance process\n- No screenshot/video/Devin attachment migration\n\n## Architectural Significance\n\nThis PR establishes the reconciliation layer between program inventories and canonical documents. It prevents:\n- one-PR-per-flag process bloat (114 flags → 16 clusters)\n- premature canonical updates before classification\n- overclaiming EVID-001 closure or GPR implementation\n- doctrine drift from treating operational practices as constitutional constraints\n- treating README as authoritative over implementation/canonical evidence\n\n## Purpose-to-Workflow Reconciliation\n\n1. **What existing PR/component/capability does this use?** PR #152 canonical KB seed structure; review traceability archives; behavior-change ledger; PRs #146–#154 execution context.\n2. **What workflow does it participate in?** Canonical Impact Flag batching workflow (00_Readme.md rule 6) → Program 6 classification → batched canonical maintenance PR.\n3. **What consumes its output?** Program 6 canonical classification; Program 0/2/5/7 targeted review; Program 1 PR execution sequencing.\n4. **What evidence proves it works?** The reconciliation itself — 114 source IDs from 5 programs reconciled into 16 clusters with cross-references preserved, duplicates resolved, and 7 open questions routed.\n5. **Disposition:** Canonical traceability / reconciliation infrastructure. Not doctrine, not runtime. Traceability-only.\n6. **What existing structure was checked?** 00_Readme.md, Docs 10–60, 40_Open_Investigations.md, behavior-change ledger, PR #154 evidence inventory, all review traceability archives.\n7. **What complexity/risk does this introduce?** Minimal — ledger is a working tool, not canonical truth. Risk: treating provisional classifications as final (mitigated by explicit Program 6 ownership). No duplicate-ledger risk (this is the first and only impact ledger).\n8. **What should be deleted/merged/preserved/left alone?** Preserved: all existing canonical docs (untouched). Left alone: documents 10–60. Added: ledger and reconciliation as new working layer. P6-CIF-022 excluded per operator clarification.\n\n## Pre-Review Self-Audit (20 checks)\n\n1. All Program 0/2/5/6/7 source IDs preserved (114 total) ✔\n2. Source IDs reconciled into 16 CIL clusters per specification ✔\n3. Program 3/4 not marked pending ✔\n4. No Program 3/4 coverage gap item created; P6-CIF-022 excluded ✔\n5. No broad canonical document rewrites ✔\n6. Not all flags turned into doctrine ✔\n7. No one-PR-per-flag bloat ✔\n8. Program 6 preserved as classification owner ✔\n9. Program 0 preserved as strategic synthesis owner ✔\n10. Program 7 preserved as operational review owner ✔\n11. Program 5 preserved as Local Runner / worker infrastructure owner ✔\n12. Program 2 preserved as architecture/state/evidence semantics owner ✔\n13. Traceability-only distinguished from canonical update ✔\n14. GPR marked as unimplemented ✔\n15. EVID-001 not claimed globally closed ✔\n16. Readiness thresholds not treated as doctrine ✔\n17. Devin compute mode not treated as doctrine ✔\n18. Windows path compatibility not treated as doctrine ✔\n19. README not treated as authoritative over implementation/canonical state ✔\n20. Next batched canonical maintenance work identified without premature execution ✔\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782689906-canonical-impact-ledger",
+    "status": "merged",
+    "merge_commit_sha": "ec2a4975cdeb1a9a39f7598b59be9a6a791d4977",
+    "created_at": "2026-06-28T23:47:18Z",
+    "updated_at": "2026-06-29T00:05:53Z",
+    "merged_at": "2026-06-29T00:05:53Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "004498a1ba8c09a847f3ef687f7a5b2381d60db6",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #155 — Canonical Impact Ledger and Program Inventory Reconciliation v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-28T23:46:07Z"
+    },
+    {
+      "commit_sha": "82d45f43763977612b7ed0b057c28dffa9272856",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #155 scope correction: Program 3/4 out of scope, not pending\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-28T23:50:25Z"
+    },
+    {
+      "commit_sha": "2e947de86b0a62952b4819ecc278f0d2d62d0337",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #155 full patch: complete source-ID reconciliation (114 IDs, 16 CIL clusters)\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-28T23:58:53Z"
+    }
+  ],
+  "files": [
+    {
+      "path": "docs/canonical_knowledge_base/00_Readme.md",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "docs/canonical_knowledge_base/impact_ledger/Canonical_Impact_Ledger.md",
+      "status": "added",
+      "additions": 393,
+      "deletions": 0
+    },
+    {
+      "path": "docs/canonical_knowledge_base/impact_ledger/Program_Inventory_Reconciliation_PR155.md",
+      "status": "added",
+      "additions": 459,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:55.425682+00:00"
+  }
+}

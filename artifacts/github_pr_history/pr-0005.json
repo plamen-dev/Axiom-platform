@@ -1,0 +1,74 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 5,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/5",
+    "title": "PR #116 — Session Memory Framework v1",
+    "description": "## Summary\n\nAdds the **Session Memory Framework v1**, the next link in the chain (Recovery Execution → **Session Memory**). It preserves compact, ordered short-term operational memory across a session — entries referencing source records from prior frameworks (attempts, outcomes, failures, recommendations, recoveries, observations) — with an always-written evidence bundle. It follows the established framework template (dataclasses + Engine + 4-file evidence bundle + create/show/export CLI + command-registry & test-selection registration).\n\nNew module `src/axiom_core/session_memory.py`:\n\n```python\nclass SessionMemoryType(str, Enum):\n    # ATTEMPT, OUTCOME, FAILURE, RECOMMENDATION, RECOVERY, OBSERVATION\n\n@dataclass\nclass SessionMemoryEntry:\n    entry_id; memory_type; source_id; summary; created_at\n\n@dataclass\nclass SessionMemory:\n    memory_id; entries; entry_count; created_at\n\n@dataclass\nclass SessionMemoryReport:\n    report_id; memory_id; entry_count\n    memory_type_counts: dict[str, int]   # sorted-key, deterministic\n    created_at; entries\n\n@dataclass\nclass SessionMemoryEvidence:\n    evidence_id; report_id; summary; created_at\n\nclass SessionMemoryEngine:\n    create(entries) -> report dict   # validates memory_type, requires source_id\n    get_report(report_id); list_reports(); export_report(report_id) -> markdown\n```\n\nBehavior notes (the parts not obvious from the code):\n- **Consumes `RecoveryExecution` and `ExecutionOutcome`** (and earlier records) generically via a required `source_id` on every entry (empty/missing rejected); source references are preserved through persistence and export.\n- **`memory_type_counts`** is a map rather than fixed count fields (memory types are open-ended categories); it is built with **sorted keys** so JSON/markdown output is reproducible.\n- **Deterministic ordering** of entries by `(created_at, source_id, entry_id)` — independent of input order.\n- **Pass/fail** is explicit: `passed = memory_type_counts.get(\"failure\", 0) == 0` (an empty memory passes).\n- **Evidence bundle** always written under `artifacts/session_memory/<report_id>/`: `session_memory_request.json`, `session_memory_result.json`, `session_memory_summary.md`, `pass_fail.json` (plus `report.json` for retrieval). Markdown includes Memory Summary, Type Counts, and Entries sections.\n- **Path safety** reused from the established template: segment-validated `report_id` (rejects `..`, `/`, `\\`, empty/whitespace), sandbox-resolved paths, symlink-escape rejection.\n\nCLI: `axiom session-memory-create` / `-show` / `-export`, registered in `runner/command_registry.py` (READ_ONLY / SAFE) and the `test_selection_engine.py` map; command names added to `tests/test_command_registry.py`. `.gitignore` ignores the new artifacts dir.\n\n## What changed\n- New: `src/axiom_core/session_memory.py`, `tests/test_session_memory.py` (36 tests).\n- Modified: `src/axiom_cli/main.py` (3 CLI commands + rich renderer), `runner/command_registry.py` (3 CommandSpecs), `test_selection_engine.py` (mapping), `tests/test_command_registry.py` (expected command names), `.gitignore`.\n\n## What did NOT change\nNo changes to existing frameworks, the Revit 2024 baseline, architecture, or dependencies. No network calls, approvals, workflow routing, or merge behavior. Non-goals (long-term memory, autonomous learning, schedulers) are out of scope — this framework only records compact short-term memory.\n\n## Validation\n- `poetry run pytest -q` → **3693 passed, 1 skipped** (+36 new; PR #115 baseline was 3657 passed, 1 skipped).\n- `poetry run ruff check src/ tests/` → **0 errors**.\n- CLI smoke verified: create → show → export with sample data; error paths (not-found → exit 2, invalid id `../../etc` → exit 1); all 4 evidence files + `report.json` written.\n\n## Risks\nLow. Additive framework following an established, tested pattern; deterministic and self-contained.\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782189618-session-memory-framework",
+    "status": "merged",
+    "merge_commit_sha": "0c862087f4342bcd5619d4446cb5bd3faeede4fa",
+    "created_at": "2026-06-23T04:43:07Z",
+    "updated_at": "2026-06-23T13:03:08Z",
+    "merged_at": "2026-06-23T13:03:08Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "59db195c6ba12cd1995ef4f9e120d006a036f497",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #116 — Session Memory Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-23T04:42:55Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 154,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 54,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/session_memory.py",
+      "status": "added",
+      "additions": 383,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_session_memory.py",
+      "status": "added",
+      "additions": 381,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:23.805321+00:00"
+  }
+}

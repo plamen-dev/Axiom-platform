@@ -1,0 +1,74 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 25,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/25",
+    "title": "PR #135 — Execution Constraint Framework v1",
+    "description": "## Summary\n\nAdds the **constraint** layer of the execution roadmap (`Capability Chain → Execution Context → Execution Environment → Execution Resource → Execution Constraint`). Where the resource layer captures *what execution requires*, this layer captures *the limitations/boundaries execution must obey* — observational and declarative only (no enforcement/orchestration/scheduling/optimization per non-goals). Same deterministic, append-only pattern as #132–#134.\n\nNew module `axiom_core/execution_constraint.py`:\n- `ExecutionConstraint` (constraint_id, context_id, environment_id, resource_id, capability_id, `constraint_type` ∈ TIME/MEMORY/STORAGE/SECURITY/NETWORK/TOOLING/VERSION/POLICY/DEPENDENCY/OTHER, `severity` ∈ INFO/WARNING/ERROR/CRITICAL, references, summary, raw_payload, schema_version)\n- `ExecutionConstraintReference` (reference_type ∈ CAPABILITY/CONTEXT/ENVIRONMENT/RESOURCE/FILE/VALIDATION/ARTIFACT/POLICY/OTHER)\n- `ExecutionConstraintReport` (constraint_count, severity_counts, constraint_type_counts, critical_count, error_count, duplicate_constraint_count)\n- `ExecutionConstraintEvidence` + `ExecutionConstraintEngine`\n\nEngine behavior (mirrors `ExecutionResourceEngine`):\n- validate → normalize (types/severities/reference-types upper-cased) → sort → dedupe → aggregate → evidence-bundle\n- dedup key (keep first): `(context_id, environment_id, resource_id, capability_id, constraint_type)`\n- sort key: `(context_id, environment_id, resource_id, capability_id, constraint_type, severity, constraint_id)`; references sorted `(reference_type, reference_value, reference_id)`\n- `passed = constraint_count > 0 and critical_count == 0 and error_count == 0` (empty → fail)\n\n```\ncritical_count = severity_counts.get(\"CRITICAL\", 0)\nerror_count    = severity_counts.get(\"ERROR\", 0)\n```\n\nCLI: `execution-constraint-create / execution-constraints / execution-constraint-show / execution-constraint-export` (JSON/Markdown/CSV) in `axiom_cli/main.py`; registered in `command_registry.py` (READ_ONLY/SAFE, 4-file evidence bundle under `artifacts/execution_constraint/<run_id>/`), `test_selection_engine.py`, `test_command_registry.py` EXPECTED set, and `.gitignore`.\n\n## Validation\n- `poetry run pytest -q` → **4581 passed, 1 skipped** (+53; baseline 4528 at #134)\n- `poetry run ruff check src/ tests/` → **0 errors**\n- CLI smoke (adversarial: 4 constraints, 1 case-insensitive duplicate `(ctx-1,env-1,res-1,cap-1,TIME)`, 1 CRITICAL, 2 ERROR, lowercase types/severities, out-of-order references) → constraint_count 3 / duplicate 1 / critical 1 / error 2; sorted severity + type counts; deterministic ordering\n\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1782275661-execution-constraint-framework",
+    "status": "merged",
+    "merge_commit_sha": "894ac094e5b9394d92520816327b6f2d3afd40d6",
+    "created_at": "2026-06-24T04:38:11Z",
+    "updated_at": "2026-06-24T06:22:55Z",
+    "merged_at": "2026-06-24T06:22:55Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "f4786c4344da3091e0bf7da920c168fd275e05a3",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "PR #135 — Execution Constraint Framework v1\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-06-24T04:37:54Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 178,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/execution_constraint.py",
+      "status": "added",
+      "additions": 757,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 79,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/test_selection_engine.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_execution_constraint.py",
+      "status": "added",
+      "additions": 754,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:24:39.732123+00:00"
+  }
+}
