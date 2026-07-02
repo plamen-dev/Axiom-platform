@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>Axiom</Name>
+    <Assembly>C:\ProgramData\Autodesk\Revit\Addins\2026\Axiom.RevitAddin.dll</Assembly>
+    <FullClassName>Axiom.RevitAddin.App</FullClassName>
+    <AddInId>E5AD3C50-0BB8-4ADA-B31B-5DCB2D408B5F</AddInId>
+    <VendorId>Axiom</VendorId>
+    <VendorDescription>Axiom Revit Automation</VendorDescription>
+  </AddIn>
+</RevitAddIns>

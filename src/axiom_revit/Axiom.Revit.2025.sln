@@ -1,0 +1,31 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.37216.2
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Axiom.RevitAddin.2025", "Axiom.RevitAddin.2025\Axiom.RevitAddin.2025.csproj", "{A1B2C3D4-1111-2222-3333-44445555A025}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Axiom.Core.2025", "Axiom.Core.2025\Axiom.Core.2025.csproj", "{A1B2C3D4-1111-2222-3333-44445555B025}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A1B2C3D4-1111-2222-3333-44445555A025}.Debug|x64.ActiveCfg = Debug|x64
+		{A1B2C3D4-1111-2222-3333-44445555A025}.Debug|x64.Build.0 = Debug|x64
+		{A1B2C3D4-1111-2222-3333-44445555A025}.Release|x64.ActiveCfg = Release|x64
+		{A1B2C3D4-1111-2222-3333-44445555A025}.Release|x64.Build.0 = Release|x64
+		{A1B2C3D4-1111-2222-3333-44445555B025}.Debug|x64.ActiveCfg = Debug|x64
+		{A1B2C3D4-1111-2222-3333-44445555B025}.Debug|x64.Build.0 = Debug|x64
+		{A1B2C3D4-1111-2222-3333-44445555B025}.Release|x64.ActiveCfg = Release|x64
+		{A1B2C3D4-1111-2222-3333-44445555B025}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {C3D4E5F6-3333-4444-5555-666677778899}
+	EndGlobalSection
+EndGlobal
