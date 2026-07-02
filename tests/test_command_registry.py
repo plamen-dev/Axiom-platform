@@ -195,6 +195,7 @@ EXPECTED_AXIOM_COMMANDS = {
     "capability-graph-show", "capability-graph-export",
     "self-model-build", "self-model-query", "self-model-gap-analysis",
     "atlas",
+    "loop-run",
     "execution-chain-run",
     "capability-evidence-apply", "capability-evidence-history",
     "capability-evidence-show",

@@ -19557,6 +19557,96 @@ def atlas(repo_root: str, serve: bool, port: int, json_output: bool) -> None:
         serve_atlas(repo_root, port=port)
 
 
+@cli.command("loop-run")
+@click.option(
+    "--cycles",
+    type=int,
+    default=1,
+    help="Number of bounded loop cycles to run (max 10).",
+)
+@click.option(
+    "--repo-root",
+    "repo_root",
+    type=click.Path(exists=True, file_okay=False),
+    default=".",
+    help="Repository root to scan (default: current directory).",
+)
+@click.option(
+    "--artifacts-root",
+    "artifacts_root",
+    type=click.Path(),
+    default=None,
+    help="Artifacts root for loop objects (default: ./artifacts).",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def loop_run(
+    cycles: int,
+    repo_root: str,
+    artifacts_root: str | None,
+    json_output: bool,
+) -> None:
+    """Run bounded gap->queue->chain->evidence->re-queue loop cycles.
+
+    Each cycle: self-model gap analysis -> work-queue report ->
+    execution-chain-run -> capability-evidence-apply -> re-queue of
+    follow-up work derived from the intake decision. The loop is
+    strictly bounded and stops on the first chain failure.
+    """
+    from axiom_core.loop_runner import LoopRunner
+
+    try:
+        runner = LoopRunner(
+            repo_root=repo_root, artifacts_root=artifacts_root
+        )
+        report = runner.run(cycles=cycles)
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, sort_keys=True, default=str))
+    else:
+        console.print("\n[bold]Loop Runner[/bold]\n")
+        console.print(f"  Loop id:     {report['loop_id']}")
+        console.print(f"  Capability:  {report['capability_id']}")
+        console.print(
+            f"  Cycles:      {report['completed_cycles']}/"
+            f"{report['requested_cycles']} completed"
+        )
+        status = report["status"]
+        color = "green" if status == "passed" else "red"
+        console.print(f"  Status:      [{color}]{status}[/{color}]")
+        for cycle in report["cycles"]:
+            console.print(f"\n  [bold]Cycle {cycle['cycle']}[/bold]")
+            gaps = cycle.get("gap_analysis", {})
+            console.print(
+                f"    Gaps:       {gaps.get('gap_count', 0)} across "
+                f"{gaps.get('module_count', 0)} modules"
+            )
+            console.print(
+                f"    Queue:      {cycle.get('queue_report_id', '')} "
+                f"({cycle.get('queued_item_count', 0)} items)"
+            )
+            if "chain_error" in cycle:
+                console.print(
+                    f"    [red]Chain error:[/red] {cycle['chain_error']}"
+                )
+                continue
+            console.print(
+                f"    Chain:      {cycle.get('chain_run_id', '')} "
+                f"[{cycle.get('chain_status', '')}]"
+            )
+            console.print(
+                f"    Evidence:   {cycle.get('evidence_decision', '')} "
+                f"(state_changed={cycle.get('state_changed', False)})"
+            )
+            console.print(
+                f"    Re-queue:   {cycle.get('requeue_report_id', '')}"
+            )
+    if report["status"] != "passed":
+        raise SystemExit(1)
+
+
 @cli.command("execution-chain-run")
 @click.option(
     "--capability",
