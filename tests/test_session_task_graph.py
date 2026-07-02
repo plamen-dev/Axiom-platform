@@ -15,6 +15,8 @@ from axiom_core.session_task_graph import (
     SessionTaskType,
 )
 
+from tests.conftest import make_symlink_or_skip
+
 # ---------------------------------------------------------------------------
 # Enum tests
 # ---------------------------------------------------------------------------
@@ -432,7 +434,7 @@ class TestIdValidation:
         outside = tmp_path / "outside"
         outside.mkdir()
         symlink = tasks_dir / "evil-link"
-        symlink.symlink_to(outside)
+        make_symlink_or_skip(symlink, outside)
         with pytest.raises(ValueError, match="escapes artifacts root"):
             reg._safe_task_path("evil-link")
 
@@ -445,7 +447,7 @@ class TestIdValidation:
         fake_json.write_text('{"title":"Evil","status":"created","task_type":"other"}')
         tasks_dir = tmp_path / "session_tasks"
         symlink = tasks_dir / "evil-link"
-        symlink.symlink_to(outside)
+        make_symlink_or_skip(symlink, outside)
         results = reg.list_tasks()
         titles = [t["title"] for t in results]
         assert "Real" in titles

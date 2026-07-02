@@ -13,6 +13,8 @@ from axiom_core.config_scenario import (
     ConfigurationScenarioResult,
 )
 
+from tests.conftest import make_symlink_or_skip
+
 # ---------------------------------------------------------------------------
 # Model tests
 # ---------------------------------------------------------------------------
@@ -393,7 +395,7 @@ class TestSafety:
         scenarios_dir = tmp_path / "config_scenarios"
         scenarios_dir.mkdir(exist_ok=True)
         link_name = scenarios_dir / "evil-link"
-        link_name.symlink_to("/tmp")
+        make_symlink_or_skip(link_name, "/tmp")
         with pytest.raises(ValueError, match="escapes artifacts root"):
             engine._safe_scenario_path("evil-link")
 

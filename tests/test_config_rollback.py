@@ -12,6 +12,8 @@ from axiom_core.config_rollback import (
     ConfigurationRollbackStatus,
 )
 
+from tests.conftest import make_symlink_or_skip
+
 # ---------------------------------------------------------------------------
 # Model tests
 # ---------------------------------------------------------------------------
@@ -294,7 +296,7 @@ class TestSafety:
         rb_dir = tmp_path / "config_rollback"
         rb_dir.mkdir(parents=True, exist_ok=True)
         link = rb_dir / "evil-link"
-        link.symlink_to("/tmp")
+        make_symlink_or_skip(link, "/tmp")
         with pytest.raises(ValueError, match="escapes artifacts root"):
             engine._safe_rollback_path("evil-link")
 

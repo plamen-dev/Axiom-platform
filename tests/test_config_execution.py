@@ -12,6 +12,8 @@ from axiom_core.config_execution import (
     ConfigurationExecutionStatus,
 )
 
+from tests.conftest import make_symlink_or_skip
+
 # ---------------------------------------------------------------------------
 # Model tests
 # ---------------------------------------------------------------------------
@@ -310,7 +312,7 @@ class TestSafety:
         exec_dir = tmp_path / "config_execution"
         exec_dir.mkdir(parents=True, exist_ok=True)
         link = exec_dir / "evil-link"
-        link.symlink_to("/tmp")
+        make_symlink_or_skip(link, "/tmp")
         with pytest.raises(ValueError, match="escapes artifacts root"):
             engine._safe_execution_path("evil-link")
 

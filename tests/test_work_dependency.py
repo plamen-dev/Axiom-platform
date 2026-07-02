@@ -16,6 +16,8 @@ from axiom_core.work_dependency import (
     detect_cycle,
 )
 
+from tests.conftest import make_symlink_or_skip
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -430,7 +432,7 @@ class TestSafety:
         target = tmp_path / "outside"
         target.mkdir()
         link = Path(engine._report_dir) / "evil-link"
-        link.symlink_to(target)
+        make_symlink_or_skip(link, target)
         with pytest.raises(ValueError):
             engine.get_report("evil-link")
 

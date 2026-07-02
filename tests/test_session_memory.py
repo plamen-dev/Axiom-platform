@@ -15,6 +15,8 @@ from axiom_core.session_memory import (
     SessionMemoryType,
 )
 
+from tests.conftest import make_symlink_or_skip
+
 
 @pytest.fixture()
 def engine(tmp_path: Path) -> SessionMemoryEngine:
@@ -337,7 +339,7 @@ class TestSafety:
         target = tmp_path / "outside"
         target.mkdir()
         link = Path(engine._report_dir) / "evil-link"
-        link.symlink_to(target)
+        make_symlink_or_skip(link, target)
         with pytest.raises(ValueError):
             engine.get_report("evil-link")
 
