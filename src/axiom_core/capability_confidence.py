@@ -150,7 +150,13 @@ _VALID_LEVELS = {lv.value for lv in CapabilityConfidenceLevel}
 def _compute_score(factors: CapabilityConfidenceFactors) -> float:
     """Compute a deterministic confidence score from factors.
 
-    Score is the success ratio adjusted for repairs and recoveries.
+    Score is the success ratio adjusted for repairs and recoveries, then
+    damped by evidence mass: ``score = ratio * n / (n + 2)`` where ``n`` is
+    the execution count. A small evidence base discounts the ratio (a single
+    success out of one run scores ~0.33, not 1.0) and the damped score
+    converges to the raw ratio as evidence accumulates (5/5 ~ 0.71,
+    18/18 = 0.9). The score therefore measures how much evidence supports
+    the ratio, not a point-estimate of the ratio alone.
     Range: 0.0 to 1.0.
     """
     if factors.execution_count == 0:
@@ -163,7 +169,11 @@ def _compute_score(factors: CapabilityConfidenceFactors) -> float:
         recovery_ratio = min(factors.recovery_count / factors.failure_count, 1.0)
         base += recovery_ratio * 0.1
 
-    return min(round(base, 4), 1.0)
+    # Evidence-mass damping: discount low-evidence optimism (BHV-037)
+    n = factors.execution_count
+    damped = base * (n / (n + 2))
+
+    return min(round(damped, 4), 1.0)
 
 
 def _level_from_score(score: float) -> str:

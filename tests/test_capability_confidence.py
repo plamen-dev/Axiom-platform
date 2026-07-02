@@ -71,13 +71,29 @@ class TestScoring:
         f = CapabilityConfidenceFactors(execution_count=0)
         assert _compute_score(f) == 0.0
 
-    def test_all_successes_gives_one(self) -> None:
+    def test_all_successes_is_damped_by_evidence_mass(self) -> None:
         f = CapabilityConfidenceFactors(execution_count=10, success_count=10)
-        assert _compute_score(f) == 1.0
+        assert _compute_score(f) == 0.8333  # 1.0 * 10/12
 
     def test_half_successes(self) -> None:
         f = CapabilityConfidenceFactors(execution_count=10, success_count=5)
-        assert _compute_score(f) == 0.5
+        assert _compute_score(f) == 0.4167  # 0.5 * 10/12
+
+    def test_damping_curve_one_execution(self) -> None:
+        f = CapabilityConfidenceFactors(execution_count=1, success_count=1)
+        assert _compute_score(f) == 0.3333  # 1/1 is weak evidence -> low
+
+    def test_damping_curve_five_executions(self) -> None:
+        f = CapabilityConfidenceFactors(execution_count=5, success_count=5)
+        assert _compute_score(f) == 0.7143  # 5/5 -> high
+
+    def test_damping_curve_eighteen_executions(self) -> None:
+        f = CapabilityConfidenceFactors(execution_count=18, success_count=18)
+        assert _compute_score(f) == 0.9  # 18/18 -> very_high
+
+    def test_damping_converges_to_ratio(self) -> None:
+        f = CapabilityConfidenceFactors(execution_count=10_000, success_count=10_000)
+        assert _compute_score(f) == 0.9998
 
     def test_recovery_bonus(self) -> None:
         f = CapabilityConfidenceFactors(
@@ -87,8 +103,8 @@ class TestScoring:
             recovery_count=5,
         )
         score = _compute_score(f)
-        assert score > 0.5
-        assert score <= 0.6
+        assert score > 0.4167  # above the no-bonus damped ratio
+        assert score <= 0.5
 
     def test_partial_recovery_bonus(self) -> None:
         f = CapabilityConfidenceFactors(
@@ -98,8 +114,8 @@ class TestScoring:
             recovery_count=2,
         )
         score = _compute_score(f)
-        assert score > 0.5
-        assert score < 0.6
+        assert score > 0.4167
+        assert score < 0.5
 
     def test_score_capped_at_one(self) -> None:
         f = CapabilityConfidenceFactors(
@@ -155,8 +171,8 @@ class TestCreate:
             success_count=9,
         )
         assert result["capability_id"] == "cap-001"
-        assert result["score"] == 0.9
-        assert result["confidence_level"] == "very_high"
+        assert result["score"] == 0.75  # 0.9 * 10/12
+        assert result["confidence_level"] == "high"
 
     def test_create_zero_executions(self, engine: CapabilityConfidenceEngine) -> None:
         result = engine.create(capability_id="cap-empty")
@@ -188,13 +204,13 @@ class TestCreate:
             capability_id="cap-clamped",
             execution_count=1,
             success_count=1,
-            level_override="low",
+            level_override="very_low",
         )
-        # Score stays the unmodified ratio; only the published level differs.
-        assert result["score"] == 1.0
-        assert result["confidence_level"] == "low"
+        # Score stays the score-doctrine value; only the published level differs.
+        assert result["score"] == 0.3333
+        assert result["confidence_level"] == "very_low"
         loaded = engine.get_report(result["report_id"])
-        assert loaded["confidence_level"] == "low"
+        assert loaded["confidence_level"] == "very_low"
 
     def test_create_invalid_level_override_raises(
         self, engine: CapabilityConfidenceEngine
@@ -236,7 +252,7 @@ class TestPassFail:
         result = engine.create(
             capability_id="cap-border",
             execution_count=10,
-            success_count=3,
+            success_count=4,  # 0.4 * 10/12 = 0.3333, just above the 0.3 gate
         )
         report_dir = Path(engine._report_dir) / result["report_id"]
         pf = json.loads((report_dir / "pass_fail.json").read_text())

@@ -648,3 +648,22 @@ See `docs/runbooks/behavior-regression-runbook.md` for philosophy and process.
 | **related_test_case** | `tests/test_evidence_promotion.py::test_ladder_climbs_one_level_per_accepted_pass`, `::test_failure_drop_is_never_clamped`, `::test_quarantined_and_duplicate_do_not_advance_ladder`, `::test_ladder_state_round_trips_durable_store`, `::test_clamp_level_is_pure_and_conservative`; `tests/test_capability_confidence.py::TestCreate::test_create_level_override_persists` |
 | **related_artifact_path** | `src/axiom_core/evidence_promotion.py` (`_clamp_level`, `_readiness_from_level`, apply step 7), `src/axiom_core/capability_confidence.py` (`create(level_override=...)`) |
 | **notes** | Promotion-side only: no confidence-scoring redesign (the score is still the pure ratio — a staged follow-up will evaluate evidence-mass damping of the score itself as design option A), no new framework, no chain/quality/quarantine/duplicate semantics change. Asymmetric by design: slow to trust, fast to distrust. Previously persisted confidence reports keep their recorded levels; the ladder applies from the next accepted application onward. 2024 Revit baseline unaffected; no Revit live validation required. |
+
+---
+
+## BHV-037: Evidence-mass damping of the confidence score (scoring doctrine change)
+
+| Field | Value |
+|-------|-------|
+| **behavior_id** | BHV-037 |
+| **date** | 2026-06-23 |
+| **capability** | Capability confidence scoring (`CapabilityConfidenceEngine` / `_compute_score`; shared by the confidence CLI and the evidence-to-promotion loop — not a Revit capability) |
+| **observed_prompt** | Operator approved staging design option A after B: the raw success ratio overstates confidence when the evidence base is small (1/1 = 1.0 reads as full trust even though one run is weak evidence) |
+| **previous_behavior** | `score = success_ratio (+ recovery bonus)` — a pure point estimate. One successful run out of one scored 1.0 (`very_high`); the BHV-036 ladder rate-limited the *published level* but the score number itself still overstated the evidence. |
+| **expected_behavior** | The score reflects evidence mass, not just the ratio: `score = ratio × n/(n+2)` where `n = execution_count`. 1/1 ≈ 0.3333 (`low`), 2/2 = 0.5 (`medium`), 5/5 ≈ 0.7143 (`high`/ready), 18/18 = 0.9 (`very_high`), converging to the raw ratio as evidence accumulates. Failures still bite immediately. |
+| **current_behavior** | `_compute_score` applies the `n/(n+2)` damping factor after the recovery bonus and before rounding/capping. Level thresholds are unchanged (0.9/0.7/0.5/0.3). The BHV-036 single-step ladder remains in place as a guard; on an all-pass history the damped curve already climbs at most one level per run, so `clamped` is rarely true in practice. |
+| **status** | implemented (Python; `tests/test_capability_confidence.py` damping-curve tests + updated promotion/summary suites; ruff green on Ubuntu) |
+| **related_bug_id** | (none — hardening; design option A of the accumulation review, staged after option B/BHV-036) |
+| **related_test_case** | `tests/test_capability_confidence.py::TestScoring::test_all_successes_is_damped_by_evidence_mass`, `::test_damping_curve_one_execution`, `::test_damping_curve_five_executions`, `::test_damping_curve_eighteen_executions`, `::test_damping_converges_to_ratio`; updated ladder/cumulative expectations in `tests/test_evidence_promotion.py` |
+| **related_artifact_path** | `src/axiom_core/capability_confidence.py` (`_compute_score` damping) |
+| **notes** | **Scoring-doctrine change**: every score computed from this point on is the damped value, and the same factors now yield a lower score than before. Previously persisted confidence reports and committed evidence summaries show scores computed under the old (undamped) rule and are historical evidence — they are not recomputed. Readiness thresholds and level mapping unchanged; chain/quality/quarantine/duplicate semantics unchanged; recovery-bonus semantics unchanged (bonus is applied to the ratio before damping). 2024 Revit baseline unaffected; no Revit live validation required. Separate PR from BHV-036 by design (each semantic change reviewed on its own). |

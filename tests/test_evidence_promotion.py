@@ -124,10 +124,12 @@ def test_passing_evidence_raises_confidence(
     assert record["updated_state"]["score"] > record["prior_state"]["score"]
     assert record["updated_state"]["confidence_level"] == "low"
     assert record["updated_state"]["readiness"] == "provisional"
+    # 1/1 damped by evidence mass scores 0.3333 -> raw level is already low,
+    # so the single-step ladder does not need to clamp.
     assert record["promotion"] == {
-        "raw_level": "very_high",
+        "raw_level": "low",
         "effective_level": "low",
-        "clamped": True,
+        "clamped": False,
     }
 
 
@@ -243,14 +245,14 @@ def test_repeated_evidence_is_cumulative(
     first = loop.apply(passing)
     assert first["updated_state"]["execution_count"] == 1
     assert first["updated_state"]["success_count"] == 1
-    assert first["updated_state"]["score"] == 1.0
+    assert first["updated_state"]["score"] == 0.3333  # 1/1 damped by n/(n+2)
 
     second = loop.apply(failing)
     # Cumulative: a later failure lowers the accumulated confidence.
     assert second["prior_state"]["execution_count"] == 1
     assert second["updated_state"]["execution_count"] == 2
     assert second["updated_state"]["failure_count"] == 1
-    assert second["updated_state"]["score"] == 0.5
+    assert second["updated_state"]["score"] == 0.25  # 1/2 damped by n/(n+2)
     assert second["updated_state"]["score"] < first["updated_state"]["score"]
 
 
@@ -814,40 +816,51 @@ def _apply_pass(loop: EvidencePromotionLoop, root: str, run_id: str) -> dict[str
 def test_ladder_climbs_one_level_per_accepted_pass(
     loop: EvidencePromotionLoop, artifacts_root: str
 ) -> None:
-    """Four distinct accepted PASSes climb exactly one level each."""
+    """Accepted PASSes never raise the published level by more than one step.
+
+    With evidence-mass damping the raw score itself climbs gradually
+    (0.3333, 0.5, 0.6, 0.6667, 0.7143 ...), so the ladder guard does not
+    need to clamp on an all-pass history — but every transition must still
+    be at most one rung.
+    """
     expectations = [
-        ("low", "provisional", True),
-        ("medium", "provisional", True),
-        ("high", "ready", True),
-        ("very_high", "ready", False),  # high -> very_high is one step: no clamp
+        ("low", "provisional"),  # 1/1 damped -> 0.3333
+        ("medium", "provisional"),  # 2/2 -> 0.5
+        ("medium", "provisional"),  # 3/3 -> 0.6
+        ("medium", "provisional"),  # 4/4 -> 0.6667
+        ("high", "ready"),  # 5/5 -> 0.7143
     ]
-    for i, (level, readiness, clamped) in enumerate(expectations):
+    ladder = ["very_low", "low", "medium", "high", "very_high"]
+    prior = "very_low"
+    for i, (level, readiness) in enumerate(expectations):
         record = _apply_pass(loop, artifacts_root, run_id=f"ladder-{i}")
         assert record["decision"] == EvidenceDecision.ACCEPTED.value
         assert record["updated_state"]["confidence_level"] == level
         assert record["updated_state"]["readiness"] == readiness
-        assert record["promotion"]["raw_level"] == "very_high"
         assert record["promotion"]["effective_level"] == level
-        assert record["promotion"]["clamped"] is clamped
+        # Damping already rate-limits the raw curve; the ladder is a guard.
+        assert record["promotion"]["clamped"] is False
+        assert ladder.index(level) - ladder.index(prior) <= 1
+        prior = level
 
 
 def test_failure_drop_is_never_clamped(
     loop: EvidencePromotionLoop, artifacts_root: str
 ) -> None:
-    """Once at very_high, a failure lowers the published level immediately."""
-    for i in range(4):
+    """Once at high, a failure lowers the published level immediately."""
+    for i in range(5):
         _apply_pass(loop, artifacts_root, run_id=f"drop-up-{i}")
-    assert loop.current_state("self-model-build")["confidence_level"] == "very_high"
+    assert loop.current_state("self-model-build")["confidence_level"] == "high"
 
     failing = _write_chain_evidence(artifacts_root, run_id="drop-fail", status="FAIL")
     record = loop.apply(failing)
 
     assert record["decision"] == EvidenceDecision.ACCEPTED.value
-    # 4/5 = 0.8 -> raw high; the drop is applied as-is, not rate-limited.
-    assert record["updated_state"]["confidence_level"] == "high"
+    # 5/6 damped = 0.625 -> raw medium; the drop is applied as-is.
+    assert record["updated_state"]["confidence_level"] == "medium"
     assert record["promotion"] == {
-        "raw_level": "high",
-        "effective_level": "high",
+        "raw_level": "medium",
+        "effective_level": "medium",
         "clamped": False,
     }
 
@@ -888,8 +901,8 @@ def test_ladder_state_round_trips_durable_store(
     state = fresh.current_state("self-model-build")
     assert state["confidence_level"] == "medium"
     assert state["readiness"] == "provisional"
-    # The raw score is untouched doctrine: still the pure success ratio.
-    assert state["score"] == 1.0
+    # Score doctrine: the evidence-mass-damped ratio (2/2 -> 0.5).
+    assert state["score"] == 0.5
 
 
 def test_clamp_level_is_pure_and_conservative() -> None:
