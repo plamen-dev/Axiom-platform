@@ -196,6 +196,7 @@ EXPECTED_AXIOM_COMMANDS = {
     "self-model-build", "self-model-query", "self-model-gap-analysis",
     "atlas",
     "simulated-adapter-run", "simulation-harness-run",
+    "simulated-mutation-loop",
     "loop-run",
     "execution-chain-run",
     "capability-evidence-apply", "capability-evidence-history",

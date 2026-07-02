@@ -21,6 +21,8 @@ _(to be populated — build/deploy commands verified on the operator machine)_
 
 `axiom simulation-harness-run [--artifacts-root <p>] [--json-output]` runs the full suite (CreateLevels → CreateGrids → InventoryModel → SetParameterValue preview → apply) against **one shared** model (`src/axiom_core/simulation_harness.py`): the inventory step must see the created elements, preview must not mutate, apply must. One bridge evidence bundle per step (`validation_runs/<harness_id>-s<n>-<capability>/bridge/`) plus a harness report with per-step assertions under `artifacts/simulation_harness/<harness_id>/`. Non-passed status exits 1. Tests: `tests/test_simulation_harness.py`.
 
+`axiom simulated-mutation-loop [--artifacts-root <p>] [--json-output]` is the Lane-3B rehearsal with zero Revit (`src/axiom_core/simulated_mutation_loop.py`): six gates — baseline → preview (must not mutate) → apply (must modify exactly the previewed ids) → independent verify → revert (back through the same SetParameterValue path) → final verify (model matches baseline). Report + pass_fail under `artifacts/simulated_mutation_loop/<loop_id>/`; bridge bundles per mutating gate. A passed loop never implies live-Revit mutation readiness. Tests: `tests/test_simulated_mutation_loop.py`.
+
 ## Registry pointers
 
 - Current Revit capabilities: CreateGrids, CreateLevels, InventoryModel, SetParameterValue (capability registry is the source of truth).

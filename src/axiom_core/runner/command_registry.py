@@ -6836,6 +6836,46 @@ _register(
 
 _register(
     CommandSpec(
+        name="simulated-mutation-loop",
+        command=(
+            "axiom simulated-mutation-loop [--artifacts-root <p>] "
+            "[--json-output]"
+        ),
+        description=(
+            "Run one preview->apply->verify->revert cycle against Adapter "
+            "000 (six gates: baseline, preview, apply, verify, revert, "
+            "final_verify) \u2014 the Lane-3B controlled single-mutation "
+            "rehearsal with zero Revit."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput(
+                "simulated_mutation_loop/<loop_id>/report.json",
+                required=True,
+            ),
+            EvidenceOutput(
+                "simulated_mutation_loop/<loop_id>/pass_fail.json",
+                required=True,
+            ),
+            EvidenceOutput(
+                "validation_runs/<loop_id>-g<n>-<gate>/bridge/pass_fail.json",
+                required=True,
+            ),
+        ),
+        timeout_seconds=300,
+        failure_modes=(FM_NONZERO,),
+        notes=(
+            "Mutates only the in-memory simulated model, and only through "
+            "the SetParameterValue capability path; a passed loop never "
+            "implies live-Revit (Lane-3B) mutation readiness."
+        ),
+    )
+)
+
+_register(
+    CommandSpec(
         name="loop-run",
         command=(
             "axiom loop-run [--cycles <n>] [--repo-root <p>] "

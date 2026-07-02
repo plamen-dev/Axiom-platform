@@ -19710,6 +19710,57 @@ def simulation_harness_run(
         raise SystemExit(1)
 
 
+@cli.command("simulated-mutation-loop")
+@click.option(
+    "--artifacts-root",
+    "artifacts_root",
+    type=click.Path(),
+    default=None,
+    help="Artifacts root for loop + bridge evidence (default: ./artifacts).",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def simulated_mutation_loop(
+    artifacts_root: str | None,
+    json_output: bool,
+) -> None:
+    """Run one preview->apply->verify->revert cycle against Adapter 000.
+
+    Lane-3B rehearsal with zero Revit: six gates (baseline, preview, apply,
+    verify, revert, final_verify), every mutation through the
+    SetParameterValue capability via the automation bridge. A passed loop
+    never implies live-Revit mutation readiness.
+    """
+    from axiom_core.simulated_mutation_loop import SimulatedMutationLoop
+
+    loop = SimulatedMutationLoop(artifacts_root=artifacts_root)
+    report = loop.run()
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, sort_keys=True, default=str))
+    else:
+        console.print(
+            "\n[bold]Simulated Mutation Loop (Adapter 000)[/bold]\n"
+        )
+        console.print(f"  Loop id: {report['loop_id']}")
+        color = "green" if report["status"] == "passed" else "red"
+        console.print(f"  Status:  [{color}]{report['status']}[/{color}]")
+        mutation = report["mutation"]
+        console.print(
+            f"  Mutation: {mutation['category']}.{mutation['parameter_name']}"
+            f" = {mutation['value']!r} on {mutation['element_count']} elements"
+        )
+        for entry in report["gates"]:
+            mark = "green]PASS" if entry["passed"] else "red]FAIL"
+            run_ref = f" ({entry['run_id']})" if entry["run_id"] else ""
+            console.print(f"  Gate {entry['gate']}: [{mark}[/]{run_ref}")
+            for assertion in entry["assertions"]:
+                status = "ok" if assertion["passed"] else "FAILED"
+                console.print(f"      - {assertion['assertion']}: {status}")
+        console.print(f"\n  {report['fidelity_note']}")
+    if report["status"] != "passed":
+        raise SystemExit(1)
+
+
 @cli.command("loop-run")
 @click.option(
     "--cycles",
