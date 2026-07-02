@@ -6755,6 +6755,47 @@ _register(
 
 _register(
     CommandSpec(
+        name="simulated-adapter-run",
+        command=(
+            "axiom simulated-adapter-run [--capability <name>] "
+            "[--args-json <json>] [--output-dir <p>] [--json-output]"
+        ),
+        description=(
+            "Run one capability (CreateGrids | CreateLevels | "
+            "InventoryModel | SetParameterValue) against the Simulated "
+            "Product Adapter (Adapter 000, in-memory model) via the "
+            "automation bridge, producing a bridge evidence bundle stamped "
+            "adapter: simulated-000."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput(
+                "validation_runs/<run_id>/bridge/bridge_request.json",
+                required=True,
+            ),
+            EvidenceOutput(
+                "validation_runs/<run_id>/bridge/bridge_response.json",
+                required=True,
+            ),
+            EvidenceOutput(
+                "validation_runs/<run_id>/bridge/pass_fail.json",
+                required=True,
+            ),
+        ),
+        timeout_seconds=120,
+        failure_modes=(FM_NONZERO,),
+        notes=(
+            "No live product touched — every run executes against a fresh "
+            "deterministic in-memory model; simulated evidence is stamped "
+            "adapter: simulated-000 and never counts as live-Revit proof."
+        ),
+    )
+)
+
+_register(
+    CommandSpec(
         name="loop-run",
         command=(
             "axiom loop-run [--cycles <n>] [--repo-root <p>] "
