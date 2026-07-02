@@ -19557,6 +19557,112 @@ def atlas(repo_root: str, serve: bool, port: int, json_output: bool) -> None:
         serve_atlas(repo_root, port=port)
 
 
+@cli.command("simulated-adapter-run")
+@click.option(
+    "--capability",
+    "capability",
+    default="InventoryModel",
+    help=(
+        "Capability to run against Adapter 000 (CreateGrids | CreateLevels "
+        "| InventoryModel | SetParameterValue)."
+    ),
+)
+@click.option(
+    "--args-json",
+    "args_json",
+    default=None,
+    help="Capability argument dict as a JSON string.",
+)
+@click.option(
+    "--output-dir",
+    "output_dir",
+    type=click.Path(),
+    default="artifacts/validation_runs",
+    help="Bridge evidence output dir (default: artifacts/validation_runs).",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def simulated_adapter_run(
+    capability: str,
+    args_json: str | None,
+    output_dir: str,
+    json_output: bool,
+) -> None:
+    """Run one capability against the Simulated Product Adapter (Adapter 000).
+
+    Executes against the deterministic in-memory model through the existing
+    automation bridge driver, producing a real bridge evidence bundle whose
+    results are stamped ``adapter: simulated-000`` — simulated evidence can
+    never be mistaken for live product evidence.
+    """
+    from axiom_core.automation_bridge import execute_capability_via_bridge
+    from axiom_core.simulated_adapter import (
+        SUPPORTED_CAPABILITIES,
+        SimulatedPipeClient,
+    )
+
+    if capability not in SUPPORTED_CAPABILITIES:
+        click.echo(
+            f"Error: Adapter 000 does not support '{capability}' "
+            f"(supported: {', '.join(SUPPORTED_CAPABILITIES)})",
+            err=True,
+        )
+        raise SystemExit(1)
+
+    args: dict = {}
+    if args_json:
+        try:
+            args = json.loads(args_json)
+        except json.JSONDecodeError as exc:
+            click.echo(f"Error: invalid --args-json: {exc}", err=True)
+            raise SystemExit(1) from exc
+        if not isinstance(args, dict):
+            click.echo("Error: --args-json must be a JSON object", err=True)
+            raise SystemExit(1)
+
+    result = execute_capability_via_bridge(
+        capability=capability,
+        args=args,
+        output_dir=output_dir,
+        pipe_client=SimulatedPipeClient(),
+    )
+
+    if json_output:
+        payload = {
+            "run_id": result.run_id,
+            "capability": result.capability,
+            "adapter": "simulated-000",
+            "classification": result.classification,
+            "reason": result.reason,
+            "artifact_dir": result.artifact_dir,
+            "checkpoints": result.checkpoints.to_dict(),
+            "tool_result": (
+                result.tool_result.model_dump(mode="json")
+                if result.tool_result is not None
+                else None
+            ),
+        }
+        click.echo(json.dumps(payload, indent=2, sort_keys=True, default=str))
+    else:
+        console.print("\n[bold]Simulated Adapter Run (Adapter 000)[/bold]\n")
+        console.print(f"  Run id:         {result.run_id}")
+        console.print(f"  Capability:     {result.capability}")
+        color = "green" if result.classification == "pass" else "red"
+        console.print(
+            f"  Classification: [{color}]{result.classification}[/{color}]"
+        )
+        console.print(f"  Reason:         {result.reason}")
+        console.print(f"  Evidence dir:   {result.artifact_dir}")
+        if result.tool_result is not None:
+            tr = result.tool_result
+            console.print(f"  Created ids:    {len(tr.created_ids)}")
+            console.print(f"  Modified ids:   {len(tr.modified_ids)}")
+            if tr.errors:
+                for err in tr.errors:
+                    console.print(f"  [red]Error:[/red] {err}")
+    if result.classification != "pass":
+        raise SystemExit(1)
+
+
 @cli.command("loop-run")
 @click.option(
     "--cycles",

@@ -15,6 +15,10 @@ Revit is Adapter 001, not the end state. Current baseline: `baseline-001-revit-2
 
 _(to be populated — build/deploy commands verified on the operator machine)_
 
+## Adapter 000 (simulated)
+
+`axiom simulated-adapter-run --capability <name> [--args-json <json>] [--output-dir <p>] [--json-output]` runs CreateGrids / CreateLevels / InventoryModel / SetParameterValue against a deterministic in-memory model (`src/axiom_core/simulated_adapter.py`) through the same automation-bridge driver, producing a bridge evidence bundle. Every result is stamped `adapter: simulated-000` — simulated evidence never counts as live-Revit proof. Same safety doctrine as live: InventoryModel is summary-mode only (no parameter dump); SetParameterValue is category-constrained, Text/writable/instance parameters only, hard cap 5 elements, preview by default (`Mode: "apply"` to mutate). Each CLI run starts from a fresh seed model (3 Walls + 2 Doors). Tests: `tests/test_simulated_adapter.py`.
+
 ## Registry pointers
 
 - Current Revit capabilities: CreateGrids, CreateLevels, InventoryModel, SetParameterValue (capability registry is the source of truth).
