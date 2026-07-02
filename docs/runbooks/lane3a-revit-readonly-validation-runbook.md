@@ -69,6 +69,8 @@ Non-goals — **strictly forbidden in lane-3A**:
   InventoryModel`, unconstrained `parameter schema`, and unconstrained
   `sample values` remain **blocked** (BUG-017 / inventory safety rules).
 - No PR C implementation, no lane-3B claims.
+- If any artifact/evidence path is not wired yet on the machine, **record it
+  as a gap in the report instead of inventing proof**.
 
 ## Operator fields (fill in before starting; return with the report)
 
