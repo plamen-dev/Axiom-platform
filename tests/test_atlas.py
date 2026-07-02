@@ -125,6 +125,90 @@ class TestBuildAtlasData:
             assert not Path(summary["path"]).is_absolute()
 
 
+class TestCapabilityTrail:
+    def test_trail_is_chronological_newest_first_with_promotion(
+        self, workspace: Path
+    ) -> None:
+        intake2 = (
+            workspace / "artifacts" / "capability_evidence_intake" / "intake-2"
+        )
+        intake2.mkdir(parents=True)
+        (intake2 / "report.json").write_text(
+            json.dumps(
+                {
+                    "intake_id": "intake-2",
+                    "capability_id": "self-model-build",
+                    "created_at": "2026-07-02T00:00:00+00:00",
+                    "decision": "accepted",
+                    "state_changed": True,
+                    "evidence_quality": {"verdict": "SUBSTANTIVE"},
+                    "promotion": {
+                        "raw_level": "very_high",
+                        "effective_level": "low",
+                        "clamped": True,
+                    },
+                    "prior_state": {
+                        "confidence_level": "very_high",
+                        "readiness": "ready",
+                        "score": 1.0,
+                    },
+                    "updated_state": {
+                        "confidence_level": "medium",
+                        "readiness": "provisional",
+                        "score": 0.5,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        data = build_atlas_data(workspace)
+        caps = data["capabilities"]
+        assert len(caps) == 1
+        trail = caps[0]["trail"]
+        assert len(trail) == 2
+        # newest first
+        assert trail[0]["intake_id"] == "intake-2"
+        assert trail[1]["intake_id"] == "intake-1"
+        assert trail[0]["quality_verdict"] == "SUBSTANTIVE"
+        assert trail[0]["before"]["confidence_level"] == "very_high"
+        assert trail[0]["after"]["confidence_level"] == "medium"
+        assert trail[0]["promotion"] == {
+            "raw_level": "very_high",
+            "effective_level": "low",
+            "clamped": True,
+        }
+        # older report has no promotion field → None, not fabricated
+        assert trail[1]["promotion"] is None
+        # panel state reflects the newest report
+        assert caps[0]["confidence_level"] == "medium"
+        assert caps[0]["last_intake_id"] == "intake-2"
+        assert caps[0]["decision_counts"] == {"accepted": 2}
+
+    def test_trail_is_capped_at_limit(self, tmp_path: Path) -> None:
+        from axiom_core.atlas import TRAIL_LIMIT
+
+        intake_root = tmp_path / "artifacts" / "capability_evidence_intake"
+        for i in range(TRAIL_LIMIT + 5):
+            d = intake_root / f"intake-{i:03d}"
+            d.mkdir(parents=True)
+            (d / "report.json").write_text(
+                json.dumps(
+                    {
+                        "intake_id": f"intake-{i:03d}",
+                        "capability_id": "cap",
+                        "created_at": f"2026-07-01T00:00:{i:02d}+00:00",
+                        "decision": "accepted",
+                        "updated_state": {"score": 0.5},
+                    }
+                ),
+                encoding="utf-8",
+            )
+        caps = build_atlas_data(tmp_path)["capabilities"]
+        assert len(caps[0]["trail"]) == TRAIL_LIMIT
+        # counts still cover all reports
+        assert caps[0]["decision_counts"] == {"accepted": TRAIL_LIMIT + 5}
+
+
 class TestRenderAtlasHtml:
     def test_embeds_data_and_is_self_contained(self, workspace: Path) -> None:
         data = build_atlas_data(workspace)
@@ -170,7 +254,7 @@ class TestWriteAtlas:
         payload = json.loads(
             (workspace / json_rel).read_text(encoding="utf-8")
         )
-        assert payload["schema_version"] == "1.0"
+        assert payload["schema_version"] == "1.1"
 
     def test_read_only_over_source_artifacts(self, workspace: Path) -> None:
         before = {

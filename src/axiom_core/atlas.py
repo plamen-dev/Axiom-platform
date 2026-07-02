@@ -22,7 +22,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-ATLAS_SCHEMA_VERSION = "1.0"
+ATLAS_SCHEMA_VERSION = "1.1"
+
+TRAIL_LIMIT = 25
 
 
 def _load_json(path: Path) -> dict[str, Any] | None:
@@ -63,12 +65,44 @@ def _newest_self_model(artifacts_root: Path) -> tuple[dict[str, Any] | None, str
     return None, ""
 
 
+def _trail_entry(report: dict[str, Any]) -> dict[str, Any]:
+    """Compact, render-ready view of one intake report (read-only)."""
+    prior = report.get("prior_state") or {}
+    updated = report.get("updated_state") or {}
+    quality = report.get("evidence_quality") or {}
+    promotion = report.get("promotion") or {}
+    return {
+        "intake_id": report.get("intake_id"),
+        "created_at": report.get("created_at"),
+        "decision": report.get("decision"),
+        "quality_verdict": quality.get("verdict"),
+        "before": {
+            "confidence_level": prior.get("confidence_level"),
+            "readiness": prior.get("readiness"),
+            "score": prior.get("score"),
+        },
+        "after": {
+            "confidence_level": updated.get("confidence_level"),
+            "readiness": updated.get("readiness"),
+            "score": updated.get("score"),
+        },
+        "state_changed": report.get("state_changed"),
+        "promotion": {
+            "raw_level": promotion.get("raw_level"),
+            "effective_level": promotion.get("effective_level"),
+            "clamped": promotion.get("clamped"),
+        }
+        if promotion
+        else None,
+    }
+
+
 def _capability_states(artifacts_root: Path) -> list[dict[str, Any]]:
-    """Latest per-capability state derived from intake reports (read-only)."""
+    """Latest per-capability state + intake trail from reports (read-only)."""
     intake_dir = artifacts_root / "capability_evidence_intake"
     if not intake_dir.is_dir():
         return []
-    latest: dict[str, tuple[float, dict[str, Any]]] = {}
+    reports: dict[str, list[tuple[float, str, dict[str, Any]]]] = {}
     counts: dict[str, dict[str, int]] = {}
     for report_path in intake_dir.glob("*/report.json"):
         report = _load_json(report_path)
@@ -78,22 +112,29 @@ def _capability_states(artifacts_root: Path) -> list[dict[str, Any]]:
         decision = str(report.get("decision") or "unknown").lower()
         counts.setdefault(capability, {})
         counts[capability][decision] = counts[capability].get(decision, 0) + 1
-        mtime = report_path.stat().st_mtime
-        if capability not in latest or mtime > latest[capability][0]:
-            latest[capability] = (mtime, report)
+        sort_key = (
+            report_path.stat().st_mtime,
+            str(report.get("created_at") or ""),
+        )
+        reports.setdefault(capability, []).append((*sort_key, report))
 
     capabilities: list[dict[str, Any]] = []
-    for capability, (_, report) in sorted(latest.items()):
-        state = report.get("updated_state") or report.get("prior_state") or {}
+    for capability, entries in sorted(reports.items()):
+        entries.sort(key=lambda e: (e[0], e[1]))
+        latest = entries[-1][2]
+        state = latest.get("updated_state") or latest.get("prior_state") or {}
+        trail = [_trail_entry(r) for _, _, r in entries[-TRAIL_LIMIT:]]
+        trail.reverse()  # newest first for display
         capabilities.append(
             {
                 "capability_id": capability,
                 "confidence_level": state.get("confidence_level"),
                 "readiness": state.get("readiness"),
                 "score": state.get("score"),
-                "last_decision": report.get("decision"),
-                "last_intake_id": report.get("intake_id"),
+                "last_decision": latest.get("decision"),
+                "last_intake_id": latest.get("intake_id"),
                 "decision_counts": counts.get(capability, {}),
+                "trail": trail,
             }
         )
     return capabilities
@@ -271,6 +312,14 @@ _ATLAS_TEMPLATE = """<!DOCTYPE html>
   .pill.red { background: var(--red); } .pill.gray { background: var(--gray); color: var(--fg); }
   .kv { color: var(--dim); font-size: 12px; margin-top: 2px; }
   .kv b { color: var(--fg); font-weight: 500; }
+  .cap { cursor: pointer; }
+  .cap .hint { color: var(--dim); font-size: 11px; float: right; }
+  .trail { display: none; margin-top: 6px; border-top: 1px solid var(--border); padding-top: 6px; }
+  .cap.open .trail { display: block; }
+  .trail-item { border-left: 2px solid var(--border); padding: 2px 0 2px 8px; margin-bottom: 4px; font-size: 12px; }
+  .trail-item .when { color: var(--dim); font-size: 11px; }
+  .arrow { color: var(--accent); }
+  .clamp { color: var(--yellow); font-size: 11px; }
   code { color: var(--accent); font-size: 11px; word-break: break-all; }
   #legend { position: absolute; left: 12px; bottom: 12px; background: var(--panel);
     border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-size: 12px; }
@@ -319,16 +368,33 @@ function pillClass(level, readiness){
 }
 const capsEl = document.getElementById("caps");
 if (!DATA.capabilities.length) capsEl.innerHTML = '<div class="kv">No capability intake records yet.</div>';
+function trailHtml(t){
+  const b=t.before||{}, a=t.after||{};
+  const move = `${esc(b.confidence_level||"?")}/${esc(b.readiness||"?")} <span class="arrow">→</span> ${esc(a.confidence_level||"?")}/${esc(a.readiness||"?")}`;
+  const clamp = t.promotion && t.promotion.clamped
+    ? ` <span class="clamp">clamped (raw ${esc(t.promotion.raw_level)} → effective ${esc(t.promotion.effective_level)})</span>` : "";
+  return `
+    <div class="trail-item">
+      <b>${esc(t.decision||"?")}</b> · ${esc(t.quality_verdict||"?")} · ${move}${clamp}
+      <div class="kv">score ${esc(b.score)} → ${esc(a.score)} · intake <code>${esc((t.intake_id||"").slice(0,8))}</code></div>
+      <div class="when">${esc(t.created_at||"")}</div>
+    </div>`;
+}
 for (const c of DATA.capabilities){
   const cls = pillClass(c.confidence_level, c.readiness);
   const counts = Object.entries(c.decision_counts||{}).map(([k,v])=>`${k}: ${v}`).join(", ");
-  capsEl.insertAdjacentHTML("beforeend", `
-    <div class="cap">
+  const trail = (c.trail||[]).map(trailHtml).join("");
+  const el = document.createElement("div");
+  el.className = "cap";
+  el.innerHTML = `
+      <span class="hint">${(c.trail||[]).length} intake(s) ▾</span>
       <span class="name">${esc(c.capability_id)}</span>
       <span class="pill ${cls}">${esc(c.confidence_level||"?")} / ${esc(c.readiness||"?")}</span>
       <div class="kv">score <b>${esc(c.score)}</b> · last decision <b>${esc(c.last_decision)}</b></div>
       <div class="kv">intakes — ${esc(counts||"none")}</div>
-    </div>`);
+      <div class="trail">${trail || '<div class="kv">no intake records</div>'}</div>`;
+  el.addEventListener("click", ()=> el.classList.toggle("open"));
+  capsEl.appendChild(el);
 }
 
 // --- Evidence summaries panel ---
