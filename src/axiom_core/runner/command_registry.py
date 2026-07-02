@@ -6579,6 +6579,36 @@ _register(
 
 _register(
     CommandSpec(
+        name="capability-graph-ingest",
+        command=(
+            "axiom capability-graph-ingest "
+            "[--artifacts-root <dir>] [--json-output]"
+        ),
+        description=(
+            "Auto-ingest evidence intake, chain-run, validation-run, and "
+            "GitHub PR import artifacts into a capability graph report."
+        ),
+        classification=CommandClass.READ_ONLY,
+        safety_level=SafetyLevel.SAFE,
+        prerequisites=(Prerequisite.POETRY_ENV,),
+        evidence_outputs=(
+            EvidenceOutput("capability_graph_request.json", required=True),
+            EvidenceOutput("capability_graph_result.json", required=True),
+            EvidenceOutput("capability_graph_summary.md", required=True),
+            EvidenceOutput("pass_fail.json", required=True),
+        ),
+        timeout_seconds=120,
+        failure_modes=(FM_NONZERO,),
+        notes=(
+            "Read-only artifact scan; deterministic node/edge ids so "
+            "re-runs over the same artifacts yield the same structure. "
+            "Malformed artifact files are skipped, never fatal."
+        ),
+    )
+)
+
+_register(
+    CommandSpec(
         name="capability-graph-create",
         command=(
             "axiom capability-graph-create "
