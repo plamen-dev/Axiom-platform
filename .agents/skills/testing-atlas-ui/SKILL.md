@@ -25,6 +25,7 @@ description: Verify the Axiom Atlas visual map UI (axiom atlas) — the module b
 - Header must show the real self-model counts (`N modules · M import edges`) and the source run id; assert against `axiom atlas --json-output` counts, not hardcoded numbers.
 - Hover a large bubble: tooltip shows module name + import-edge count, and its edges highlight.
 - Right panels: capability pills (confidence/readiness) from intake reports; captured summaries with quality-verdict + decision pills and relative paths.
+- Evidence trail (v1.1): click a capability card — it expands to a newest-first intake trail showing decision, quality verdict, before→after level/readiness/score, and (when present) the BHV-036 promotion audit (`raw → effective`, amber "clamped" marker). Older reports without a `promotion` field render without it — never fabricated. Trail is capped at `TRAIL_LIMIT` (25) entries; `decision_counts` still cover all reports.
 - Read-only assertions (shell): no tracked files modified, `artifacts/atlas/` gitignored, capability-confidence reports byte-identical before/after.
 - Self-contained page: no CDN assets, no external calls, server binds 127.0.0.1 only; module names HTML-escaped.
 
