@@ -19206,6 +19206,45 @@ def _render_capability_validation_report_rich(report: dict) -> None:
             )
 
 
+@cli.command("capability-graph-ingest")
+@click.option(
+    "--artifacts-root",
+    type=click.Path(exists=True, file_okay=False),
+    default=None,
+    help="Artifacts root to scan (defaults to ./artifacts).",
+)
+@click.option("--json-output", is_flag=True, default=False, help="Output JSON.")
+def capability_graph_ingest(
+    artifacts_root: str | None, json_output: bool
+) -> None:
+    """Auto-ingest evidence artifacts into a capability graph report."""
+    from axiom_core.graph_auto_ingest import GraphAutoIngestEngine
+
+    try:
+        engine = GraphAutoIngestEngine(artifacts_root=artifacts_root)
+        summary = engine.ingest()
+    except (ValueError, OSError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if json_output:
+        click.echo(json.dumps(summary, indent=2, default=str))
+    else:
+        console.print("\n[bold]Capability Graph Auto-Ingest[/bold]\n")
+        console.print(f"  Report:          {summary['report_id']}")
+        console.print(f"  Artifacts root:  {summary['artifacts_root']}")
+        for source, count in summary["source_counts"].items():
+            console.print(f"  {source + ':':<17}{count}")
+        console.print(f"  Nodes:           {summary['node_count']}")
+        console.print(f"  Edges:           {summary['edge_count']}")
+        console.print(f"  Orphan nodes:    {summary['orphan_node_count']}")
+        console.print(f"  Skipped files:   {summary['skipped_count']}")
+        for item in summary["skipped"]:
+            console.print(
+                f"  [yellow]SKIPPED[/yellow] {item['file']}: {item['error']}"
+            )
+
+
 @cli.command("capability-graph-create")
 @click.option(
     "--graph-file",
