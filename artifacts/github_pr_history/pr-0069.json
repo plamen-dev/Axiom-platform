@@ -1,0 +1,68 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 69,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/69",
+    "title": "Knowledge graph auto-ingest: capability-graph-ingest — evidence feeds the graph without manual create (C10)",
+    "description": "## Summary\n\nCloses the \"graph feeding is manual\" gap: evidence that already exists on disk now flows into the capability knowledge graph with one command — no hand-built `capability-graph-create` payloads.\n\nNew `GraphAutoIngestEngine` (`src/axiom_core/graph_auto_ingest.py`) scans four read-only artifact sources and assembles one graph report via the existing `CapabilityKnowledgeGraphEngine` (framework untouched):\n\n- `capability_evidence_intake/*/report.json` → `VALIDATION` node + `VALIDATES` edge to a shared `CAPABILITY` node\n- `execution_chain/*/evidence.json` → `ARTIFACT` node + `HAS_ARTIFACT` edge from the capability\n- `validation_evidence/*/validation_run.json` → `VALIDATION` node (run status + command counts)\n- `github_metadata_import/*/report.json` → `EVENT` node per PR, carrying `repository_pr_number` + `global_capability_number` (consumes the #68 backfill, so the reconciled PR timeline lands in the graph)\n\nDesign properties:\n- **Deterministic**: node/edge ids derived from source ids (`ingest:<type>:<source_id>`), so re-runs over the same artifacts yield identical graph structure (only the report_id differs) — verified by test.\n- **Safe**: read-only artifact scan, upstream files never mutated (tested); malformed artifact files recorded as `skipped`, never fatal; missing source dirs → empty graph, not an error.\n- Shared capability nodes dedupe via the graph framework's existing `(node_type, source_id)` dedup.\n\nNew CLI `axiom capability-graph-ingest [--artifacts-root <dir>] [--json-output]`, cataloged in the command registry (READ_ONLY / SAFE) and `EXPECTED_AXIOM_COMMANDS`.\n\nReal-data run on this repo's artifacts: 3 evidence intakes + 3 chain runs + 2 validation runs + 67 PR imports → 76 nodes / 6 edges, 0 skipped.\n\n**Stacked on #68** (base is the backfill branch — the PR-import ingest consumes its imports and the skill/registry edits are adjacent); merge #68 first and GitHub retargets this to main.\n\nWhat did NOT change: `CapabilityKnowledgeGraphEngine` semantics, schemas, any upstream evidence producer.\n\nTests (tier 2, targeted): `tests/test_graph_auto_ingest.py` 10 passed (all-sources ingest, dedup, re-run determinism, malformed skip, no-mutation, canonical-number carry-through), `tests/test_command_registry.py` 27 passed; ruff clean. Skill `testing-cli-governance` updated in the same PR.\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1783002795-graph-auto-ingest",
+    "status": "merged",
+    "merge_commit_sha": "07e90f638ce9a335ec4b5a8c23c71eafe2432bf2",
+    "created_at": "2026-07-02T14:33:42Z",
+    "updated_at": "2026-07-02T14:46:54Z",
+    "merged_at": "2026-07-02T14:46:54Z"
+  },
+  "commits": [
+    {
+      "commit_sha": "b6e33525fbdc679793492d3265c2085247272a9e",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Knowledge graph auto-ingest: capability-graph-ingest command (C10)\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-02T14:33:22Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".agents/skills/testing-cli-governance/SKILL.md",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 39,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/graph_auto_ingest.py",
+      "status": "added",
+      "additions": 333,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 30,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_graph_auto_ingest.py",
+      "status": "added",
+      "additions": 228,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:52:24.459194+00:00"
+  }
+}

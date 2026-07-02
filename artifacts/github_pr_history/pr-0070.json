@@ -1,0 +1,68 @@
+{
+  "pr": {
+    "repository_owner": "plamen-dev",
+    "repository_name": "Axiom-platform",
+    "repository_pr_number": 70,
+    "repository_pr_url": "https://github.com/plamen-dev/Axiom-platform/pull/70",
+    "title": "Loop Runner v1: bounded gap→queue→chain→evidence→re-queue cycles (A1)",
+    "description": "## Summary\n\nFirst closed autonomous loop: `axiom loop-run --cycles N` wires the existing engines end-to-end so the factory spins without a human queueing each step. Per cycle:\n\n1. **Gap analysis** — `SelfModelBuilder` + `SelfModelGapAnalyzer` over the live repo self-model (in-memory graph payload; no manual `self-model-build` prerequisite)\n2. **Work queue** — `WorkQueueEngine.create()` with the executable chain-run item (high priority) plus the top-5 ranked gap recommendations (gap priority → queue priority)\n3. **Execute** — `ExecutionChainOrchestrator.run()` (full Plan→…→Report id flow)\n4. **Evidence apply** — `EvidencePromotionLoop.apply()` on the produced `evidence.json` (BHV-036 ladder + BHV-037 damping apply as normal)\n5. **Re-queue** — follow-up items derived from the intake decision: accepted → normal-priority \"re-validate\" item; rejected/quarantined → high-priority \"investigate\" item\n\nSafety/doctrine properties:\n- **Strictly bounded**: `cycles` capped at `MAX_LOOP_CYCLES = 10`; `--cycles 0`/negative rejected.\n- **Stops on the first chain failure** (recorded as `chain_error`, loop status `failed`, CLI exits 1).\n- **No new object model, nothing upstream mutated** — every stage is the existing engine producing its normal artifacts; the loop report (`artifacts/loop_runner/<loop_id>/report.json` + `pass_fail.json`) just links the real ids of every stage of every cycle (queue_report_id, chain_run_id + all 7 chain ids, intake_id, evidence decision, updated state, requeue_report_id). Persistence uses the existing `is_within_sandbox` guard.\n\nNew module `src/axiom_core/loop_runner.py` (~200 lines), CLI `loop-run`, command registry entry (READ_ONLY/SAFE, 600s), `EXPECTED_AXIOM_COMMANDS` updated.\n\n**Stacked on #69** (merge order: #68 → #69 → this).\n\nReal run on this repo, 2 cycles: both PASS + accepted, `state_changed=true` each cycle (evidence mass accumulating on the damped curve), 11 gaps / 170 modules queued per cycle, distinct queue/re-queue reports per cycle.\n\nWhat did NOT change: orchestrator, promotion loop, gap analyzer, work-queue engine semantics.\n\nTests (tier 2, targeted): `tests/test_loop_runner.py` — full-stage linkage, persisted loop report, 2-cycle evidence accumulation, cycle bounds, synthetic chain-failure stop, queue/re-queue item derivation, CLI JSON + bound rejection (9 tests); `tests/test_command_registry.py` 27 passed; ruff clean. Skill `testing-execution-chain` updated in the same PR.\n\nLink to Devin session: https://app.devin.ai/sessions/8ad1c9ac0d2f4252bb77647f1eabaac7\nRequested by: @plamen-dev",
+    "author": "plamen-dev",
+    "branch_name": "devin/1783003295-loop-runner",
+    "status": "open",
+    "merge_commit_sha": "00541c61bcbbee297120703e276577123a3e194d",
+    "created_at": "2026-07-02T14:42:16Z",
+    "updated_at": "2026-07-02T14:42:19Z",
+    "merged_at": ""
+  },
+  "commits": [
+    {
+      "commit_sha": "f1a9d3b2517022c58735906e885d5e5006e05d36",
+      "author": "plamen.hristov@imsdevlab.onmicrosoft.com",
+      "message": "Loop Runner v1: bounded gap->queue->chain->evidence->re-queue cycles (A1)\n\nCo-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>",
+      "timestamp": "2026-07-02T14:41:35Z"
+    }
+  ],
+  "files": [
+    {
+      "path": ".agents/skills/testing-execution-chain/SKILL.md",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 1
+    },
+    {
+      "path": "src/axiom_cli/main.py",
+      "status": "modified",
+      "additions": 90,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/loop_runner.py",
+      "status": "added",
+      "additions": 271,
+      "deletions": 0
+    },
+    {
+      "path": "src/axiom_core/runner/command_registry.py",
+      "status": "modified",
+      "additions": 38,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_command_registry.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_loop_runner.py",
+      "status": "added",
+      "additions": 175,
+      "deletions": 0
+    }
+  ],
+  "labels": [],
+  "raw_metadata": {
+    "source": "gh api",
+    "fetched_at": "2026-07-02T14:52:25.143470+00:00"
+  }
+}
